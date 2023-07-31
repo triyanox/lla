@@ -4,6 +4,8 @@
 
 `lla` (Lightweight ls Alternative) is an elegant and efficient command-line utility written in Rust, designed to be a fast and minimalistic replacement for the classic "ls" command. Say goodbye to cluttered outputs and embrace a refreshing listing experience with `lla`. Whether you're dealing with small directories or vast file landscapes, `lla` delivers lightning-fast performance with its minimalist design.
 
+<img src="lla.png" alt="lla" width="100%">
+
 ## Features
 
 - **Simplicity & Speed**: `lla` is crafted to be lightweight and lightning-fast, offering a sleek, no-nonsense listing experience.
