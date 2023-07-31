@@ -1,6 +1,6 @@
 [package]
 name = "lla"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "A lightweight ls replacement"
 authors = ["Achaq <hi@achaq.dev>"]
@@ -16,3 +16,7 @@ clap = "3.2.25"
 termion = "2.0.1"
 users = "0.11.0"
 chrono = "0.4.26"
+
+[template]
+exclude = ["lla.png"]
+
