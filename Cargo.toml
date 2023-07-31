@@ -5,6 +5,9 @@ edition = "2021"
 description = "A lightweight ls replacement"
 authors = ["Achaq <hi@achaq.dev>"]
 license = "MIT"
+repository = "https://github.com/triyanox/lla"
+keywords = ["cli", "ls", "lightweight"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
