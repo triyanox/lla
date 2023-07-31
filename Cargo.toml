@@ -1,6 +1,6 @@
 [package]
 name = "lla"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A lightweight ls replacement"
 authors = ["Achaq <hi@achaq.dev>"]

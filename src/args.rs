@@ -25,8 +25,8 @@ pub struct Options {
 }
 
 pub fn parse_args() -> Options {
-    let matches = App::new("ls")
-        .version("1.0")
+    let matches = App::new("lla")
+        .version(std::env!("CARGO_PKG_VERSION"))
         .author("Mohamed Achaq")
         .about("A lightweight ls replacement")
         .arg(
