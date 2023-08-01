@@ -37,7 +37,7 @@ cargo install lla
 ## Usage
 
 ```
-`lla` [FLAGS] [OPTIONS] [DIRECTORY]
+lla [FLAGS] [OPTIONS] [DIRECTORY]
 ```
 
 ### Flags
@@ -94,6 +94,14 @@ lla -f .txt
 
 ```bash
 lla -r -d 3
+```
+
+- Combine flags and options:
+
+```bash
+lla -l -r -s size -f .txt -d 3
+# or
+lla -lrs size -f .txt -d 3
 ```
 
 ## Contributing
