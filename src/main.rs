@@ -1,4 +1,5 @@
 mod args;
+mod error;
 mod filter;
 mod format;
 mod ls;
@@ -37,12 +38,17 @@ fn main() {
         None => Box::new(NoFilter::new()),
     };
 
-    let files = lister.list_files(&options.directory, Some(options.recursive), options.depth);
-    let sorted_files = sorter.sort_files(files);
-    let filtered_files = filter.filter_files(sorted_files);
-    let formatter: Box<dyn FileFormatter> = match options.recursive {
-        true => Box::new(TreeFileFormatter::new()),
-        false => Box::new(DefaultFileFormatter::new()),
-    };
-    formatter.display_files(&filtered_files, Some(options.long_format));
+    let result = lister.list_files(&options.directory, Some(options.recursive), options.depth);
+    match result {
+        Err(e) => eprintln!("{}", e),
+        Ok(files) => {
+            let sorted_files = sorter.sort_files(files);
+            let filtered_files = filter.filter_files(sorted_files);
+            let formatter: Box<dyn FileFormatter> = match options.recursive {
+                true => Box::new(TreeFileFormatter::new()),
+                false => Box::new(DefaultFileFormatter::new()),
+            };
+            formatter.display_files(&filtered_files, Some(options.long_format));
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use crate::error::LlaError;
 use std::fs::{self, Metadata};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::prelude::MetadataExt;
@@ -10,7 +11,7 @@ pub trait FileLister {
         directory: &str,
         recursive: Option<bool>,
         depth: Option<u32>,
-    ) -> Vec<PathBuf>;
+    ) -> Result<Vec<PathBuf>, LlaError>;
 }
 
 pub struct BasicLister;
@@ -27,8 +28,9 @@ impl FileLister for BasicLister {
         directory: &str,
         _recursive: Option<bool>,
         _depth: Option<u32>,
-    ) -> Vec<PathBuf> {
-        let entries = fs::read_dir(directory).unwrap();
+    ) -> Result<Vec<PathBuf>, LlaError> {
+        let entries =
+            fs::read_dir(directory).map_err(|e| LlaError::FailedToReadDir(e.to_string()))?;
         let mut files = Vec::new();
 
         for entry in entries {
@@ -38,7 +40,7 @@ impl FileLister for BasicLister {
             }
         }
 
-        files
+        Ok(files)
     }
 }
 
@@ -97,16 +99,22 @@ impl LongLister {
         file_mode
     }
 
-    pub fn get_user_name(&self, metadata: &Metadata) -> String {
+    pub fn get_user_name(&self, metadata: &Metadata) -> Result<String, LlaError> {
         let uid = metadata.uid();
-        let user = users::get_user_by_uid(uid).unwrap();
-        user.name().to_string_lossy().to_string()
+        let user = users::get_user_by_uid(uid);
+        match user {
+            Some(user) => Ok(user.name().to_string_lossy().to_string()),
+            None => Err(LlaError::FailedToGetUserByUID(uid.to_string())),
+        }
     }
 
-    pub fn get_group_name(&self, metadata: &Metadata) -> String {
+    pub fn get_group_name(&self, metadata: &Metadata) -> Result<String, LlaError> {
         let gid = metadata.gid();
-        let group = users::get_group_by_gid(gid).unwrap();
-        group.name().to_string_lossy().to_string()
+        let group = users::get_group_by_gid(gid);
+        match group {
+            Some(group) => Ok(group.name().to_string_lossy().to_string()),
+            None => Err(LlaError::FailedToGetGroupByGID(gid.to_string())),
+        }
     }
 
     pub fn format_size(&self, size: u64) -> String {
@@ -129,8 +137,9 @@ impl FileLister for LongLister {
         directory: &str,
         _recursive: Option<bool>,
         _depth: Option<u32>,
-    ) -> Vec<PathBuf> {
-        let entries = fs::read_dir(directory).unwrap();
+    ) -> Result<Vec<PathBuf>, LlaError> {
+        let entries =
+            fs::read_dir(directory).map_err(|e| LlaError::FailedToReadDir(e.to_string()))?;
         let mut files = Vec::new();
 
         for entry in entries {
@@ -140,7 +149,7 @@ impl FileLister for LongLister {
             }
         }
 
-        files
+        Ok(files)
     }
 }
 
@@ -158,12 +167,24 @@ impl FileLister for TreeLister {
         directory: &str,
         recursive: Option<bool>,
         depth: Option<u32>,
-    ) -> Vec<PathBuf> {
+    ) -> Result<Vec<PathBuf>, LlaError> {
         if (depth.is_some() && depth.unwrap() == 0) || (recursive.is_some() && !recursive.unwrap())
         {
-            return Vec::new();
+            let entries =
+                fs::read_dir(directory).map_err(|e| LlaError::FailedToReadDir(e.to_string()))?;
+            let mut files = Vec::new();
+
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    files.push(path);
+                }
+            }
+
+            Ok(files)
         } else {
-            let entries = fs::read_dir(directory).unwrap();
+            let entries =
+                fs::read_dir(directory).map_err(|e| LlaError::FailedToReadDir(e.to_string()))?;
             let mut files = Vec::new();
 
             for entry in entries {
@@ -182,18 +203,16 @@ impl FileLister for TreeLister {
                         new_directory.push_str("/");
                         new_directory.push_str(path.file_name().unwrap().to_str().unwrap());
                         files.push(path);
-                        files.append(&mut self.list_files(
-                            &new_directory,
-                            Some(new_recursive),
-                            Some(new_depth),
-                        ));
+                        let mut new_files =
+                            self.list_files(&new_directory, Some(new_recursive), Some(new_depth))?;
+                        files.append(&mut new_files);
                     } else {
                         files.push(path);
                     }
                 }
             }
 
-            files
+            Ok(files)
         }
     }
 }

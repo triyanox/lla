@@ -1,5 +1,7 @@
+use crate::error::LlaError;
 use crate::ls::LongLister;
 use std::collections::HashMap;
+use std::process::exit;
 use std::{fs::Metadata, os::unix::prelude::MetadataExt, path::PathBuf};
 use termion::{color, style};
 
@@ -22,15 +24,35 @@ pub trait FileFormatter {
 
 impl LongFile {
     pub fn new(file: &PathBuf) -> LongFile {
-        let metadata = file.metadata().expect("Failed to get file metadata");
+        let metadata = file
+            .metadata()
+            .map_err(|e| LlaError::FailedToGetMetadata(e.to_string()))
+            .unwrap();
         let file_type = get_file_type(&metadata);
         let permissions = LongLister::new().get_file_permissions(&metadata);
         let links = metadata.nlink();
-        let user = LongLister::new().get_user_name(&metadata);
-        let group = LongLister::new().get_group_name(&metadata);
         let size = metadata.len();
         let date = chrono::DateTime::from(metadata.modified().unwrap());
         let name = file.file_name().unwrap().to_string_lossy().to_string();
+
+        let user: String;
+        let group: String;
+
+        let u = LongLister::new().get_user_name(&metadata);
+        if let Err(e) = u {
+            eprintln!("{}", e);
+            exit(1);
+        } else {
+            user = u.unwrap();
+        }
+
+        let g = LongLister::new().get_group_name(&metadata);
+        if let Err(e) = g {
+            eprintln!("{}", e);
+            exit(1);
+        } else {
+            group = g.unwrap();
+        }
 
         LongFile {
             file_type,
@@ -157,11 +179,16 @@ impl DefaultFileFormatter {
             "docker-compose.yml",
             "docker-compose.yaml",
             "dockerfile",
+            "pnpm-lock.yaml",
+            "pnpmfile.js",
+            ".npmrc",
+            "yarn.lock",
+            "yarn.lock",
         ];
         let is_dir = long_file.file_type == "dir";
         for config_file in config_files_vec {
             if long_file.name == config_file {
-                return color::Fg(color::Rgb(255, 165, 0));
+                return color::Fg(color::Rgb(255, 0, 255));
             }
         }
         if is_dir {

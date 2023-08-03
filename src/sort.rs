@@ -1,3 +1,4 @@
+use crate::error::LlaError;
 use std::fs::Metadata;
 use std::path::PathBuf;
 
@@ -64,14 +65,21 @@ impl DateSorter {
 impl FileSorter for DateSorter {
     fn sort_files(&self, mut files: Vec<PathBuf>) -> Vec<PathBuf> {
         files.sort_by(|a, b| {
-            let date_a = self.get_modification_date(a).unwrap_or_else(|| {
-                panic!("Failed to get modification date for file {:?}", a);
-            });
-            let date_b = self.get_modification_date(b).unwrap_or_else(|| {
-                panic!("Failed to get modification date for file {:?}", b);
-            });
-            date_a.modified().unwrap().cmp(&date_b.modified().unwrap())
+            let date_a = self
+                .get_modification_date(a)
+                .ok_or_else(|| LlaError::FailedToGetMetadata(a.to_string_lossy().to_string()));
+            let date_b = self
+                .get_modification_date(b)
+                .ok_or_else(|| LlaError::FailedToGetMetadata(b.to_string_lossy().to_string()));
+            date_a
+                .map_err(|e| eprintln!("{}", e))
+                .unwrap_or_else(|_| std::process::exit(1))
+                .modified()
+                .map_err(|e| eprintln!("{}", e))
+                .unwrap_or_else(|_| std::process::exit(1))
+                .cmp(&date_b.unwrap().modified().unwrap())
         });
+
         files
     }
 }

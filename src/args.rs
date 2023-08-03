@@ -38,6 +38,7 @@ pub fn parse_args() -> Options {
         .arg(
             Arg::with_name("long")
                 .short('l')
+                .long("long")
                 .help("Use a long listing format"),
         )
         .arg(
