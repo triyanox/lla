@@ -34,6 +34,13 @@ cargo install lla
 
 3. **Ready to Use**: Once the installation is complete, you can start using `lla` immediately. Simply type ``lla`` in your terminal, and let the magic begin!
 
+### NetBSD
+
+On NetBSD, a pre-compiled binary is available from the official repositories. To install it, simply run:
+```bash
+pkgin install lla
+```
+
 ## Usage
 
 ```
