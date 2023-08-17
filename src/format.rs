@@ -1,6 +1,5 @@
 use crate::error::LlaError;
 use crate::ls::LongLister;
-use std::collections::HashMap;
 use std::process::exit;
 use std::{fs::Metadata, os::unix::prelude::MetadataExt, path::PathBuf};
 use termion::{color, style};
@@ -198,52 +197,96 @@ impl DefaultFileFormatter {
     }
 }
 
+#[derive(Clone)]
+pub struct FSTreeItem {
+    pub name: String,
+    pub children: Vec<FSTreeItem>,
+    pub type_: String,
+}
+
 impl TreeFileFormatter {
     pub fn new() -> TreeFileFormatter {
         TreeFileFormatter
     }
 
-    pub fn build_map(&self, files: &[PathBuf]) -> HashMap<String, Vec<String>> {
-        let mut map: HashMap<String, Vec<String>> = HashMap::new();
-        for file in files {
-            let parent = file.parent().unwrap().to_string_lossy().to_string();
-            let child_name = match file.file_name() {
-                Some(name) => name.to_string_lossy().to_string(),
-                None => continue,
-            };
-            map.entry(parent).or_insert(Vec::new()).push(child_name);
-        }
-        let sorted_map: HashMap<String, Vec<String>> = map
-            .into_iter()
-            .map(|(k, mut v)| {
-                v.sort();
-                (k, v)
-            })
-            .collect();
+    pub fn display_files_tree_format(&self, files: &[PathBuf]) {
+        let mut root = FSTreeItem {
+            name: ".".to_string(),
+            children: Vec::new(),
+            type_: "dir".to_string(),
+        };
 
-        let merged_map: HashMap<String, Vec<String>> = sorted_map
-            .into_iter()
-            .map(|(k, v)| {
-                let mut new_k = k.clone();
-                if new_k == "." {
-                    new_k = String::from("root");
+        for file in files {
+            let path = file.clone();
+            let mut current_node = &mut root;
+
+            for component in path.components() {
+                let component_name = component.as_os_str().to_str().unwrap().to_string();
+                let child_index = current_node
+                    .children
+                    .iter()
+                    .position(|c| c.name == component_name);
+
+                if let Some(index) = child_index {
+                    current_node = &mut current_node.children[index];
+                } else {
+                    let path_buf = PathBuf::from(component_name.clone());
+                    let new_node = FSTreeItem {
+                        name: component_name.clone(),
+                        children: Vec::new(),
+                        type_: path_buf
+                            .is_dir()
+                            .then(|| "dir".to_string())
+                            .unwrap_or("file".to_string()),
+                    };
+                    current_node.children.push(new_node);
+                    let new_index = current_node.children.len() - 1;
+                    current_node = &mut current_node.children[new_index];
                 }
-                (new_k, v)
-            })
-            .collect();
-        merged_map
+            }
+        }
+        self.print_tree(&root, 0, true);
+    }
+
+    fn get_file_color(&self, file_type: &str) -> termion::color::Fg<termion::color::Rgb> {
+        match file_type {
+            "file" => color::Fg(color::Rgb(255, 255, 255)),
+            "dir" => color::Fg(color::Rgb(0, 255, 255)),
+            "link" => color::Fg(color::Rgb(255, 255, 0)),
+            _ => color::Fg(color::Rgb(255, 0, 255)),
+        }
+    }
+
+    fn print_tree(&self, tree: &FSTreeItem, depth: usize, is_last: bool) {
+        let mut prefix = String::new();
+
+        for _ in 0..depth {
+            prefix.push_str("│   ");
+        }
+        if depth > 0 {
+            prefix.push_str(if is_last { "└── " } else { "├── " });
+        }
+
+        prefix.push_str(&tree.name);
+        let reset_color = color::Fg(color::Reset);
+        println!("{}", prefix);
+
+        for (i, child) in tree.children.iter().enumerate() {
+            let type_color = self.get_file_color(&child.type_);
+            let is_last_child = i == tree.children.len() - 1;
+            let mut child = child.clone();
+            child.name = if is_last_child {
+                format!("{}{}{}{}", "└── ", type_color, child.name, reset_color)
+            } else {
+                format!("{}{}{}{}", "├── ", type_color, child.name, reset_color)
+            };
+            self.print_tree(&child, depth + 1, is_last_child);
+        }
     }
 }
 
 impl FileFormatter for TreeFileFormatter {
     fn display_files(&self, files: &[PathBuf], _long: Option<bool>) {
-        let map = self.build_map(files);
-        for (key, value) in map.iter() {
-            println!("{}{}:", color::Fg(color::Cyan), key);
-            for child in value {
-                print!("  ");
-                println!("{}{}", color::Fg(color::Reset), child);
-            }
-        }
+        self.display_files_tree_format(files);
     }
 }
