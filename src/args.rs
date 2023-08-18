@@ -22,6 +22,7 @@ pub struct Options {
     pub filter: Option<FilterBy>,
     pub recursive: bool,
     pub depth: Option<u32>,
+    pub git: bool,
 }
 
 pub fn parse_args() -> Options {
@@ -71,6 +72,12 @@ pub fn parse_args() -> Options {
                 .takes_value(true)
                 .value_name("DEPTH"),
         )
+        .arg(
+            Arg::with_name("git")
+                .short('g')
+                .long("git")
+                .help("Show git status"),
+        )
         .get_matches();
 
     let directory = matches.value_of("directory").unwrap().to_string();
@@ -99,6 +106,7 @@ pub fn parse_args() -> Options {
         },
         None => None,
     };
+    let git = matches.is_present("git");
 
     Options {
         directory,
@@ -107,5 +115,6 @@ pub fn parse_args() -> Options {
         filter,
         recursive,
         depth,
+        git,
     }
 }

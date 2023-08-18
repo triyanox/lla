@@ -5,13 +5,12 @@ mod format;
 mod ls;
 mod sort;
 
+use crate::filter::NoFilter;
 use args::{parse_args, FilterBy, SortBy};
 use filter::FileFilter;
-use format::{DefaultFileFormatter, TreeFileFormatter};
+use format::{DefaultFileFormatter, FileFormatter, TreeFileFormatter};
 use ls::FileLister;
 use sort::FileSorter;
-
-use crate::{filter::NoFilter, format::FileFormatter};
 
 fn main() {
     let options = parse_args();
@@ -48,7 +47,11 @@ fn main() {
                 true => Box::new(TreeFileFormatter::new()),
                 false => Box::new(DefaultFileFormatter::new()),
             };
-            formatter.display_files(&filtered_files, Some(options.long_format));
+            formatter.display_files(
+                &filtered_files,
+                Some(options.long_format),
+                Some(options.git),
+            );
         }
     }
 }
