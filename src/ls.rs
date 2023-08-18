@@ -129,6 +129,39 @@ impl LongLister {
 
         format!("{:.1} {}", size, sizes[idx])
     }
+
+    pub fn get_git_status(&self, path: &str) -> String {
+        let repo = git2::Repository::open_from_env().unwrap();
+        let mut status_options = git2::StatusOptions::new();
+        status_options.include_untracked(true);
+        let binding = repo.statuses(Some(&mut status_options)).unwrap();
+
+        let statuses = binding.iter().filter(|e| {
+            if let Some(e_path) = e.path() {
+                e_path == path && !e.status().contains(git2::Status::WT_NEW)
+            } else {
+                false
+            }
+        });
+
+        let mut status_str = String::new();
+
+        for status in statuses {
+            match status.status() {
+                s if s.contains(git2::Status::WT_MODIFIED) => status_str.push_str("M"),
+                s if s.contains(git2::Status::INDEX_MODIFIED) => status_str.push_str("M"),
+                s if s.contains(git2::Status::WT_DELETED) => status_str.push_str("D"),
+                s if s.contains(git2::Status::INDEX_DELETED) => status_str.push_str("D"),
+                s if s.contains(git2::Status::WT_RENAMED) => status_str.push_str("R"),
+                s if s.contains(git2::Status::INDEX_RENAMED) => status_str.push_str("R"),
+                s if s.contains(git2::Status::WT_TYPECHANGE) => status_str.push_str("C"),
+                s if s.contains(git2::Status::INDEX_TYPECHANGE) => status_str.push_str("C"),
+                _ => status_str.push_str("?"),
+            }
+        }
+
+        status_str
+    }
 }
 
 impl FileLister for LongLister {
