@@ -131,6 +131,9 @@ impl LongLister {
     }
 
     pub fn get_git_status(&self, path: &str) -> String {
+        if (git2::Repository::open_from_env()).is_err() {
+            return String::new();
+        }
         let repo = git2::Repository::open_from_env().unwrap();
         let mut status_options = git2::StatusOptions::new();
         status_options.include_untracked(true);
