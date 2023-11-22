@@ -43,7 +43,7 @@ pub fn parse_args() -> Options {
                 .help("Use a long listing format"),
         )
         .arg(
-            Arg::with_name("sort")
+            Arg::new("sort")
                 .short('s')
                 .long("sort")
                 .help("Sort by name, size, or date")
@@ -51,7 +51,7 @@ pub fn parse_args() -> Options {
                 .possible_values(&["name", "size", "date"]),
         )
         .arg(
-            Arg::with_name("filter")
+            Arg::new("filter")
                 .short('f')
                 .long("filter")
                 .help("Filter by extension or pattern")
@@ -59,13 +59,13 @@ pub fn parse_args() -> Options {
                 .value_name("FILTER"),
         )
         .arg(
-            Arg::with_name("recursive")
+            Arg::new("recursive")
                 .short('r')
                 .long("recursive")
                 .help("List subdirectories recursively"),
         )
         .arg(
-            Arg::with_name("depth")
+            Arg::new("depth")
                 .short('d')
                 .long("depth")
                 .help("Maximum depth of recursion")
@@ -73,7 +73,7 @@ pub fn parse_args() -> Options {
                 .value_name("DEPTH"),
         )
         .arg(
-            Arg::with_name("git")
+            Arg::new("git")
                 .short('g')
                 .long("git")
                 .help("Show git status"),

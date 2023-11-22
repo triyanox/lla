@@ -53,6 +53,9 @@ lla [FLAGS] [OPTIONS] [DIRECTORY]
 
 - `-r`, `--recursive`: Explore subdirectories recursively.
 
+- `-g`, `--git` : Show git status of files.
+
+
 ### Options
 
 - `-s`, `--sort [SORT_BY]`: Sort files by name, size, or date. Values for SORT_BY: "name", "size", or "date".
@@ -60,6 +63,10 @@ lla [FLAGS] [OPTIONS] [DIRECTORY]
 - `-f`, `--filter [FILTER_BY]`: Filter files by extension or pattern. Dot (.) prefix for extension filtering.
 
 - `-d`, `--depth [DEPTH]`: Set the maximum depth of recursion when using recursive mode.
+
+- `-h`, `--help`: Prints help information.
+
+- `-V`, `--version`: Prints version information.
 
 ### Arguments
 
