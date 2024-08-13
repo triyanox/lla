@@ -2,7 +2,7 @@
 
 `lla` is a high-performance, extensible alternative to the traditional `ls` command, written in Rust. It offers enhanced functionality, customizable output, and a plugin system for extended capabilities.
 
-![lla in action](lla.png)
+![lla in action](https://github.com/triyanox/lla/blob/main/lla.png?raw=true)
 
 ## Features
 
@@ -18,9 +18,6 @@
   - Modification date (`-s date`)
 - **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
 - **Customizable recursion**: Set maximum depth for subdirectory traversal (`-d, --depth`)
-- **Git integration**: Display Git status for repository files
-- **Directory analytics**: File counts and total sizes for directories
-- **File integrity**: SHA1 and SHA256 hash generation for files
 - **Extensible plugin system**: Develop and integrate custom functionality
 
 ## Installation
