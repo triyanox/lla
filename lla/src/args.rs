@@ -103,8 +103,8 @@ impl Args {
                 SubCommand::with_name("install")
                     .about("Install a plugin")
                     .arg(
-                        Arg::with_name("github")
-                            .long("github")
+                        Arg::with_name("git")
+                            .long("git")
                             .takes_value(true)
                             .help("Install a plugin from a GitHub repository URL"),
                     )
@@ -134,7 +134,7 @@ impl Args {
         };
 
         let command = if let Some(install_matches) = matches.subcommand_matches("install") {
-            if let Some(github_url) = install_matches.value_of("github") {
+            if let Some(github_url) = install_matches.value_of("git") {
                 Some(Command::Install(InstallSource::GitHub(
                     github_url.to_string(),
                 )))

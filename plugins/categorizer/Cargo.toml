@@ -1,0 +1,12 @@
+[package]
+name = "categorizer"
+description = "Categorizer plugin for LLA"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.0.0"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+
+[lib]
+crate-type = ["cdylib"]

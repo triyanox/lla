@@ -32,7 +32,7 @@ fn main() -> Result<()> {
         Some(Command::Install(source)) => {
             let plugin_installer = PluginInstaller::new(&args.plugins_dir);
             match source {
-                InstallSource::GitHub(url) => install_plugin_from_github(&plugin_installer, &url),
+                InstallSource::GitHub(url) => install_plugin_from_git(&plugin_installer, &url),
                 InstallSource::LocalDir(dir) => {
                     install_plugin_from_directory(&plugin_installer, &dir)
                 }
@@ -189,8 +189,8 @@ fn filter_files(files: Vec<PathBuf>, filter: &Arc<dyn FileFilter + Send + Sync>)
         .collect()
 }
 
-fn install_plugin_from_github(installer: &PluginInstaller, url: &str) -> Result<()> {
-    installer.install_from_github(url)?;
+fn install_plugin_from_git(installer: &PluginInstaller, url: &str) -> Result<()> {
+    installer.install_from_git(url)?;
     println!("Plugin(s) installed successfully from GitHub");
     Ok(())
 }

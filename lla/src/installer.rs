@@ -15,7 +15,7 @@ impl PluginInstaller {
         }
     }
 
-    pub fn install_from_github(&self, url: &str) -> Result<()> {
+    pub fn install_from_git(&self, url: &str) -> Result<()> {
         let temp_dir = tempfile::tempdir()?;
         let repo_name = url
             .split('/')

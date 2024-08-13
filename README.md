@@ -59,7 +59,7 @@ lla [OPTIONS] [DIRECTORY]
 ### Utility Commands
 
 - `lla install`: Install plugins
-  - `--github <URL>`: Install from a GitHub repository
+  - `--git <URL>`: Install from a Git repository
   - `--dir <PATH>`: Install from a local directory
 - `lla list-plugins`: Display all available plugins
 - `lla init`: Initialize configuration file
@@ -84,23 +84,23 @@ default_depth = 3
 
 ## Install Plugins
 
-You can instll plugins from a local directory or from a GitHub repository.
+You can instll plugins from a local directory or from a Git repository.
 
-### From GitHub
+You can find official plugins [here](
+    https://github.com/triyanox/lla/blob/main/plugins.md
+).
+
+
+### From Git
 
 ```bash
-lla install --github <github_url>
+lla install --git <github_url>
 ```
 
 ### From Local Directory
 
 ```bash
 lla install --dir <path>
-```
-You can install official plugins by running the following command:
-
-```bash
-lla install --github https://github.com/triyanox/lla/tree/main
 ```
 
 ## Plugin Development
@@ -140,7 +140,7 @@ impl Plugin for MyPlugin {
     }
 
     fn description(&self) -> &'static str {
-        "My custom lla plugin"
+        env!("CARGO_PKG_DESCRIPTION")
     }
 }
 
@@ -163,6 +163,7 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
 
 4. Build your plugin:
    ```bash
+   cargo add lla_plugin_interface
    cargo build --release
    ```
 
@@ -170,6 +171,11 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
    ```bash
    lla install --dir /path/to/my_lla_plugin
    ```
+    or
+    ```bash
+    lla install --git <git_repo>
+    ```
+
 
 ### Plugin Interface
 
@@ -189,9 +195,13 @@ lla -ls size -f .rs -d 3
 
 # enable git status plugin
 lla --enable-plugin git_status
+# or for multiple plugins
+lla --enable-plugin git_status categorizer
 
 # disanble git status plugin
 lla --disable-plugin git_status
+# or for multiple plugins
+lla --disable-plugin git_status categorizer
 ```
 
 ## Contributing
@@ -199,11 +209,11 @@ lla --disable-plugin git_status
 Contributions are welcome! Please feel free to submit pull requests, report bugs, and suggest features.
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create your feature branch (`git checkout -b feature/new-feature`)
+3. Commit your changes (`git commit -m 'Add some new-feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
 5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/triyanox/lla/blob/main/LICENSE) file for details.
