@@ -36,8 +36,9 @@ cargo install lla
 ```bash
 pkgin install lla
 ```
+(we see you, netbsd. we appreciate you.)
 
-## Usage
+## how to play
 
 ```
 lla [OPTIONS] [DIRECTORY]
