@@ -1,0 +1,11 @@
+[package]
+name = "file_meta"
+description = "Displays the file metadata of each file"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+chrono = '0.4.38'
+[lib]
+crate-type = ["cdylib"]

@@ -1,0 +1,14 @@
+[package]
+name = "file_hash"
+description = "Displays the hash of each file"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sha1 = "0.10.1"
+sha2 = "0.10.2"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+colored = "2.0.0"
+
+[lib]
+crate-type = ["cdylib"]

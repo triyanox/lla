@@ -1,0 +1,13 @@
+[package]
+name = "dirs"
+description = "Shows directories metadata"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.0.0"
+walkdir = "2.3.2"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+
+[lib]
+crate-type = ["cdylib"]
