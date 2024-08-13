@@ -20,7 +20,12 @@ impl CodeComplexityEstimatorPlugin {
         for line in reader.lines() {
             if let Ok(content) = line {
                 lines += 1;
-                if content.contains("fn ") || content.contains("function ") || content.contains("def ")  || content.contains("class ") || content.contains("struct ") {
+                if content.contains("fn ")
+                    || content.contains("function ")
+                    || content.contains("def ")
+                    || content.contains("class ")
+                    || content.contains("struct ")
+                {
                     functions += 1;
                 }
                 if content.contains("if ")
@@ -67,7 +72,7 @@ impl EntryDecorator for CodeComplexityEstimatorPlugin {
     fn decorate(&self, entry: &mut DecoratedEntry) {
         if entry.path.is_file() {
             if let Some(ext) = entry.path.extension() {
-                if ["rs", "py", "js", "java", "c", "cpp", "go", 'ts']
+                if ["rs", "py", "js", "java", "c", "cpp", "go", "ts"]
                     .contains(&ext.to_str().unwrap_or(""))
                 {
                     if let Some((lines, functions, branches)) =
