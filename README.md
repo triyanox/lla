@@ -85,6 +85,27 @@ plugins_dir = "/home/user/.config/lla/plugins"
 default_depth = 3
 ```
 
+## Install Plugins
+
+You can instll plugins from a local directory or from a GitHub repository.
+
+### From GitHub
+
+```bash
+lla install --github <github_url>
+```
+
+### From Local Directory
+
+```bash
+lla install --dir <path>
+```
+You can install official plugins by running the following command:
+
+```bash
+lla install --github https://github.com/triyanox/lla/tree/main
+```
+
 ## Plugin Development
 
 Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libraries that implement the `Plugin` trait from the `lla_plugin_interface` crate.
