@@ -342,6 +342,8 @@ dependencies = [
 [[package]]
 name = "lla_plugin_interface"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bc7b852a2defeac7e472c4bff9f99bffc3fe1a11ddc59c8f21be30842f2b755"
 
 [[package]]
 name = "log"
