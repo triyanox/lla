@@ -4,4 +4,4 @@ version = 3
 
 [[package]]
 name = "lla_plugin_interface"
-version = "0.1.0"
+version = "0.1.1"

@@ -1,9 +1,18 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct DecoratedEntry {
     pub path: PathBuf,
     pub metadata: std::fs::Metadata,
-    pub custom_fields: std::collections::HashMap<String, String>,
+    pub custom_fields: HashMap<String, String>,
+}
+
+pub struct CliArg {
+    pub name: String,
+    pub short: Option<char>,
+    pub long: Option<String>,
+    pub help: String,
+    pub takes_value: bool,
 }
 
 pub trait EntryDecorator: Send + Sync {
@@ -18,6 +27,14 @@ pub trait EntryDecorator: Send + Sync {
 pub trait Plugin: EntryDecorator {
     fn version(&self) -> &'static str;
     fn description(&self) -> &'static str;
+
+    fn cli_args(&self) -> Vec<CliArg> {
+        Vec::new()
+    }
+    fn handle_cli_args(&self, _args: &[String]) {}
+    fn perform_action(&self, _action: &str, _args: &[String]) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[macro_export]
