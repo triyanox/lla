@@ -14,12 +14,14 @@ pub struct Args {
     pub plugins_dir: PathBuf,
     pub depth: Option<usize>,
     pub command: Option<Command>,
+    pub plugin_args: Vec<String>,
 }
 
 pub enum Command {
     Install(InstallSource),
     ListPlugins,
     InitConfig,
+    PluginAction(String, String, Vec<String>),
 }
 
 pub enum InstallSource {
@@ -115,6 +117,41 @@ impl Args {
                             .help("Install a plugin from a local directory"),
                     ),
             )
+            .arg(
+                Arg::with_name("plugin-arg")
+                    .long("plugin-arg")
+                    .takes_value(true)
+                    .multiple(true)
+                    .help("Arguments to pass to enabled plugins"),
+            )
+            .subcommand(
+                SubCommand::with_name("plugin")
+                    .about("Run a plugin action")
+                    .arg(
+                        Arg::with_name("name")
+                            .long("name")
+                            .short('n')
+                            .takes_value(true)
+                            .required(true)
+                            .help("Name of the plugin"),
+                    )
+                    .arg(
+                        Arg::with_name("action")
+                            .long("action")
+                            .short('a')
+                            .takes_value(true)
+                            .required(true)
+                            .help("Action to perform"),
+                    )
+                    .arg(
+                        Arg::with_name("args")
+                            .long("args")
+                            .short('r')
+                            .takes_value(true)
+                            .multiple(true)
+                            .help("Arguments for the plugin action"),
+                    ),
+            )
             .subcommand(SubCommand::with_name("list-plugins").about("List all available plugins"))
             .subcommand(SubCommand::with_name("init").about("Initialize the configuration file"))
             .get_matches();
@@ -149,6 +186,14 @@ impl Args {
             Some(Command::ListPlugins)
         } else if matches.subcommand_matches("init").is_some() {
             Some(Command::InitConfig)
+        } else if let Some(plugin_matches) = matches.subcommand_matches("plugin") {
+            let plugin_name = plugin_matches.value_of("name").unwrap().to_string();
+            let action = plugin_matches.value_of("action").unwrap().to_string();
+            let args = plugin_matches
+                .values_of("args")
+                .map(|v| v.map(String::from).collect())
+                .unwrap_or_default();
+            Some(Command::PluginAction(plugin_name, action, args))
         } else {
             None
         };
@@ -180,6 +225,10 @@ impl Args {
                 .map(|d| d.parse().unwrap())
                 .or(config.default_depth),
             command,
+            plugin_args: matches
+                .values_of("plugin-arg")
+                .map(|v| v.map(String::from).collect())
+                .unwrap_or_default(),
         }
     }
 }

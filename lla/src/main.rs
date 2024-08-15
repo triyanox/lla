@@ -28,6 +28,9 @@ fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
     let args = Args::parse(&config);
 
+    let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
+    plugin_manager.handle_plugin_args(&args.plugin_args);
+
     match args.command {
         Some(Command::Install(source)) => {
             let plugin_installer = PluginInstaller::new(&args.plugins_dir);
@@ -38,14 +41,12 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Some(Command::ListPlugins) => {
-            let plugin_manager = initialize_plugin_manager(&args, &config)?;
-            list_plugins(&plugin_manager)
-        }
+        Some(Command::ListPlugins) => list_plugins(&plugin_manager),
         Some(Command::InitConfig) => initialize_config(),
+        Some(Command::PluginAction(plugin_name, action, action_args)) => {
+            plugin_manager.perform_plugin_action(&plugin_name, &action, &action_args)
+        }
         None => {
-            let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
-
             if let Some(error) = config_error {
                 eprintln!("Warning: {}", error);
             }
@@ -103,7 +104,6 @@ fn main() -> Result<()> {
         }
     }
 }
-
 fn load_config() -> Result<(Config, Option<LlaError>)> {
     match Config::load(&Config::get_config_path()) {
         Ok(config) => Ok((config, None)),

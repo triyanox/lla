@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::{LlaError, Result};
 use libloading::{Library, Symbol};
-use lla_plugin_interface::Plugin;
+use lla_plugin_interface::{CliArg, Plugin};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,6 +26,47 @@ impl PluginManager {
         }
     }
 
+    pub fn handle_plugin_args(&self, args: &[String]) {
+        for (name, plugin) in &self.plugins {
+            if self.enabled_plugins.contains(name) {
+                plugin.handle_cli_args(args);
+            }
+        }
+    }
+
+    pub fn perform_plugin_action(
+        &self,
+        plugin_name: &str,
+        action: &str,
+        args: &[String],
+    ) -> Result<()> {
+        if let Some(plugin) = self.plugins.get(plugin_name) {
+            if self.enabled_plugins.contains(plugin_name) {
+                plugin
+                    .perform_action(action, args)
+                    .map_err(|e| LlaError::Plugin(e))
+            } else {
+                Err(LlaError::Plugin(format!(
+                    "Plugin '{}' is not enabled",
+                    plugin_name
+                )))
+            }
+        } else {
+            Err(LlaError::Plugin(format!(
+                "Plugin '{}' not found",
+                plugin_name
+            )))
+        }
+    }
+
+    pub fn get_cli_args(&self) -> Vec<CliArg> {
+        self.plugins
+            .iter()
+            .filter(|(name, _)| self.enabled_plugins.contains(*name))
+            .flat_map(|(_, plugin)| plugin.cli_args())
+            .collect()
+    }
+
     pub fn list_plugins(&self) -> Vec<(&str, &str, &str)> {
         self.plugins
             .values()
@@ -36,7 +77,7 @@ impl PluginManager {
     pub fn load_plugin<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         let path = path.as_ref().canonicalize()?;
         if self.loaded_paths.contains(&path) {
-            return Ok(()); // Plugin already loaded, skip
+            return Ok(());
         }
 
         unsafe {
