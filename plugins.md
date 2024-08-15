@@ -1,6 +1,6 @@
 # LLA Plugins
 
-A list of all available plugins for LLA and installation instructions.
+This document lists all available plugins for LLA and provides installation instructions.
 
 ## Installation
 
@@ -13,6 +13,28 @@ lla install --git https://github.com/triyanox/lla
 Or you can install individual plugins as described below.
 
 ## Available Plugins
+
+### last_git_commit
+
+**Description:** A plugin for the LLA that provides the last git commit hash
+
+**Version:** 0.1.0
+
+**Installation Options:**
+
+1. Using LLA install command:
+```bash
+lla install --dir path/to/lla/plugins/last_git_commit
+```
+
+2. Manual installation:
+```bash
+git clone https://github.com/triyanox/lla
+cd lla/plugins/last_git_commit
+cargo build --release
+```
+
+Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
 
 ### file_type
 
@@ -124,6 +146,28 @@ cargo build --release
 
 Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
 
+### duplicate_file_detector
+
+**Description:** A plugin for the LLA that detects duplicate files.
+
+**Version:** 0.1.0
+
+**Installation Options:**
+
+1. Using LLA install command:
+```bash
+lla install --dir path/to/lla/plugins/duplicate_file_detector
+```
+
+2. Manual installation:
+```bash
+git clone https://github.com/triyanox/lla
+cd lla/plugins/duplicate_file_detector
+cargo build --release
+```
+
+Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
+
 ### keyword_searcher
 
 **Description:** Searches for specific keywords within text-based files
@@ -141,6 +185,28 @@ lla install --dir path/to/lla/plugins/keyword_searcher
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/keyword_searcher
+cargo build --release
+```
+
+Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
+
+### keyword_search
+
+**Description:** Searches file contents for user-specified keywords
+
+**Version:** 0.1.0
+
+**Installation Options:**
+
+1. Using LLA install command:
+```bash
+lla install --dir path/to/lla/plugins/keyword_search
+```
+
+2. Manual installation:
+```bash
+git clone https://github.com/triyanox/lla
+cd lla/plugins/keyword_search
 cargo build --release
 ```
 
