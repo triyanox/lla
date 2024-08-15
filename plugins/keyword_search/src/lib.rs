@@ -117,7 +117,7 @@ impl Plugin for KeywordSearchPlugin {
 
 impl EntryDecorator for KeywordSearchPlugin {
     fn name(&self) -> &'static str {
-        "keyword_search"
+        env!("CARGO_PKG_NAME")
     }
 
     fn decorate(&self, entry: &mut DecoratedEntry) {
