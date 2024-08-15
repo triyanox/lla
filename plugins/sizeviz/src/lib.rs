@@ -56,7 +56,7 @@ impl EntryDecorator for FileSizeVisualizerPlugin {
         match format {
             "long" | "tree" => {
                 let size = entry.custom_fields.get("size")?.parse::<u64>().ok()?;
-                let max_size = 1_073_741_824; // 1 GB
+                let max_size = 1_073_741_824;
                 let bar = Self::size_to_bar(size, max_size, 10);
                 let color = Self::size_to_color(size);
                 Some(bar.color(color).to_string())

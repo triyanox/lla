@@ -1,0 +1,13 @@
+[package]
+name = "duplicate_file_detector"
+description = "A plugin for the LLA that detects duplicate files."
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.0.0"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+sha2 = "0.9.5"
+
+[lib]
+crate-type = ["cdylib"]

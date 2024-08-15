@@ -1,0 +1,13 @@
+[package]
+name = "keyword_search"
+description = "Searches file contents for user-specified keywords"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.0.0"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+sha2 = "0.9.5"
+
+[lib]
+crate-type = ["cdylib"]
