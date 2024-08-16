@@ -6,19 +6,32 @@
 
 ## Features
 
-- **Efficient file listing**: Optimized for speed, even in large directories
-- **Multiple view modes**: 
-  - Default view
-  - Long format (`-l`)
-  - Tree view (`-t`)
-  - Recursive listing (`-R`)
-- **Advanced sorting**: 
-  - Alphabetical (default)
-  - File size (`-s size`)
-  - Modification date (`-s date`)
-- **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
-- **Customizable recursion**: Set maximum depth for subdirectory traversal (`-d, --depth`)
-- **Extensible plugin system**: Develop and integrate custom functionality
+* **Efficient file listing**: Optimized for speed, even in large directories
+* **Multiple view modes**:
+   * Default view
+   * Long format (`-l`)
+   * Tree view (`-t`)
+   * Recursive listing (`-R`)
+* **Advanced sorting**:
+   * Alphabetical (default)
+   * File size (`-s size`)
+   * Modification date (`-s date`)
+* **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
+* **Customizable recursion**: Set maximum depth for subdirectory traversal
+* **Extensible plugin system**: Develop and integrate custom functionality
+* **Color-coded output**: Easily distinguish file types and permissions
+* **Git integration**: Show git status for files (with plugin)
+* **File categorization**: Categorize files by type (with plugin)
+* **Keyword search**: Search file contents for specified keywords (with plugin)
+* **File hash display**: Show file hashes (with plugin)
+* **Code complexity analysis**: Analyze code complexity (with plugin)
+* **File size visualization**: Visualize file sizes (with plugin)
+* **Duplicate file detection**: Identify duplicate files (with plugin)
+* **Directory metadata**: Display detailed directory information (with plugin)
+* **File metadata**: Show extended file metadata (with plugin)
+* **Last git commit info**: Display information about the last git commit (with plugin)
+
+and more!
 
 ## Installation
 
@@ -35,7 +48,16 @@ pkgin install lla
 ```
 (we see you, netbsd. we appreciate you.)
 
-## how to play
+## Usage
+
+First you need to initialize the configuration file:
+
+```bash
+lla init
+```
+
+Then you can start using `lla`:
+
 
 ```
 lla [OPTIONS] [DIRECTORY]
@@ -55,6 +77,19 @@ lla [OPTIONS] [DIRECTORY]
 - `--enable-plugin <NAME>`: Enable a specific plugin
 - `--disable-plugin <NAME>`: Disable a specific plugin
 - `--plugins-dir <PATH>`: Specify custom plugins directory
+- `--plugin-arg <ARG>`: Pass arguments to enabled plugins
+
+### Plugin Actions
+
+`lla` supports plugin-specific actions, allowing you to interact with plugins directly:
+
+```
+lla plugin --name <PLUGIN_NAME> --action <ACTION_NAME> [--args <ARG1> <ARG2> ...]
+```
+
+- `--name <PLUGIN_NAME>`: Specify the name of the plugin
+- `--action <ACTION_NAME>`: Specify the action to perform
+- `--args <ARG1> <ARG2> ...`: Provide arguments for the action (optional)
 
 ### Utility Commands
 
@@ -84,12 +119,9 @@ default_depth = 3
 
 ## Install Plugins
 
-You can instll plugins from a local directory or from a Git repository.
+You can install plugins from a local directory or from a Git repository.
 
-You can find official plugins [here](
-    https://github.com/triyanox/lla/blob/main/plugins.md
-).
-
+You can find official plugins [here](https://github.com/triyanox/lla/blob/main/plugins.md).
 
 ### From Git
 
@@ -117,7 +149,7 @@ Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libr
 2. Add dependencies to `Cargo.toml`:
    ```toml
    [dependencies]
-   lla_plugin_interface = { path = "/path/to/lla_plugin_interface" }
+   lla_plugin_interface = "*"
    
    [lib]
    crate-type = ["cdylib"]
@@ -126,7 +158,7 @@ Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libr
 3. Implement the `Plugin` trait:
 
 ```rust
-use lla_plugin_interface::{Plugin, DecoratedEntry, EntryDecorator};
+use lla_plugin_interface::{Plugin, DecoratedEntry, EntryDecorator, CliArg};
 
 pub struct MyPlugin;
 
@@ -141,6 +173,32 @@ impl Plugin for MyPlugin {
 
     fn description(&self) -> &'static str {
         env!("CARGO_PKG_DESCRIPTION")
+    }
+
+    fn cli_args(&self) -> Vec<CliArg> {
+        vec![
+            CliArg {
+                name: "my-option".to_string(),
+                short: Some('m'),
+                long: Some("my-option".to_string()),
+                help: "Description of my option".to_string(),
+                takes_value: true,
+            }
+        ]
+    }
+
+    fn handle_cli_args(&self, args: &[String]) {
+        // Handle CLI arguments passed to the plugin
+    }
+
+    fn perform_action(&self, action: &str, args: &[String]) -> Result<(), String> {
+        match action {
+            "my-action" => {
+                // Perform custom action
+                Ok(())
+            }
+            _ => Err(format!("Unknown action: {}", action)),
+        }
     }
 }
 
@@ -163,7 +221,6 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
 
 4. Build your plugin:
    ```bash
-   cargo add lla_plugin_interface
    cargo build --release
    ```
 
@@ -171,11 +228,10 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
    ```bash
    lla install --dir /path/to/my_lla_plugin
    ```
-    or
-    ```bash
-    lla install --git <git_repo>
-    ```
-
+   or
+   ```bash
+   lla install --git <git_repo>
+   ```
 
 ### Plugin Interface
 
@@ -184,24 +240,34 @@ The `lla_plugin_interface` crate provides the following key components:
 - `Plugin` trait: Core interface for plugin functionality
 - `EntryDecorator` trait: Methods for decorating and formatting file entries
 - `DecoratedEntry` struct: Represents a file entry with metadata and custom fields
-
-Refer to the `lla_plugin_interface` documentation for detailed API information.
+- `CliArg` struct: Defines command-line arguments for the plugin
 
 ## Examples
 
 ```bash
-# Long format, sorted by size, showing only .rs files, max depth 3
-lla -ls size -f .rs -d 3
+# Long format, sorted by size, showing only .rs files
+lla -ls size -f .rs
 
-# enable git status plugin
+# Enable git status plugin
 lla --enable-plugin git_status
-# or for multiple plugins
+
+# Enable multiple plugins
 lla --enable-plugin git_status categorizer
 
-# disanble git status plugin
+# Disable git status plugin
 lla --disable-plugin git_status
-# or for multiple plugins
+
+# Disable multiple plugins
 lla --disable-plugin git_status categorizer
+
+# Set keywords for the keyword search plugin using plugin action
+lla plugin --name keyword_search --action set-keywords --args "TODO" "FIXME" "BUG"
+
+# Show current keywords for the keyword search plugin
+lla plugin --name keyword_search --action show-keywords
+
+# Use the keyword search plugin with the set keywords
+lla --enable-plugin keyword_search
 ```
 
 ## Contributing
