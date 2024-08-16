@@ -1,0 +1,16 @@
+[package]
+name = "code_snippet_extractor"
+description = "A plugin for extracting and managing code snippets"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colored = "2.0.0"
+lla_plugin_interface = { path = "../../lla_plugin_interface" }
+dirs = "5.0.1"
+base64 = "0.22.1"
+ring = "0.17.8"
+rand = "0.8.4"
+
+[lib]
+crate-type = ["cdylib"]

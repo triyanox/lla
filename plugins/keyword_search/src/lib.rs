@@ -110,6 +110,15 @@ impl Plugin for KeywordSearchPlugin {
                 println!("Current keywords: {:?}", *self.keywords.lock().unwrap());
                 Ok(())
             }
+            "help" => {
+                println!(
+                    "Available actions:\n\
+                    - set-keywords: Set the keywords to search for\n\
+                    - show-keywords: Show the current keywords\n\
+                    - help: Show this help message"
+                );
+                Ok(())
+            }
             _ => Err(format!("Unknown action: {}", action)),
         }
     }
