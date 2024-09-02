@@ -1,4 +1,4 @@
-# `lla` - Advanced File Listing Utility
+# `lla` - A modern alternative to ls
 
 `lla` is a high-performance, extensible alternative to the traditional `ls` command, written in Rust. It offers enhanced functionality, customizable output, and a plugin system for extended capabilities.
 
