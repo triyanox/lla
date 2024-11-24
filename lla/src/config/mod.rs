@@ -20,11 +20,27 @@ impl Config {
     }
 
     pub fn load(path: &Path) -> io::Result<Self> {
-        let contents = fs::read_to_string(path)?;
-        toml::from_str(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        
+        if path.exists() {
+            let contents = fs::read_to_string(path)?;
+            toml::from_str(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        } else {
+            let config = Config::default();
+            config.ensure_plugins_dir()?;
+            config.save(path)?;
+            Ok(config)
+        }
     }
 
     pub fn save(&self, path: &Path) -> io::Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        self.ensure_plugins_dir()?;
+        
         let contents = toml::to_string_pretty(self)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         fs::write(path, contents)
@@ -35,7 +51,12 @@ impl Config {
         home.join(".config").join("lla").join("config.toml")
     }
 
+    pub fn ensure_plugins_dir(&self) -> io::Result<()> {
+        fs::create_dir_all(&self.plugins_dir)
+    }
+
     pub fn enable_plugin(&mut self, plugin_name: &str) -> Result<(), LlaError> {
+        self.ensure_plugins_dir().map_err(LlaError::Io)?;
         if !self.enabled_plugins.contains(&plugin_name.to_string()) {
             self.enabled_plugins.push(plugin_name.to_string());
             self.save(&Self::get_config_path())?;
@@ -68,25 +89,14 @@ impl Default for Config {
 pub fn initialize_config() -> Result<(), LlaError> {
     let config_path = Config::get_config_path();
 
-    if let Some(parent) = config_path.parent() {
-        fs::create_dir_all(parent).map_err(LlaError::Io)?;
-    }
-
     if config_path.exists() {
-        println!(
-            "Config file already exists at {:?}. Do you want to overwrite it? (y/N)",
-            config_path
-        );
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        if input.trim().to_lowercase() != "y" {
-            println!("Config initialization cancelled.");
-            return Ok(());
-        }
+        println!("Config file already exists at {:?}", config_path);
+        println!("Use `lla config` to view or modify the configuration.");
+        return Ok(());
     }
 
     let config = Config::default();
-    fs::create_dir_all(&config.plugins_dir).map_err(LlaError::Io)?;
+    config.ensure_plugins_dir().map_err(LlaError::Io)?;
     config.save(&config_path).map_err(LlaError::Io)?;
 
     println!("Config file initialized at {:?}", config_path);
@@ -94,5 +104,13 @@ pub fn initialize_config() -> Result<(), LlaError> {
     println!("Default configuration:");
     println!("{:#?}", config);
 
+    Ok(())
+}
+
+pub fn view_config() -> Result<(), LlaError> {
+    let config_path = Config::get_config_path();
+    let config = Config::load(&config_path).map_err(LlaError::Io)?;
+    println!("Current configuration at {:?}:", config_path);
+    println!("{:#?}", config);
     Ok(())
 }

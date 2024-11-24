@@ -46,6 +46,7 @@ fn main() -> Result<()> {
         Some(Command::PluginAction(plugin_name, action, action_args)) => {
             plugin_manager.perform_plugin_action(&plugin_name, &action, &action_args)
         }
+        Some(Command::Config) => Ok(config::view_config()?),
         None => {
             if let Some(error) = config_error {
                 eprintln!("Warning: {}", error);
