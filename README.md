@@ -6,30 +6,30 @@
 
 ## Features
 
-* **Efficient file listing**: Optimized for speed, even in large directories
-* **Multiple view modes**:
-   * Default view
-   * Long format (`-l`)
-   * Tree view (`-t`)
-   * Recursive listing (`-R`)
-* **Advanced sorting**:
-   * Alphabetical (default)
-   * File size (`-s size`)
-   * Modification date (`-s date`)
-* **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
-* **Customizable recursion**: Set maximum depth for subdirectory traversal
-* **Extensible plugin system**: Develop and integrate custom functionality
-* **Color-coded output**: Easily distinguish file types and permissions
-* **Git integration**: Show git status for files (with plugin)
-* **File categorization**: Categorize files by type (with plugin)
-* **Keyword search**: Search file contents for specified keywords (with plugin)
-* **File hash display**: Show file hashes (with plugin)
-* **Code complexity analysis**: Analyze code complexity (with plugin)
-* **File size visualization**: Visualize file sizes (with plugin)
-* **Duplicate file detection**: Identify duplicate files (with plugin)
-* **Directory metadata**: Display detailed directory information (with plugin)
-* **File metadata**: Show extended file metadata (with plugin)
-* **Last git commit info**: Display information about the last git commit (with plugin)
+- **Efficient file listing**: Optimized for speed, even in large directories
+- **Multiple view modes**:
+  - Default view
+  - Long format (`-l`)
+  - Tree view (`-t`)
+  - Recursive listing (`-R`)
+- **Advanced sorting**:
+  - Alphabetical (default)
+  - File size (`-s size`)
+  - Modification date (`-s date`)
+- **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
+- **Customizable recursion**: Set maximum depth for subdirectory traversal
+- **Extensible plugin system**: Develop and integrate custom functionality
+- **Color-coded output**: Easily distinguish file types and permissions
+- **Git integration**: Show git status for files (with plugin)
+- **File categorization**: Categorize files by type (with plugin)
+- **Keyword search**: Search file contents for specified keywords (with plugin)
+- **File hash display**: Show file hashes (with plugin)
+- **Code complexity analysis**: Analyze code complexity (with plugin)
+- **File size visualization**: Visualize file sizes (with plugin)
+- **Duplicate file detection**: Identify duplicate files (with plugin)
+- **Directory metadata**: Display detailed directory information (with plugin)
+- **File metadata**: Show extended file metadata (with plugin)
+- **Last git commit info**: Display information about the last git commit (with plugin)
 
 and more!
 
@@ -46,6 +46,7 @@ cargo install lla
 ```bash
 pkgin install lla
 ```
+
 (we see you, netbsd. we appreciate you.)
 
 ## Usage
@@ -54,10 +55,10 @@ First you need to initialize the configuration file:
 
 ```bash
 lla init
+lla config # to view the config file
 ```
 
 Then you can start using `lla`:
-
 
 ```
 lla [OPTIONS] [DIRECTORY]
@@ -98,6 +99,7 @@ lla plugin --name <PLUGIN_NAME> --action <ACTION_NAME> [--args <ARG1> <ARG2> ...
   - `--dir <PATH>`: Install from a local directory
 - `lla list-plugins`: Display all available plugins
 - `lla init`: Initialize configuration file
+- `lla config`: View configuration file
 
 ## Configuration
 
@@ -105,6 +107,7 @@ lla plugin --name <PLUGIN_NAME> --action <ACTION_NAME> [--args <ARG1> <ARG2> ...
 
 ```bash
 lla init
+lla config # to view the config file
 ```
 
 Example configuration:
@@ -142,15 +145,17 @@ Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libr
 ### Plugin Structure
 
 1. Create a new Rust library:
+
    ```bash
    cargo new --lib my_lla_plugin
    ```
 
 2. Add dependencies to `Cargo.toml`:
+
    ```toml
    [dependencies]
    lla_plugin_interface = "*"
-   
+
    [lib]
    crate-type = ["cdylib"]
    ```
@@ -220,6 +225,7 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
 ```
 
 4. Build your plugin:
+
    ```bash
    cargo build --release
    ```
