@@ -21,6 +21,7 @@ pub enum Command {
     Install(InstallSource),
     ListPlugins,
     InitConfig,
+    Config,
     PluginAction(String, String, Vec<String>),
 }
 
@@ -154,6 +155,7 @@ impl Args {
             )
             .subcommand(SubCommand::with_name("list-plugins").about("List all available plugins"))
             .subcommand(SubCommand::with_name("init").about("Initialize the configuration file"))
+            .subcommand(SubCommand::with_name("config").about("View or modify configuration"))
             .get_matches();
 
         Self::from_matches(&matches, config)
@@ -186,6 +188,8 @@ impl Args {
             Some(Command::ListPlugins)
         } else if matches.subcommand_matches("init").is_some() {
             Some(Command::InitConfig)
+        } else if matches.subcommand_matches("config").is_some() {
+            Some(Command::Config)
         } else if let Some(plugin_matches) = matches.subcommand_matches("plugin") {
             let plugin_name = plugin_matches.value_of("name").unwrap().to_string();
             let action = plugin_matches.value_of("action").unwrap().to_string();
