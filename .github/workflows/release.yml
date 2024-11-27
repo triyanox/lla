@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  check_release:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check_version.outputs.should_release }}
+      current_version: ${{ steps.check_version.outputs.current_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version changes
+        id: check_version
+        run: |
+          git fetch origin main
+
+          # Get the version from the main branch's Cargo.toml
+          OLD_VERSION=$(git show origin/main:Cargo.toml | grep '^version =' | cut -d '"' -f 2)
+
+          # Get the current version from Cargo.toml
+          CURRENT_VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f 2)
+
+          if [ "$OLD_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "Version changed from $OLD_VERSION to $CURRENT_VERSION"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish:
+    needs: check_release
+    if: needs.check_release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.71.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Publish to crates.io
+        run: |
+          cargo login ${{ secrets.CRATES_IO_TOKEN }}
+          cargo publish -p lla_plugin_interface
+          # Wait for crates.io indexing
+          sleep 30
+          cargo publish -p lla
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+  create_release:
+    needs: [check_release, publish]
+    if: needs.check_release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          for artifact in */*; do
+            sha256sum "$artifact" >> ../SHA256SUMS
+          done
+          cd ..
+
+      - name: Create Release Notes
+        run: |
+          {
+            echo "# Release v${{ needs.check_release.outputs.current_version }}"
+            echo
+            if [ -f CHANGELOG.md ]; then
+              echo "## Changelog"
+              echo
+              sed -n "/## \[${{ needs.check_release.outputs.current_version }}\]/,/## \[/p" CHANGELOG.md | sed '$d'
+              echo
+            fi
+            echo "## SHA256 Checksums"
+            echo "\`\`\`"
+            cat SHA256SUMS
+            echo "\`\`\`"
+          } > RELEASE_NOTES.md
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.check_release.outputs.current_version }}
+          release_name: Release v${{ needs.check_release.outputs.current_version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Upload binaries
+          for asset in artifacts/*/*; do
+            filename=$(basename "$asset")
+            echo "Uploading $filename..."
+            gh release upload "v${{ needs.check_release.outputs.current_version }}" "$asset" --clobber
+          done
+
+          # Upload checksums
+          gh release upload "v${{ needs.check_release.outputs.current_version }}" SHA256SUMS --clobber
