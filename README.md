@@ -110,6 +110,15 @@ lla init
 lla config # to view the config file
 ```
 
+You can modify configuration values using the `config --set` command:
+
+```bash
+lla config --set plugins_dir /new/path/to/plugins  # Change plugins directory
+lla config --set default_sort size                 # Change default sort
+lla config --set default_format long              # Change default format
+lla config --set default_depth 5                  # Change default depth
+```
+
 Example configuration:
 
 ```toml

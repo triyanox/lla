@@ -21,13 +21,18 @@ pub enum Command {
     Install(InstallSource),
     ListPlugins,
     InitConfig,
-    Config,
+    Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
 }
 
 pub enum InstallSource {
     GitHub(String),
     LocalDir(String),
+}
+
+pub enum ConfigAction {
+    View,
+    Set(String, String),
 }
 
 impl Args {
@@ -155,7 +160,18 @@ impl Args {
             )
             .subcommand(SubCommand::with_name("list-plugins").about("List all available plugins"))
             .subcommand(SubCommand::with_name("init").about("Initialize the configuration file"))
-            .subcommand(SubCommand::with_name("config").about("View or modify configuration"))
+            .subcommand(
+                SubCommand::with_name("config")
+                    .about("View or modify configuration")
+                    .arg(
+                        Arg::with_name("set")
+                            .long("set")
+                            .takes_value(true)
+                            .number_of_values(2)
+                            .value_names(&["KEY", "VALUE"])
+                            .help("Set a configuration value (e.g., --set plugins_dir /new/path)")
+                    )
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
@@ -188,8 +204,16 @@ impl Args {
             Some(Command::ListPlugins)
         } else if matches.subcommand_matches("init").is_some() {
             Some(Command::InitConfig)
-        } else if matches.subcommand_matches("config").is_some() {
-            Some(Command::Config)
+        } else if let Some(config_matches) = matches.subcommand_matches("config") {
+            if let Some(values) = config_matches.values_of("set") {
+                let values: Vec<_> = values.collect();
+                Some(Command::Config(Some(ConfigAction::Set(
+                    values[0].to_string(),
+                    values[1].to_string(),
+                ))))
+            } else {
+                Some(Command::Config(Some(ConfigAction::View)))
+            }
         } else if let Some(plugin_matches) = matches.subcommand_matches("plugin") {
             let plugin_name = plugin_matches.value_of("name").unwrap().to_string();
             let action = plugin_matches.value_of("action").unwrap().to_string();

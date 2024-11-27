@@ -114,3 +114,27 @@ pub fn view_config() -> Result<(), LlaError> {
     println!("{:#?}", config);
     Ok(())
 }
+
+pub fn update_config(key: &str, value: &str) -> Result<(), LlaError> {
+    let config_path = Config::get_config_path();
+    let mut config = Config::load(&config_path).map_err(LlaError::Io)?;
+
+    match key {
+        "plugins_dir" => {
+            config.plugins_dir = PathBuf::from(value);
+            config.ensure_plugins_dir().map_err(LlaError::Io)?;
+        }
+        "default_sort" => config.default_sort = value.to_string(),
+        "default_format" => config.default_format = value.to_string(),
+        "default_depth" => {
+            config.default_depth = Some(value.parse().map_err(|_| {
+                LlaError::Config(format!("Invalid value for default_depth: {}", value))
+            })?);
+        }
+        _ => return Err(LlaError::Config(format!("Unknown config key: {}", key))),
+    }
+
+    config.save(&config_path).map_err(LlaError::Io)?;
+    println!("Updated {} to {}", key, value);
+    Ok(())
+}
