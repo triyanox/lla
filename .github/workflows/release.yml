@@ -142,17 +142,22 @@ jobs:
         run: |
           cargo login ${{ secrets.CRATES_IO_TOKEN }}
 
-          # Check if lla_plugin_interface version already exists
-          if ! cargo search lla_plugin_interface --limit 1 | grep -q "lla_plugin_interface = \"${{ needs.check_release.outputs.current_version }}\""; then
-            echo "Publishing lla_plugin_interface v${{ needs.check_release.outputs.current_version }}"
+          # Get current version without 'v' prefix
+          VERSION="${{ needs.check_release.outputs.current_version }}"
+
+          # Check if lla_plugin_interface version exists (using awk to get just the version)
+          PUBLISHED_VERSION=$(cargo search lla_plugin_interface --limit 1 | awk -F '"' '{print $2}')
+
+          if [ "$PUBLISHED_VERSION" != "$VERSION" ]; then
+            echo "Publishing lla_plugin_interface v$VERSION"
             cargo publish -p lla_plugin_interface
             # Wait for crates.io indexing
-            sleep 60
+            sleep 30
           else
-            echo "lla_plugin_interface v${{ needs.check_release.outputs.current_version }} already published, skipping..."
+            echo "lla_plugin_interface v$VERSION already published, skipping..."
           fi
 
-          echo "Publishing lla v${{ needs.check_release.outputs.current_version }}"
+          echo "Publishing lla v$VERSION"
           cargo publish -p lla
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
