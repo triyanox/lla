@@ -12,7 +12,7 @@ impl LastGitCommitPlugin {
 
     fn get_last_commit_info(path: &Path) -> Option<(String, String, String)> {
         let output = Command::new("git")
-            .args(&["log", "-1", "--format=%h|%an|%ar", "--", path.to_str()?])
+            .args(["log", "-1", "--format=%h|%an|%ar", "--", path.to_str()?])
             .output()
             .ok()?;
 
@@ -82,6 +82,12 @@ impl EntryDecorator for LastGitCommitPlugin {
 
     fn supported_formats(&self) -> Vec<&'static str> {
         vec!["default", "long", "tree"]
+    }
+}
+
+impl Default for LastGitCommitPlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

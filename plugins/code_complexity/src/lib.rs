@@ -17,25 +17,27 @@ impl CodeComplexityEstimatorPlugin {
         let mut functions = 0;
         let mut branches = 0;
 
-        for line in reader.lines() {
-            if let Ok(content) = line {
-                lines += 1;
-                if content.contains("fn ")
-                    || content.contains("function ")
-                    || content.contains("def ")
-                    || content.contains("class ")
-                    || content.contains("struct ")
-                {
-                    functions += 1;
-                }
-                if content.contains("if ")
-                    || content.contains("else ")
-                    || content.contains("match ")
-                    || content.contains("for ")
-                    || content.contains("while ")
-                {
-                    branches += 1;
-                }
+        for content in reader.lines().map_while(Result::ok) {
+            lines += 1;
+            if content.contains("fn ")
+                || content.contains("function ")
+                || content.contains("def ")
+                || content.contains("class ")
+                || content.contains("struct ")
+                || content.contains("enum ")
+                || content.contains("interface ")
+                || content.contains("trait ")
+                || content.contains("impl ")
+            {
+                functions += 1;
+            }
+            if content.contains("if ")
+                || content.contains("else ")
+                || content.contains("match ")
+                || content.contains("for ")
+                || content.contains("while ")
+            {
+                branches += 1;
             }
         }
 
@@ -124,3 +126,9 @@ impl EntryDecorator for CodeComplexityEstimatorPlugin {
 }
 
 lla_plugin_interface::declare_plugin!(CodeComplexityEstimatorPlugin);
+
+impl Default for CodeComplexityEstimatorPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}

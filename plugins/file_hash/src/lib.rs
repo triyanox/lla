@@ -73,4 +73,10 @@ impl EntryDecorator for FileHashPlugin {
     }
 }
 
+impl Default for FileHashPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 lla_plugin_interface::declare_plugin!(FileHashPlugin);

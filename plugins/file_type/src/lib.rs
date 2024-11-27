@@ -88,11 +88,11 @@ impl EntryDecorator for FileTypePlugin {
                 .and_then(|ext| self.icon_map.get(ext))
                 .unwrap_or_else(|| {
                     if entry.path.is_symlink() {
-                        &&"🔗"
+                        &"🔗"
                     } else if entry.metadata.permissions().mode() & 0o111 != 0 {
-                        &&"🚀"
+                        &"🚀"
                     } else {
-                        &&"📄"
+                        &"📄"
                     }
                 })
         };
@@ -108,3 +108,9 @@ impl EntryDecorator for FileTypePlugin {
 }
 
 lla_plugin_interface::declare_plugin!(FileTypePlugin);
+
+impl Default for FileTypePlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -6,8 +6,16 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
 
+type FileMap = Arc<Mutex<HashMap<(u64, String), Vec<std::path::PathBuf>>>>;
+
 pub struct DuplicateFileDetectorPlugin {
-    file_map: Arc<Mutex<HashMap<(u64, String), Vec<std::path::PathBuf>>>>,
+    file_map: FileMap,
+}
+
+impl Default for DuplicateFileDetectorPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DuplicateFileDetectorPlugin {
@@ -21,17 +29,17 @@ impl DuplicateFileDetectorPlugin {
         let mut file = File::open(path).ok()?;
         let mut buffer = [0u8; 4096];
         let mut hasher = Sha256::new();
-        file.read(&mut buffer).ok()?;
-        hasher.update(&buffer);
+        file.read_exact(&mut buffer).ok()?;
+        hasher.update(buffer);
         if size > 8192 {
             file.seek(SeekFrom::Start(size / 2)).ok()?;
-            file.read(&mut buffer).ok()?;
-            hasher.update(&buffer);
+            file.read_exact(&mut buffer).ok()?;
+            hasher.update(buffer);
         }
         if size > 4096 {
             file.seek(SeekFrom::End(-4096)).ok()?;
-            file.read(&mut buffer).ok()?;
-            hasher.update(&buffer);
+            file.read_exact(&mut buffer).ok()?;
+            hasher.update(buffer);
         }
         Some(format!("{:x}", hasher.finalize()))
     }
@@ -58,7 +66,7 @@ impl EntryDecorator for DuplicateFileDetectorPlugin {
             if let Some(hash) = Self::calculate_partial_hash(&entry.path, size) {
                 let key = (size, hash);
                 let mut file_map = self.file_map.lock().unwrap();
-                let entry_list = file_map.entry(key).or_insert_with(Vec::new);
+                let entry_list = file_map.entry(key).or_default();
                 entry_list.push(entry.path.clone());
 
                 if entry_list.len() > 1 {
@@ -82,11 +90,9 @@ impl EntryDecorator for DuplicateFileDetectorPlugin {
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
             "long" => {
-                if let Some(count) = entry.custom_fields.get("duplicate_count") {
-                    Some(format!("Potential duplicates: {}", count.bright_red()))
-                } else {
-                    None
-                }
+                entry.custom_fields
+                    .get("duplicate_count")
+                    .map(|count| format!("Potential duplicates: {}", count.bright_red()))
             }
             "default" | "tree" => entry
                 .custom_fields
