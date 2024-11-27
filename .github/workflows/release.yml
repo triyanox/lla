@@ -1,19 +1,26 @@
 name: Release
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   check_release:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner) ||
+      (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release'))
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       should_release: ${{ steps.check_version.outputs.should_release }}
       current_version: ${{ steps.check_version.outputs.current_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check version changes
         id: check_version
