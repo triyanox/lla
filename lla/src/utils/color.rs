@@ -71,7 +71,6 @@ pub fn colorize_date(date: &std::time::SystemTime) -> ColoredString {
 fn is_executable(path: &Path) -> bool {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
         if let Ok(metadata) = path.metadata() {
             return metadata.permissions().mode() & 0o111 != 0;
         }
