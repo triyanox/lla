@@ -169,8 +169,8 @@ impl Args {
                             .takes_value(true)
                             .number_of_values(2)
                             .value_names(&["KEY", "VALUE"])
-                            .help("Set a configuration value (e.g., --set plugins_dir /new/path)")
-                    )
+                            .help("Set a configuration value (e.g., --set plugins_dir /new/path)"),
+                    ),
             )
             .get_matches();
 
