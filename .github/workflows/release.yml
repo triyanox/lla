@@ -9,7 +9,7 @@ on:
 jobs:
   check_release:
     if: |
-      (github.event_name == 'workflow_dispatch' && github.actor == github.repository.owner.login) ||
+      (github.event_name == 'workflow_dispatch' && github.actor == 'triyanox') ||
       (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release'))
     runs-on: ubuntu-latest
     permissions:
@@ -28,10 +28,10 @@ jobs:
           git fetch origin main
 
           # Get the version from the main branch's Cargo.toml
-          OLD_VERSION=$(git show origin/main:Cargo.toml | sed -n '/^\[workspace\.package\]/,/^$/p' | grep '^version = ' | cut -d '"' -f 2)
+          OLD_VERSION=$(git show origin/main:Cargo.toml | sed -n '/^\[workspace\.package\]/,/^\[/p' | grep '^version = ' | cut -d '"' -f 2)
 
           # Get the current version from Cargo.toml
-          CURRENT_VERSION=$(sed -n '/^\[workspace\.package\]/,/^$/p' Cargo.toml | grep '^version = ' | cut -d '"' -f 2)
+          CURRENT_VERSION=$(sed -n '/^\[workspace\.package\]/,/^\[/p' Cargo.toml | grep '^version = ' | cut -d '"' -f 2)
 
           echo "Old version: $OLD_VERSION"
           echo "Current version: $CURRENT_VERSION"
@@ -43,6 +43,7 @@ jobs:
           else
             echo "Version unchanged"
             echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           fi
 
   publish:
