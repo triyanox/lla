@@ -74,7 +74,7 @@ impl FileTaggerPlugin {
     }
 
     fn get_tags(&self, file_path: &str) -> Vec<String> {
-        self.tags.get(file_path).cloned().unwrap_or_else(Vec::new)
+        self.tags.get(file_path).cloned().unwrap_or_default()
     }
 }
 
