@@ -1,0 +1,24 @@
+[workspace]
+members = ["lla", "lla_plugin_interface", "plugins/*"]
+
+[workspace.package]
+version = "0.2.7"
+edition = "2021"
+authors = ["Achaq <hi@achaq.dev>"]
+license = "MIT"
+repository = "https://github.com/triyanox/lla"
+
+[workspace.dependencies]
+clap = "3.2.25"
+serde = { version = "1.0.207", features = ["derive"] }
+toml = "0.8.19"
+dirs = "5.0.1"
+colored = "2.0"
+rayon = "1.5"
+chrono = "0.4"
+libloading = "0.8.5"
+serde_json = "1.0"
+walkdir = "2.5"
+tempfile = "3.2"
+users = "0.11"
+lla_plugin_interface = { path = "lla_plugin_interface" }
