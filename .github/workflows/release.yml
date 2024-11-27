@@ -132,12 +132,27 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Publish to crates.io
+      - name: Update dependency version
+        run: |
+          VERSION="${{ needs.check_release.outputs.current_version }}"
+          # Update the version in lla/Cargo.toml
+          sed -i 's/version = "[0-9]*\.[0-9]*\.[0-9]*"/version = "'$VERSION'"/' lla/Cargo.toml
+
+      - name: Check and publish to crates.io
         run: |
           cargo login ${{ secrets.CRATES_IO_TOKEN }}
-          cargo publish -p lla_plugin_interface
-          # Wait for crates.io indexing
-          sleep 30
+
+          # Check if lla_plugin_interface version already exists
+          if ! cargo search lla_plugin_interface --limit 1 | grep -q "lla_plugin_interface = \"${{ needs.check_release.outputs.current_version }}\""; then
+            echo "Publishing lla_plugin_interface v${{ needs.check_release.outputs.current_version }}"
+            cargo publish -p lla_plugin_interface
+            # Wait for crates.io indexing
+            sleep 60
+          else
+            echo "lla_plugin_interface v${{ needs.check_release.outputs.current_version }} already published, skipping..."
+          fi
+
+          echo "Publishing lla v${{ needs.check_release.outputs.current_version }}"
           cargo publish -p lla
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
