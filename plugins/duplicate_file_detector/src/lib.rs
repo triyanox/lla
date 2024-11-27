@@ -89,11 +89,10 @@ impl EntryDecorator for DuplicateFileDetectorPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" => {
-                entry.custom_fields
-                    .get("duplicate_count")
-                    .map(|count| format!("Potential duplicates: {}", count.bright_red()))
-            }
+            "long" => entry
+                .custom_fields
+                .get("duplicate_count")
+                .map(|count| format!("Potential duplicates: {}", count.bright_red())),
             "default" | "tree" => entry
                 .custom_fields
                 .get("duplicate_count")
