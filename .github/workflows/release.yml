@@ -25,10 +25,8 @@ jobs:
       - name: Check version changes
         id: check_version
         run: |
-          git fetch origin main
-
-          # Get the version from the main branch's Cargo.toml
-          OLD_VERSION=$(git show origin/main:Cargo.toml | sed -n '/^\[workspace\.package\]/,/^\[/p' | grep '^version = ' | cut -d '"' -f 2)
+          # Get the latest release version
+          OLD_VERSION=$(gh release view --json tagName --jq '.tagName' | sed 's/^v//' || echo "0.0.0")
 
           # Get the current version from Cargo.toml
           CURRENT_VERSION=$(sed -n '/^\[workspace\.package\]/,/^\[/p' Cargo.toml | grep '^version = ' | cut -d '"' -f 2)
@@ -38,18 +36,91 @@ jobs:
 
           if [ "$OLD_VERSION" != "$CURRENT_VERSION" ]; then
             echo "Version changed from $OLD_VERSION to $CURRENT_VERSION"
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "Version unchanged"
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish:
+  build:
     needs: check_release
     if: needs.check_release.outputs.should_release == 'true'
+    name: Build Release Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: lla-linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: lla-linux-arm64
+            cross_compile: true
+          - os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            artifact_name: lla-linux-i686
+            cross_compile: true
+
+          # macOS builds
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: lla-macos-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: lla-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.71.0
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross_compile && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-i686-linux-gnu
+          sudo apt-get install -y crossbuild-essential-arm64 crossbuild-essential-i386
+
+      - name: Set cross-compilation environment
+        if: matrix.cross_compile && runner.os == 'Linux'
+        run: |
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare binary
+        run: |
+          cp target/${{ matrix.target }}/release/lla ${{ matrix.artifact_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  publish:
+    needs: [check_release, build]
+    if: needs.check_release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -72,9 +143,11 @@ jobs:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
   create_release:
-    needs: [check_release, publish]
+    needs: [check_release, build, publish]
     if: needs.check_release.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
