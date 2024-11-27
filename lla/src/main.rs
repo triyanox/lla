@@ -9,7 +9,7 @@ mod plugin;
 mod sorter;
 mod utils;
 
-use args::{Args, Command, InstallSource};
+use args::{Args, Command, ConfigAction, InstallSource};
 use config::{initialize_config, Config};
 use error::{LlaError, Result};
 use filter::{ExtensionFilter, FileFilter, PatternFilter};
@@ -43,10 +43,14 @@ fn main() -> Result<()> {
         }
         Some(Command::ListPlugins) => list_plugins(&plugin_manager),
         Some(Command::InitConfig) => initialize_config(),
+        Some(Command::Config(action)) => match action {
+            Some(ConfigAction::View) => config::view_config(),
+            Some(ConfigAction::Set(key, value)) => config::update_config(&key, &value),
+            None => config::view_config(),
+        },
         Some(Command::PluginAction(plugin_name, action, action_args)) => {
             plugin_manager.perform_plugin_action(&plugin_name, &action, &action_args)
         }
-        Some(Command::Config) => Ok(config::view_config()?),
         None => {
             if let Some(error) = config_error {
                 eprintln!("Warning: {}", error);
