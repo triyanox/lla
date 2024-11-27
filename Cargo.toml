@@ -2,7 +2,7 @@
 members = ["lla", "lla_plugin_interface", "plugins/*"]
 
 [workspace.package]
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 authors = ["Achaq <hi@achaq.dev>"]
 license = "MIT"
