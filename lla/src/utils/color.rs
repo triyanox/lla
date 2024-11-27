@@ -4,7 +4,7 @@ use std::path::Path;
 pub fn colorize_file_name(path: &Path) -> ColoredString {
     let name = path.file_name().unwrap().to_str().unwrap();
     if path.is_dir() {
-        name.bright_blue().bold()
+        format!("{}/", name).bright_blue().bold()
     } else if path.is_symlink() {
         name.bright_cyan().italic()
     } else if is_executable(path) {
@@ -39,10 +39,15 @@ use std::os::unix::fs::PermissionsExt;
 
 pub fn colorize_permissions(permissions: &Permissions) -> String {
     let mode = permissions.mode();
+    let file_type = if mode & 0o40000 != 0 {
+        "d".bright_blue()
+    } else {
+        "-".bright_black()
+    };
     let user = triplet(mode, 6);
     let group = triplet(mode, 3);
     let other = triplet(mode, 0);
-    format!("{}{}{}", user, group, other)
+    format!("{}{}{}{}", file_type, user, group, other)
 }
 
 fn triplet(mode: u32, shift: u32) -> String {
