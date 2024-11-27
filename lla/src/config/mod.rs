@@ -15,6 +15,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Config::default()
     }
@@ -23,7 +24,7 @@ impl Config {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
+
         if path.exists() {
             let contents = fs::read_to_string(path)?;
             toml::from_str(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
@@ -40,7 +41,7 @@ impl Config {
             fs::create_dir_all(parent)?;
         }
         self.ensure_plugins_dir()?;
-        
+
         let contents = toml::to_string_pretty(self)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         fs::write(path, contents)

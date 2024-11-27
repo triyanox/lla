@@ -96,4 +96,10 @@ impl EntryDecorator for FileCategoryPlugin {
     }
 }
 
+impl Default for FileCategoryPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 lla_plugin_interface::declare_plugin!(FileCategoryPlugin);

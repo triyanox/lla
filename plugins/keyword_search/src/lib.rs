@@ -28,7 +28,7 @@ impl KeywordSearchPlugin {
     fn load_keywords(path: &PathBuf) -> Vec<String> {
         if let Ok(file) = File::open(path) {
             let reader = BufReader::new(file);
-            reader.lines().filter_map(|line| line.ok()).collect()
+            reader.lines().map_while(Result::ok).collect()
         } else {
             Vec::new()
         }
@@ -130,17 +130,20 @@ impl EntryDecorator for KeywordSearchPlugin {
     }
 
     fn decorate(&self, entry: &mut DecoratedEntry) {
-        if let Some(matches) = entry.path.is_file().then(|| self.search_file(&entry.path)) {
-            if let Some(matches) = matches {
-                entry.custom_fields.insert(
-                    "keyword_matches".to_string(),
-                    matches
-                        .into_iter()
-                        .map(|(line, content)| format!("{}:{}", line, content))
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                );
-            }
+        if let Some(matches) = entry
+            .path
+            .is_file()
+            .then(|| self.search_file(&entry.path))
+            .flatten()
+        {
+            entry.custom_fields.insert(
+                "keyword_matches".to_string(),
+                matches
+                    .iter()
+                    .map(|(line_num, line)| format!("{}:{}", line_num, line))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            );
         }
     }
 
@@ -156,6 +159,12 @@ impl EntryDecorator for KeywordSearchPlugin {
 
     fn supported_formats(&self) -> Vec<&'static str> {
         vec!["default", "long", "tree"]
+    }
+}
+
+impl Default for KeywordSearchPlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

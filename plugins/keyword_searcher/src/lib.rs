@@ -8,6 +8,7 @@ pub struct KeywordSearcherPlugin {
 }
 
 impl KeywordSearcherPlugin {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let keywords = vec![
             "TODO".to_string(),
@@ -99,6 +100,12 @@ impl EntryDecorator for KeywordSearcherPlugin {
 
     fn supported_formats(&self) -> Vec<&'static str> {
         vec!["long", "tree"]
+    }
+}
+
+impl Default for KeywordSearcherPlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -1,14 +1,13 @@
 [package]
 name = "lla_plugin_interface"
 description = "Interface for lla plugins"
-version = "0.1.1"
-edition = "2021"
-authors = ["Achaq <hi@achaq.dev>"]
-license = "MIT"
-repository = "https://github.com/triyanox/lla"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 keywords = ["cli", "ls", "lightweight"]
 categories = ["command-line-utilities"]
 exclude = ["lla.png"]
-
 
 [dependencies]

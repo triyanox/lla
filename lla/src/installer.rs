@@ -23,7 +23,7 @@ impl PluginInstaller {
             .ok_or_else(|| LlaError::Plugin(format!("Invalid GitHub URL: {}", url)))?;
 
         let output = Command::new("git")
-            .args(&["clone", url])
+            .args(["clone", url])
             .current_dir(&temp_dir)
             .output()?;
 
@@ -77,7 +77,7 @@ impl PluginInstaller {
         println!("Building plugin in {:?}", source_dir);
 
         let output = Command::new("cargo")
-            .args(&["build", "--release"])
+            .args(["build", "--release"])
             .current_dir(source_dir)
             .output()?;
 

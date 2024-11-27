@@ -10,11 +10,11 @@ impl FileSorter for DateSorter {
             let time_a = a
                 .metadata()
                 .and_then(|m| m.modified())
-                .unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH);
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             let time_b = b
                 .metadata()
                 .and_then(|m| m.modified())
-                .unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH);
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             time_b.cmp(&time_a)
         });
         Ok(())

@@ -44,7 +44,7 @@ impl PluginManager {
             if self.enabled_plugins.contains(plugin_name) {
                 plugin
                     .perform_action(action, args)
-                    .map_err(|e| LlaError::Plugin(e))
+                    .map_err(LlaError::Plugin)
             } else {
                 Err(LlaError::Plugin(format!(
                     "Plugin '{}' is not enabled",
@@ -59,6 +59,7 @@ impl PluginManager {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_cli_args(&self) -> Vec<CliArg> {
         self.plugins
             .iter()

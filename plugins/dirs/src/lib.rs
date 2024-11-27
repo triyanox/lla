@@ -1,13 +1,13 @@
 use colored::Colorize;
 use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
 use std::env;
-use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
 pub struct DirectorySummaryPlugin;
 
 impl DirectorySummaryPlugin {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         DirectorySummaryPlugin
     }
@@ -44,6 +44,12 @@ impl DirectorySummaryPlugin {
         } else {
             format!("{} B", size)
         }
+    }
+}
+
+impl Default for DirectorySummaryPlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

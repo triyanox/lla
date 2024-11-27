@@ -6,6 +6,12 @@ use std::process::Command;
 
 pub struct GitStatusPlugin;
 
+impl Default for GitStatusPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitStatusPlugin {
     pub fn new() -> Self {
         GitStatusPlugin
@@ -30,7 +36,7 @@ impl GitStatusPlugin {
         }
 
         let output = Command::new("git")
-            .args(&["status", "--porcelain", "--ignored", path.to_str().unwrap()])
+            .args(["status", "--porcelain", "--ignored", path.to_str().unwrap()])
             .output()
             .ok()?;
 

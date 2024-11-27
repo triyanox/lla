@@ -1,5 +1,5 @@
 use colored::Colorize;
-use lla_plugin_interface::{CliArg, DecoratedEntry, EntryDecorator, Plugin};
+use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -9,6 +9,12 @@ use std::path::PathBuf;
 pub struct CodeSnippetExtractorPlugin {
     snippet_file: PathBuf,
     snippets: HashMap<String, Vec<(String, String)>>,
+}
+
+impl Default for CodeSnippetExtractorPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CodeSnippetExtractorPlugin {
@@ -32,8 +38,8 @@ impl CodeSnippetExtractorPlugin {
             let mut current_snippet = Vec::new();
             let mut current_name = String::new();
 
-            for line in reader.lines().filter_map(|l| l.ok()) {
-                if line.starts_with("FILE:") {
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some(file_path) = line.strip_prefix("FILE:") {
                     if !current_file.is_empty() && !current_snippet.is_empty() {
                         snippets
                             .entry(current_file.clone())
@@ -41,8 +47,8 @@ impl CodeSnippetExtractorPlugin {
                             .push((current_name.clone(), current_snippet.join("\n")));
                         current_snippet.clear();
                     }
-                    current_file = line[5..].trim().to_string();
-                } else if line.starts_with("NAME:") {
+                    current_file = file_path.trim().to_string();
+                } else if let Some(name_part) = line.strip_prefix("NAME:") {
                     if !current_name.is_empty() && !current_snippet.is_empty() {
                         snippets
                             .entry(current_file.clone())
@@ -50,7 +56,7 @@ impl CodeSnippetExtractorPlugin {
                             .push((current_name.clone(), current_snippet.join("\n")));
                         current_snippet.clear();
                     }
-                    current_name = line[5..].trim().to_string();
+                    current_name = name_part.trim().to_string();
                 } else {
                     current_snippet.push(line);
                 }
@@ -91,7 +97,7 @@ impl CodeSnippetExtractorPlugin {
     ) -> Result<(), String> {
         let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
         let reader = BufReader::new(file);
-        let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+        let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
 
         if start_line > end_line || end_line > lines.len() {
             return Err("Invalid line range".to_string());
@@ -100,7 +106,7 @@ impl CodeSnippetExtractorPlugin {
         let snippet = lines[start_line - 1..end_line].join("\n");
         self.snippets
             .entry(file_path.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((name.to_string(), snippet));
         self.save_snippets();
         Ok(())
@@ -110,7 +116,7 @@ impl CodeSnippetExtractorPlugin {
         self.snippets
             .get(file_path)
             .map(|snippets| snippets.iter().map(|(name, _)| name.clone()).collect())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     fn get_snippet(&self, file_path: &str, name: &str) -> Option<String> {

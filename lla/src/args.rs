@@ -77,7 +77,7 @@ impl Args {
                     .short('s')
                     .long("sort")
                     .takes_value(true)
-                    .possible_values(&["name", "size", "date"])
+                    .possible_values(["name", "size", "date"])
                     .default_value(&config.default_sort),
             )
             .arg(
@@ -169,8 +169,8 @@ impl Args {
                             .takes_value(true)
                             .number_of_values(2)
                             .value_names(&["KEY", "VALUE"])
-                            .help("Set a configuration value (e.g., --set plugins_dir /new/path)")
-                    )
+                            .help("Set a configuration value (e.g., --set plugins_dir /new/path)"),
+                    ),
             )
             .get_matches();
 
@@ -193,12 +193,10 @@ impl Args {
                 Some(Command::Install(InstallSource::GitHub(
                     github_url.to_string(),
                 )))
-            } else if let Some(local_dir) = install_matches.value_of("dir") {
-                Some(Command::Install(InstallSource::LocalDir(
-                    local_dir.to_string(),
-                )))
             } else {
-                None
+                install_matches.value_of("dir").map(|local_dir| {
+                    Command::Install(InstallSource::LocalDir(local_dir.to_string()))
+                })
             }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)

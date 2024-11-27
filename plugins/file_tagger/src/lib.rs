@@ -1,5 +1,4 @@
 use colored::Colorize;
-use dirs::config_dir;
 use lla_plugin_interface::{CliArg, DecoratedEntry, EntryDecorator, Plugin};
 use std::collections::HashMap;
 use std::fs::File;
@@ -9,6 +8,12 @@ use std::path::PathBuf;
 pub struct FileTaggerPlugin {
     tag_file: PathBuf,
     tags: HashMap<String, Vec<String>>,
+}
+
+impl Default for FileTaggerPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FileTaggerPlugin {
@@ -22,14 +27,14 @@ impl FileTaggerPlugin {
     }
 
     fn load_tags(path: &PathBuf) -> HashMap<String, Vec<String>> {
-        let mut tags = HashMap::new();
+        let mut tags: HashMap<String, Vec<String>> = HashMap::new();
         if let Ok(file) = File::open(path) {
             let reader = BufReader::new(file);
-            for line in reader.lines().filter_map(|l| l.ok()) {
+            for line in reader.lines().map_while(Result::ok) {
                 let parts: Vec<&str> = line.split('|').collect();
                 if parts.len() == 2 {
                     tags.entry(parts[0].to_string())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(parts[1].to_string());
                 }
             }
@@ -53,7 +58,7 @@ impl FileTaggerPlugin {
     fn add_tag(&mut self, file_path: &str, tag: &str) {
         self.tags
             .entry(file_path.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(tag.to_string());
         self.save_tags();
     }
@@ -69,7 +74,7 @@ impl FileTaggerPlugin {
     }
 
     fn get_tags(&self, file_path: &str) -> Vec<String> {
-        self.tags.get(file_path).cloned().unwrap_or_else(Vec::new)
+        self.tags.get(file_path).cloned().unwrap_or_default()
     }
 }
 
