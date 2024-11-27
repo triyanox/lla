@@ -24,3 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Build consistency across different platforms
 - Plugin interface versioning
+
+## [0.2.9] - 2024-11-27
+
+### Changed
+
+- Plugin interface versioning
+
+### Fixed
+
+- Plugin interface versioning
+- GitHub Actions workflows
