@@ -49,6 +49,16 @@ pkgin install lla
 
 (we see you, netbsd. we appreciate you.)
 
+### For Arch Linux users
+
+`lla` is available in the [AUR](https://aur.archlinux.org/packages/lla). You can install it with your favorite [AUR helper](https://wiki.archlinux.org/title/AUR_helpers), e.g.:
+
+```sh
+paru -S lla
+```
+
+(btw)
+
 ## Usage
 
 First you need to initialize the configuration file:
