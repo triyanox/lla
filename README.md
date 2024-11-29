@@ -59,6 +59,14 @@ paru -S lla
 
 (btw)
 
+### For macOS users with Homebrew
+
+[`lla`](https://formulae.brew.sh/formula/lla#default) is available in the [Homebrew](https://brew.sh) package manager. You can install it with:
+
+```bash
+brew install lla
+```
+
 ## Usage
 
 First you need to initialize the configuration file:
