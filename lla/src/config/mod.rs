@@ -6,12 +6,72 @@ use std::path::{Path, PathBuf};
 use crate::error::LlaError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TreeFormatterConfig {
+    #[serde(default)]
+    pub max_lines: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RecursiveConfig {
+    #[serde(default)]
+    pub max_entries: Option<usize>,
+}
+
+impl Default for RecursiveConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: Some(100_000),
+        }
+    }
+}
+
+impl Default for TreeFormatterConfig {
+    fn default() -> Self {
+        Self {
+            max_lines: Some(20_000),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FormatterConfig {
+    #[serde(default)]
+    pub tree: TreeFormatterConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ListerConfig {
+    #[serde(default)]
+    pub recursive: RecursiveConfig,
+}
+
+impl Default for ListerConfig {
+    fn default() -> Self {
+        Self {
+            recursive: RecursiveConfig::default(),
+        }
+    }
+}
+
+impl Default for FormatterConfig {
+    fn default() -> Self {
+        Self {
+            tree: TreeFormatterConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub default_sort: String,
     pub default_format: String,
     pub enabled_plugins: Vec<String>,
     pub plugins_dir: PathBuf,
     pub default_depth: Option<usize>,
+    #[serde(default)]
+    pub formatters: FormatterConfig,
+    #[serde(default)]
+    pub listers: ListerConfig,
 }
 
 impl Config {
@@ -27,7 +87,10 @@ impl Config {
 
         if path.exists() {
             let contents = fs::read_to_string(path)?;
-            toml::from_str(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+            let config: Config = toml::from_str(&contents)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            config.save(path)?;
+            Ok(config)
         } else {
             let config = Config::default();
             config.ensure_plugins_dir()?;
@@ -83,6 +146,8 @@ impl Default for Config {
             enabled_plugins: vec![],
             plugins_dir: default_plugins_dir,
             default_depth: Some(3),
+            formatters: FormatterConfig::default(),
+            listers: ListerConfig::default(),
         }
     }
 }
@@ -98,12 +163,56 @@ pub fn initialize_config() -> Result<(), LlaError> {
 
     let config = Config::default();
     config.ensure_plugins_dir().map_err(LlaError::Io)?;
-    config.save(&config_path).map_err(LlaError::Io)?;
+
+    let config_content = format!(
+        r#"# LLA Configuration File
+
+# Default sorting method for file listings
+# Possible values: "name", "size", "date"
+default_sort = "name"
+
+# Default format for displaying files
+# Possible values: "default", "long", "tree", "grid"
+default_format = "default"
+
+# List of enabled plugins
+enabled_plugins = []
+
+# Directory where plugins are stored
+plugins_dir = "{}"
+
+# Maximum depth for recursive directory traversal
+# Set to None for unlimited depth
+default_depth = 3
+
+# Formatter-specific configurations
+[formatters]
+
+# Tree formatter configuration
+[formatters.tree]
+# Maximum number of entries to display in tree view
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_lines = 20000
+
+# Lister-specific configurations
+[listers]
+
+# Recursive lister configuration
+[listers.recursive]
+# Maximum number of entries to display in recursive lister
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_entries = 20000
+"#,
+        config.plugins_dir.to_string_lossy()
+    );
+
+    fs::write(&config_path, config_content).map_err(LlaError::Io)?;
 
     println!("Config file initialized at {:?}", config_path);
     println!("Plugins directory created at {:?}", config.plugins_dir);
-    println!("Default configuration:");
-    println!("{:#?}", config);
+    println!("Default configuration has been created with comments explaining each option.");
 
     Ok(())
 }
