@@ -20,7 +20,7 @@ pub struct RecursiveConfig {
 impl Default for RecursiveConfig {
     fn default() -> Self {
         Self {
-            max_entries: Some(100_000),
+            max_entries: Some(20_000),
         }
     }
 }
@@ -89,7 +89,6 @@ impl Config {
             let contents = fs::read_to_string(path)?;
             let config: Config = toml::from_str(&contents)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-            config.save(path)?;
             Ok(config)
         } else {
             let config = Config::default();
@@ -99,15 +98,63 @@ impl Config {
         }
     }
 
+    fn generate_config_content(&self) -> String {
+        format!(
+            r#"# LLA Configuration File
+
+# Default sorting method for file listings
+# Possible values: "name", "size", "date"
+default_sort = "{}"
+
+# Default format for displaying files
+# Possible values: "default", "long", "tree", "grid"
+default_format = "{}"
+
+# List of enabled plugins
+enabled_plugins = {:?}
+
+# Directory where plugins are stored
+plugins_dir = "{}"
+
+# Maximum depth for recursive directory traversal
+# Set to None for unlimited depth
+default_depth = {}
+
+# Formatter-specific configurations
+[formatters]
+
+# Tree formatter configuration
+[formatters.tree]
+# Maximum number of entries to display in tree view
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_lines = {}
+
+# Lister-specific configurations
+[listers]
+
+# Recursive lister configuration
+[listers.recursive]
+# Maximum number of entries to display in recursive lister
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_entries = {}"#,
+            self.default_sort,
+            self.default_format,
+            self.enabled_plugins,
+            self.plugins_dir.to_string_lossy(),
+            self.default_depth.unwrap_or(3),
+            self.formatters.tree.max_lines.unwrap_or(20000),
+            self.listers.recursive.max_entries.unwrap_or(100000),
+        )
+    }
+
     pub fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
         self.ensure_plugins_dir()?;
-
-        let contents = toml::to_string_pretty(self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        fs::write(path, contents)
+        fs::write(path, self.generate_config_content())
     }
 
     pub fn get_config_path() -> PathBuf {
@@ -164,51 +211,7 @@ pub fn initialize_config() -> Result<(), LlaError> {
     let config = Config::default();
     config.ensure_plugins_dir().map_err(LlaError::Io)?;
 
-    let config_content = format!(
-        r#"# LLA Configuration File
-
-# Default sorting method for file listings
-# Possible values: "name", "size", "date"
-default_sort = "name"
-
-# Default format for displaying files
-# Possible values: "default", "long", "tree", "grid"
-default_format = "default"
-
-# List of enabled plugins
-enabled_plugins = []
-
-# Directory where plugins are stored
-plugins_dir = "{}"
-
-# Maximum depth for recursive directory traversal
-# Set to None for unlimited depth
-default_depth = 3
-
-# Formatter-specific configurations
-[formatters]
-
-# Tree formatter configuration
-[formatters.tree]
-# Maximum number of entries to display in tree view
-# Set to 0 to show all entries (may impact performance with large directories)
-# Default: 20000
-max_lines = 20000
-
-# Lister-specific configurations
-[listers]
-
-# Recursive lister configuration
-[listers.recursive]
-# Maximum number of entries to display in recursive lister
-# Set to 0 to show all entries (may impact performance with large directories)
-# Default: 20000
-max_entries = 20000
-"#,
-        config.plugins_dir.to_string_lossy()
-    );
-
-    fs::write(&config_path, config_content).map_err(LlaError::Io)?;
+    fs::write(&config_path, config.generate_config_content()).map_err(LlaError::Io)?;
 
     println!("Config file initialized at {:?}", config_path);
     println!("Plugins directory created at {:?}", config.plugins_dir);
