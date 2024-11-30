@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 pub struct Args {
     pub directory: String,
-    pub recursive: bool,
+    pub depth: Option<usize>,
     pub long_format: bool,
     pub tree_format: bool,
     pub sort_by: String,
@@ -12,7 +12,6 @@ pub struct Args {
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
-    pub depth: Option<usize>,
     pub command: Option<Command>,
     pub plugin_args: Vec<String>,
 }
@@ -48,17 +47,11 @@ impl Args {
                     .default_value("."),
             )
             .arg(
-                Arg::with_name("recursive")
-                    .short('R')
-                    .long("recursive")
-                    .help("Recursively list subdirectories"),
-            )
-            .arg(
                 Arg::with_name("depth")
                     .short('d')
                     .long("depth")
                     .takes_value(true)
-                    .help("Set the depth for recursive listing"),
+                    .help("Set the depth for tree listing"),
             )
             .arg(
                 Arg::with_name("long")
@@ -178,9 +171,7 @@ impl Args {
     }
 
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let format = if matches.is_present("recursive") {
-            "recursive"
-        } else if matches.is_present("long") {
+        let format = if matches.is_present("long") {
             "long"
         } else if matches.is_present("tree") {
             "tree"
@@ -226,7 +217,10 @@ impl Args {
 
         Args {
             directory: matches.value_of("directory").unwrap().to_string(),
-            recursive: format == "recursive",
+            depth: matches
+                .value_of("depth")
+                .map(|d| d.parse().unwrap())
+                .or(config.default_depth),
             long_format: format == "long",
             tree_format: format == "tree",
             sort_by: matches
@@ -246,10 +240,6 @@ impl Args {
                 .value_of("plugins-dir")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
-            depth: matches
-                .value_of("depth")
-                .map(|d| d.parse().unwrap())
-                .or(config.default_depth),
             command,
             plugin_args: matches
                 .values_of("plugin-arg")

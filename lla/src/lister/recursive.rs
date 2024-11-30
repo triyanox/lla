@@ -1,8 +1,9 @@
 use super::FileLister;
 use crate::error::Result;
 use crate::lister::BasicLister;
-use std::fs;
-use std::path::{Path, PathBuf};
+use rayon::prelude::*;
+use std::path::PathBuf;
+use walkdir::WalkDir;
 
 pub struct RecursiveLister;
 
@@ -13,29 +14,23 @@ impl FileLister for RecursiveLister {
         recursive: bool,
         depth: Option<usize>,
     ) -> Result<Vec<PathBuf>> {
-        fn list_recursive(
-            dir: &Path,
-            max_depth: Option<usize>,
-            current_depth: usize,
-        ) -> Result<Vec<PathBuf>> {
-            let mut files = Vec::new();
-            if max_depth.map_or(true, |d| current_depth < d) {
-                for entry in fs::read_dir(dir)? {
-                    let entry = entry?;
-                    let path = entry.path();
-                    files.push(path.clone());
-                    if path.is_dir() {
-                        files.extend(list_recursive(&path, max_depth, current_depth + 1)?);
-                    }
-                }
-            }
-            Ok(files)
+        if !recursive {
+            return BasicLister.list_files(directory, false, None);
         }
 
-        if recursive {
-            list_recursive(Path::new(directory), depth, 0)
-        } else {
-            BasicLister.list_files(directory, false, None)
+        let max_depth = depth.unwrap_or(usize::MAX);
+        let mut entries = Vec::with_capacity(128);
+        let walker = WalkDir::new(directory)
+            .min_depth(0)
+            .max_depth(max_depth)
+            .follow_links(false)
+            .same_file_system(true);
+
+        for entry in walker.into_iter().filter_map(|e| e.ok()) {
+            entries.push(entry.into_path());
         }
+
+        entries.par_sort_unstable();
+        Ok(entries)
     }
 }

@@ -18,16 +18,13 @@ use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
 use lla_plugin_interface::DecoratedEntry;
 use plugin::PluginManager;
-use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
-
 use rayon::prelude::*;
-use std::path::PathBuf;
+use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
 use std::sync::Arc;
 
 fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
     let args = Args::parse(&config);
-
     let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
     plugin_manager.handle_plugin_args(&args.plugin_args);
 
@@ -36,9 +33,7 @@ fn main() -> Result<()> {
             let plugin_installer = PluginInstaller::new(&args.plugins_dir);
             match source {
                 InstallSource::GitHub(url) => install_plugin_from_git(&plugin_installer, &url),
-                InstallSource::LocalDir(dir) => {
-                    install_plugin_from_directory(&plugin_installer, &dir)
-                }
+                InstallSource::LocalDir(dir) => install_plugin_from_directory(&plugin_installer, &dir),
             }
         }
         Some(Command::ListPlugins) => list_plugins(&plugin_manager),
@@ -51,64 +46,104 @@ fn main() -> Result<()> {
         Some(Command::PluginAction(plugin_name, action, action_args)) => {
             plugin_manager.perform_plugin_action(&plugin_name, &action, &action_args)
         }
-        None => {
-            if let Some(error) = config_error {
-                eprintln!("Warning: {}", error);
-            }
-
-            for plugin in &args.enable_plugin {
-                if let Err(e) = plugin_manager.enable_plugin(plugin) {
-                    eprintln!("Failed to enable plugin '{}': {}", plugin, e);
-                }
-            }
-
-            for plugin in &args.disable_plugin {
-                if let Err(e) = plugin_manager.disable_plugin(plugin) {
-                    eprintln!("Failed to disable plugin '{}': {}", plugin, e);
-                }
-            }
-
-            let lister = create_lister(&args);
-            let sorter = create_sorter(&args);
-            let filter = create_filter(&args);
-            let formatter = create_formatter(&args);
-
-            let files = list_files(&args, &lister)?;
-            let sorted_files = sort_files(files, &sorter)?;
-            let filtered_files = filter_files(sorted_files, &filter);
-
-            let mut decorated_files: Vec<DecoratedEntry> = filtered_files
-                .into_iter()
-                .filter_map(|path| {
-                    path.metadata().ok().map(|metadata| DecoratedEntry {
-                        path,
-                        metadata,
-                        custom_fields: std::collections::HashMap::new(),
-                    })
-                })
-                .collect();
-
-            let format = if args.long_format {
-                "long"
-            } else if args.tree_format {
-                "tree"
-            } else {
-                "default"
-            };
-
-            for entry in &mut decorated_files {
-                plugin_manager.decorate_entry(entry, format);
-            }
-
-            let formatted_output =
-                formatter.format_files(&decorated_files, &plugin_manager, args.depth)?;
-
-            println!("{}", formatted_output);
-
-            Ok(())
-        }
+        None => list_directory(&args, &mut plugin_manager, config_error),
     }
 }
+
+fn list_directory(args: &Args, plugin_manager: &mut PluginManager, config_error: Option<LlaError>) -> Result<()> {
+    if let Some(error) = config_error {
+        eprintln!("Warning: {}", error);
+    }
+
+    for plugin in &args.enable_plugin {
+        if let Err(e) = plugin_manager.enable_plugin(plugin) {
+            eprintln!("Failed to enable plugin '{}': {}", plugin, e);
+        }
+    }
+    for plugin in &args.disable_plugin {
+        if let Err(e) = plugin_manager.disable_plugin(plugin) {
+            eprintln!("Failed to disable plugin '{}': {}", plugin, e);
+        }
+    }
+
+    let lister = create_lister(args);
+    let sorter = create_sorter(args);
+    let filter = create_filter(args);
+    let formatter = create_formatter(args);
+    let format = get_format(args);
+
+    let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
+    
+    let  decorated_files = if !args.tree_format {
+        sort_files(decorated_files, &sorter)?
+    } else {
+        decorated_files
+    };
+
+    let formatted_output = formatter.format_files(&decorated_files, plugin_manager, args.depth)?;
+    println!("{}", formatted_output);
+    Ok(())
+}
+
+fn get_format(args: &Args) -> &'static str {
+    if args.long_format {
+        "long"
+    } else if args.tree_format {
+        "tree"
+    } else {
+        "default"
+    }
+}
+
+fn list_and_decorate_files(
+    args: &Args,
+    lister: &Arc<dyn FileLister + Send + Sync>,
+    filter: &Arc<dyn FileFilter + Send + Sync>,
+    plugin_manager: &PluginManager,
+    format: &str,
+) -> Result<Vec<DecoratedEntry>> {
+    Ok(lister
+        .list_files(&args.directory, args.tree_format, args.depth)?
+        .into_par_iter()
+        .filter_map(|path| {
+            let metadata = path.metadata().ok()?;
+            
+            if !filter
+                .filter_files(std::slice::from_ref(&path))
+                .map(|v| !v.is_empty())
+                .unwrap_or(false)
+            {
+                return None;
+            }
+
+            let mut entry = DecoratedEntry {
+                path,
+                metadata,
+                custom_fields: std::collections::HashMap::with_capacity(8),
+            };
+            plugin_manager.decorate_entry(&mut entry, format);
+            Some(entry)
+        })
+        .collect())
+}
+
+fn sort_files(
+    mut files: Vec<DecoratedEntry>,
+    sorter: &Arc<dyn FileSorter + Send + Sync>,
+) -> Result<Vec<DecoratedEntry>> {
+    let mut paths: Vec<_> = files.iter().map(|entry| entry.path.clone()).collect();
+    sorter.sort_files(&mut paths)?;
+    
+    files.sort_by_key(|entry| {
+        paths
+            .iter()
+            .position(|p| p == &entry.path)
+            .unwrap_or(usize::MAX)
+    });
+    
+    Ok(files)
+}
+
 fn load_config() -> Result<(Config, Option<LlaError>)> {
     match Config::load(&Config::get_config_path()) {
         Ok(config) => Ok((config, None)),
@@ -134,7 +169,7 @@ fn list_plugins(plugin_manager: &PluginManager) -> Result<()> {
 }
 
 fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
-    if args.recursive {
+    if args.tree_format {
         Arc::new(RecursiveLister)
     } else {
         Arc::new(BasicLister)
@@ -168,30 +203,6 @@ fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
     } else {
         Arc::new(DefaultFormatter)
     }
-}
-
-fn list_files(args: &Args, lister: &Arc<dyn FileLister + Send + Sync>) -> Result<Vec<PathBuf>> {
-    lister.list_files(&args.directory, args.recursive, args.depth)
-}
-
-fn sort_files(
-    mut files: Vec<PathBuf>,
-    sorter: &Arc<dyn FileSorter + Send + Sync>,
-) -> Result<Vec<PathBuf>> {
-    sorter.sort_files(&mut files)?;
-    Ok(files)
-}
-
-fn filter_files(files: Vec<PathBuf>, filter: &Arc<dyn FileFilter + Send + Sync>) -> Vec<PathBuf> {
-    files
-        .into_par_iter()
-        .filter(|file| {
-            filter
-                .filter_files(&[file.clone()])
-                .map(|v| !v.is_empty())
-                .unwrap_or(false)
-        })
-        .collect()
 }
 
 fn install_plugin_from_git(installer: &PluginInstaller, url: &str) -> Result<()> {

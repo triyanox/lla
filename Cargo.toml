@@ -7,6 +7,7 @@ edition = "2021"
 authors = ["Achaq <hi@achaq.dev>"]
 license = "MIT"
 repository = "https://github.com/triyanox/lla"
+resolver = "1"
 
 [workspace.dependencies]
 clap = "3.2.25"
@@ -22,3 +23,6 @@ walkdir = "2.5"
 tempfile = "3.2"
 users = "0.11"
 lla_plugin_interface = { path = "lla_plugin_interface" }
+dashmap = "5.5.3"
+parking_lot = "0.12"
+once_cell = "1.18"

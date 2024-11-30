@@ -3,7 +3,73 @@ use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
 use lla_plugin_interface::DecoratedEntry;
-use std::fs;
+use std::ffi::OsStr;
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+enum TreePart {
+    Edge,
+    Line,
+    Corner,
+}
+
+impl TreePart {
+    #[inline]
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Edge => "├── ",
+            Self::Line => "│   ",
+            Self::Corner => "└── ",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct TreeTrunk {
+    stack: Vec<TreePart>,
+    last_depth: Option<(usize, bool)>,
+    prefix_buf: String,
+}
+
+impl Default for TreeTrunk {
+    fn default() -> Self {
+        Self {
+            stack: Vec::with_capacity(32),
+            last_depth: None,
+            prefix_buf: String::with_capacity(128),
+        }
+    }
+}
+
+impl TreeTrunk {
+    #[inline]
+    fn get_prefix(&mut self, depth: usize, is_absolute_last: bool) -> &str {
+        if let Some((last_depth, _)) = self.last_depth {
+            if last_depth < self.stack.len() {
+                self.stack[last_depth] = TreePart::Line;
+            }
+        }
+
+        if depth + 1 > self.stack.len() {
+            self.stack.resize(depth + 1, TreePart::Line);
+        }
+
+        if depth < self.stack.len() {
+            self.stack[depth] = if is_absolute_last {
+                TreePart::Corner
+            } else {
+                TreePart::Edge
+            };
+        }
+
+        self.last_depth = Some((depth, is_absolute_last));
+
+        self.prefix_buf.clear();
+        for part in self.stack[1..=depth].iter() {
+            self.prefix_buf.push_str(part.as_str());
+        }
+        &self.prefix_buf
+    }
+}
 
 pub struct TreeFormatter;
 
@@ -12,65 +78,72 @@ impl FileFormatter for TreeFormatter {
         &self,
         files: &[DecoratedEntry],
         plugin_manager: &PluginManager,
-        depth: Option<usize>,
+        max_depth: Option<usize>,
     ) -> Result<String> {
-        fn build_tree(
-            entry: &DecoratedEntry,
-            prefix: &str,
-            is_last: bool,
-            current_depth: usize,
-            max_depth: Option<usize>,
-            plugin_manager: &PluginManager,
-        ) -> std::io::Result<String> {
-            let mut result = String::new();
-            let file_name = colorize_file_name(&entry.path);
-            let branch = if is_last { "└── " } else { "├── " };
+        if files.is_empty() {
+            return Ok(String::new());
+        }
 
-            let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
+        let has_plugins = !plugin_manager.enabled_plugins.is_empty();
+        let mut trunk = TreeTrunk::default();
 
-            result.push_str(&format!(
-                "{}{}{} {}\n",
-                prefix, branch, file_name, plugin_fields
-            ));
-
-            if entry.path.is_dir() && max_depth.map_or(true, |d| current_depth < d) {
-                let new_prefix = format!("{}{}   ", prefix, if is_last { " " } else { "│" });
-                let entries = fs::read_dir(&entry.path)?;
-                let mut entries: Vec<_> = entries
-                    .filter_map(|e| e.ok())
-                    .map(|e| DecoratedEntry {
-                        path: e.path(),
-                        metadata: e.metadata().unwrap(),
-                        custom_fields: std::collections::HashMap::new(),
-                    })
-                    .collect();
-                entries.sort_by_key(|e| e.path.file_name().unwrap().to_owned());
-                let last_index = entries.len().saturating_sub(1);
-                for (index, child_entry) in entries.into_iter().enumerate() {
-                    result.push_str(&build_tree(
-                        &child_entry,
-                        &new_prefix,
-                        index == last_index,
-                        current_depth + 1,
-                        max_depth,
-                        plugin_manager,
-                    )?);
+        let mut entries: Vec<_> = files
+            .iter()
+            .filter_map(|entry| {
+                let depth = entry.path.components().count() - 1;
+                if max_depth.map_or(true, |max| depth <= max) {
+                    Some((
+                        entry,
+                        depth,
+                        entry.path.clone(),
+                        entry
+                            .path
+                            .file_name()
+                            .unwrap_or_else(|| OsStr::new(""))
+                            .to_owned(),
+                    ))
+                } else {
+                    None
                 }
+            })
+            .collect();
+
+        entries.sort_unstable_by(|a, b| a.2.cmp(&b.2));
+        let avg_line_len = entries
+            .first()
+            .map(|(e, d, _, _)| {
+                let name_len = e.path.file_name().map_or(0, |n| n.len());
+                let prefix_len = *d * 4;
+                name_len + prefix_len + if has_plugins { 20 } else { 0 }
+            })
+            .unwrap_or(64);
+        let mut result = String::with_capacity(entries.len() * avg_line_len);
+
+        const CHUNK_SIZE: usize = 8192;
+        for chunk in entries.chunks(CHUNK_SIZE) {
+            let chunk_len = chunk.len();
+            for (i, (entry, depth, path, _)) in chunk.iter().enumerate() {
+                let is_last = if i + 1 < chunk_len {
+                    let (next_entry, next_depth, _, _) = &chunk[i + 1];
+                    *depth > *next_depth || !next_entry.path.starts_with(path.parent().unwrap_or(path))
+                } else {
+                    true
+                };
+
+                result.push_str(trunk.get_prefix(*depth, is_last));
+                result.push_str(&colorize_file_name(&entry.path));
+
+                if has_plugins {
+                    let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
+                    if !plugin_fields.is_empty() {
+                        result.push(' ');
+                        result.push_str(&plugin_fields);
+                    }
+                }
+                result.push('\n');
             }
-            Ok(result)
         }
 
-        let mut output = String::new();
-        for (index, file) in files.iter().enumerate() {
-            output.push_str(&build_tree(
-                file,
-                "",
-                index == files.len() - 1,
-                0,
-                depth,
-                plugin_manager,
-            )?);
-        }
-        Ok(output)
+        Ok(result)
     }
 }
