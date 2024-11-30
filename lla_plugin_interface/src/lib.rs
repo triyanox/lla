@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct DecoratedEntry {
     pub path: PathBuf,
     pub metadata: std::fs::Metadata,
