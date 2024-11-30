@@ -79,7 +79,7 @@ fn list_directory(args: &Args, plugin_manager: &mut PluginManager, config_error:
 
     let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
     
-    let  decorated_files = if !args.tree_format {
+    let decorated_files = if !args.tree_format {
         sort_files(decorated_files, &sorter)?
     } else {
         decorated_files
@@ -267,7 +267,8 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
 
 fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
     if args.tree_format {
-        Arc::new(RecursiveLister)
+        let config = Config::load(&Config::get_config_path()).unwrap_or_default();
+        Arc::new(RecursiveLister::new(config))
     } else {
         Arc::new(BasicLister)
     }
