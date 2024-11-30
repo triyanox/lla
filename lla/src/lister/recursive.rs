@@ -28,7 +28,12 @@ impl FileLister for RecursiveLister {
         }
 
         let max_depth = depth.unwrap_or(usize::MAX);
-        let max_entries = self.config.listers.recursive.max_entries.unwrap_or(usize::MAX);
+        let max_entries = self
+            .config
+            .listers
+            .recursive
+            .max_entries
+            .unwrap_or(usize::MAX);
         let mut entries = Vec::with_capacity(128);
         let walker = WalkDir::new(directory)
             .min_depth(0)

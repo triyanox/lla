@@ -2,7 +2,7 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
-use chrono::{DateTime, Local, Duration};
+use chrono::{DateTime, Duration, Local};
 use colored::*;
 use lla_plugin_interface::DecoratedEntry;
 use std::collections::BTreeMap;
@@ -64,7 +64,7 @@ impl FileFormatter for TimelineFormatter {
         }
 
         let mut groups: BTreeMap<TimeGroup, Vec<&DecoratedEntry>> = BTreeMap::new();
-        
+
         for file in files {
             let modified = file.metadata.modified()?;
             let dt: DateTime<Local> = modified.into();
@@ -81,7 +81,11 @@ impl FileFormatter for TimelineFormatter {
                 TimeGroup::Today => group.display_name().to_string(),
                 TimeGroup::Yesterday => {
                     let yesterday = Local::now().date_naive() - Duration::days(1);
-                    format!("{} ({})", group.display_name(), yesterday.format(date_format))
+                    format!(
+                        "{} ({})",
+                        group.display_name(),
+                        yesterday.format(date_format)
+                    )
                 }
                 _ => group.display_name().to_string(),
             };
@@ -96,21 +100,19 @@ impl FileFormatter for TimelineFormatter {
                 let name = colorize_file_name(&entry.path);
                 let modified = entry.metadata.modified()?;
                 let dt: DateTime<Local> = modified.into();
-                
+
                 let datetime_str = match group {
-                    TimeGroup::Today | TimeGroup::Yesterday => {
-                        dt.format(time_format).to_string()
-                    }
+                    TimeGroup::Today | TimeGroup::Yesterday => dt.format(time_format).to_string(),
                     _ => {
-                        format!("{} {}", 
-                            dt.format(date_format),
-                            dt.format(time_format)
-                        )
+                        format!("{} {}", dt.format(date_format), dt.format(time_format))
                     }
                 };
-                
+
                 let plugin_fields = plugin_manager.format_fields(entry, "timeline").join(" ");
-                let git_info = if let Some(git_field) = plugin_fields.split_whitespace().find(|s| s.contains("commit:")) {
+                let git_info = if let Some(git_field) = plugin_fields
+                    .split_whitespace()
+                    .find(|s| s.contains("commit:"))
+                {
                     format!(" [{}]", git_field.bright_yellow())
                 } else {
                     String::new()
@@ -121,10 +123,10 @@ impl FileFormatter for TimelineFormatter {
                     datetime_str.bright_black(),
                     name,
                     git_info,
-                    if plugin_fields.is_empty() { 
-                        String::new() 
-                    } else { 
-                        format!(" {}", plugin_fields) 
+                    if plugin_fields.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {}", plugin_fields)
                     }
                 ));
                 output.push('\n');
@@ -133,4 +135,4 @@ impl FileFormatter for TimelineFormatter {
 
         Ok(output)
     }
-} 
+}

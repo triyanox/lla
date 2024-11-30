@@ -10,21 +10,24 @@ mod sorter;
 mod utils;
 
 use args::{Args, Command, ConfigAction, InstallSource};
+use atty;
+use colored::*;
 use config::{initialize_config, Config};
+use dialoguer::{theme::ColorfulTheme, MultiSelect};
 use error::{LlaError, Result};
 use filter::{ExtensionFilter, FileFilter, PatternFilter};
-use formatter::{DefaultFormatter, FileFormatter, LongFormatter, TreeFormatter, TableFormatter, GridFormatter, SizeMapFormatter, TimelineFormatter, GitFormatter};
+use formatter::{
+    DefaultFormatter, FileFormatter, GitFormatter, GridFormatter, LongFormatter, SizeMapFormatter,
+    TableFormatter, TimelineFormatter, TreeFormatter,
+};
 use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
 use lla_plugin_interface::DecoratedEntry;
 use plugin::PluginManager;
 use rayon::prelude::*;
 use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
-use std::sync::Arc;
-use atty;
 use std::collections::HashSet;
-use colored::*;
-use dialoguer::{MultiSelect, theme::ColorfulTheme};
+use std::sync::Arc;
 
 fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
@@ -37,7 +40,9 @@ fn main() -> Result<()> {
             let plugin_installer = PluginInstaller::new(&args.plugins_dir);
             match source {
                 InstallSource::GitHub(url) => install_plugin_from_git(&plugin_installer, &url),
-                InstallSource::LocalDir(dir) => install_plugin_from_directory(&plugin_installer, &dir),
+                InstallSource::LocalDir(dir) => {
+                    install_plugin_from_directory(&plugin_installer, &dir)
+                }
             }
         }
         Some(Command::ListPlugins) => list_plugins(&mut plugin_manager),
@@ -55,7 +60,11 @@ fn main() -> Result<()> {
     }
 }
 
-fn list_directory(args: &Args, plugin_manager: &mut PluginManager, config_error: Option<LlaError>) -> Result<()> {
+fn list_directory(
+    args: &Args,
+    plugin_manager: &mut PluginManager,
+    config_error: Option<LlaError>,
+) -> Result<()> {
     if let Some(error) = config_error {
         eprintln!("Warning: {}", error);
     }
@@ -78,7 +87,7 @@ fn list_directory(args: &Args, plugin_manager: &mut PluginManager, config_error:
     let format = get_format(args);
 
     let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
-    
+
     let decorated_files = if !args.tree_format {
         sort_files(decorated_files, &sorter)?
     } else {
@@ -116,7 +125,7 @@ fn list_and_decorate_files(
         .into_par_iter()
         .filter_map(|path| {
             let metadata = path.metadata().ok()?;
-            
+
             if !filter
                 .filter_files(std::slice::from_ref(&path))
                 .map(|v| !v.is_empty())
@@ -142,14 +151,14 @@ fn sort_files(
 ) -> Result<Vec<DecoratedEntry>> {
     let mut paths: Vec<_> = files.iter().map(|entry| entry.path.clone()).collect();
     sorter.sort_files(&mut paths)?;
-    
+
     files.sort_by_key(|entry| {
         paths
             .iter()
             .position(|p| p == &entry.path)
             .unwrap_or(usize::MAX)
     });
-    
+
     Ok(files)
 }
 
@@ -180,7 +189,8 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
         let plugin_names: Vec<String> = plugins
             .iter()
             .map(|(name, version, desc)| {
-                format!("{} {} - {}", 
+                format!(
+                    "{} {} - {}",
                     name.cyan(),
                     format!("v{}", version).yellow(),
                     desc
@@ -193,26 +203,38 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
 
         let theme = ColorfulTheme {
             active_item_style: dialoguer::console::Style::new().cyan().bold(),
-            active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string()).for_stderr().cyan(),
-            checked_item_prefix: dialoguer::console::style("  ◉ ".to_string()).for_stderr().green(),
-            unchecked_item_prefix: dialoguer::console::style("  ○ ".to_string()).for_stderr().red(),
-            prompt_prefix: dialoguer::console::style("│ ".to_string()).for_stderr().cyan(),
+            active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string())
+                .for_stderr()
+                .cyan(),
+            checked_item_prefix: dialoguer::console::style("  ◉ ".to_string())
+                .for_stderr()
+                .green(),
+            unchecked_item_prefix: dialoguer::console::style("  ○ ".to_string())
+                .for_stderr()
+                .red(),
+            prompt_prefix: dialoguer::console::style("│ ".to_string())
+                .for_stderr()
+                .cyan(),
             prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
-            success_prefix: dialoguer::console::style("│ ".to_string()).for_stderr().cyan(),
+            success_prefix: dialoguer::console::style("│ ".to_string())
+                .for_stderr()
+                .cyan(),
             ..ColorfulTheme::default()
         };
 
         let selections = MultiSelect::with_theme(&theme)
             .with_prompt("Select plugins")
             .items(&plugin_names)
-            .defaults(&plugins
-                .iter()
-                .map(|(name, _, _)| plugin_manager.enabled_plugins.contains(name))
-                .collect::<Vec<_>>())
+            .defaults(
+                &plugins
+                    .iter()
+                    .map(|(name, _, _)| plugin_manager.enabled_plugins.contains(name))
+                    .collect::<Vec<_>>(),
+            )
             .interact()?;
 
         let mut updated_plugins = HashSet::new();
-        
+
         for idx in selections {
             let (name, _, _) = &plugins[idx];
             updated_plugins.insert(name.clone());
@@ -225,8 +247,8 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
                 plugin_manager.disable_plugin(name)?;
             }
         }
-        
-        print!("\x1B[1A\x1B[2K"); 
+
+        print!("\x1B[1A\x1B[2K");
         println!("\n{}", "Enabled plugins:".cyan().bold());
         let enabled: Vec<_> = plugins
             .iter()
@@ -237,14 +259,15 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
             println!("  {}", "No plugins enabled".bright_black().italic());
         } else {
             for (name, version, _) in enabled {
-                println!("  {} {} {}", 
+                println!(
+                    "  {} {} {}",
                     "◉".green(),
                     name.cyan(),
                     format!("v{}", version).yellow()
                 );
             }
         }
-        
+
         println!("\n{}", "Configuration updated successfully".green());
     } else {
         println!("{}", "Available plugins:".cyan().bold());
@@ -254,7 +277,8 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
             } else {
                 "○".red()
             };
-            println!("  {} {} {} - {}", 
+            println!(
+                "  {} {} {} - {}",
                 status,
                 name.cyan(),
                 format!("v{}", version).yellow(),

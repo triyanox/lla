@@ -1,7 +1,7 @@
 use super::FileSorter;
 use crate::error::Result;
-use std::path::PathBuf;
 use rayon::prelude::*;
+use std::path::PathBuf;
 
 pub struct AlphabeticalSorter;
 

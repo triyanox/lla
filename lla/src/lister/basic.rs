@@ -13,7 +13,7 @@ impl FileLister for BasicLister {
         _depth: Option<usize>,
     ) -> Result<Vec<PathBuf>> {
         let mut files = Vec::with_capacity(16);
-        
+
         let entries = fs::read_dir(directory)?;
         for entry in entries {
             if let Ok(entry) = entry {

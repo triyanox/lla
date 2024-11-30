@@ -25,7 +25,7 @@ impl FileSorter for DateSorter {
         for (i, &idx) in indices.iter().enumerate() {
             files[i] = temp[idx].clone();
         }
-        
+
         Ok(())
     }
 }

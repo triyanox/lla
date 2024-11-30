@@ -50,13 +50,19 @@ impl PluginInstaller {
     fn install_plugins(&self, root_dir: &Path) -> Result<()> {
         let plugin_dirs = self.find_plugin_directories(root_dir)?;
         if plugin_dirs.is_empty() {
-            return Err(LlaError::Plugin(format!("No plugins found in {:?}", root_dir)));
+            return Err(LlaError::Plugin(format!(
+                "No plugins found in {:?}",
+                root_dir
+            )));
         }
         let mut success = false;
         for plugin_dir in plugin_dirs {
             match self.build_and_install_plugin(&plugin_dir) {
                 Ok(_) => {
-                    println!("✅ Successfully built and installed plugin from {:?}", plugin_dir);
+                    println!(
+                        "✅ Successfully built and installed plugin from {:?}",
+                        plugin_dir
+                    );
                     success = true;
                 }
                 Err(e) => {
@@ -68,7 +74,9 @@ impl PluginInstaller {
         if success {
             Ok(())
         } else {
-            Err(LlaError::Plugin("No plugins were successfully installed".to_string()))
+            Err(LlaError::Plugin(
+                "No plugins were successfully installed".to_string(),
+            ))
         }
     }
 
@@ -81,23 +89,33 @@ impl PluginInstaller {
                     if contents.contains("[workspace]") {
                         if let Ok(rel_path) = plugin_dir.strip_prefix(parent) {
                             let rel_path_str = rel_path.to_string_lossy();
-                            
-                            if contents.contains(&format!("\"{}\"", rel_path_str)) ||
-                               contents.contains(&format!("'{}'", rel_path_str)) {
+
+                            if contents.contains(&format!("\"{}\"", rel_path_str))
+                                || contents.contains(&format!("'{}'", rel_path_str))
+                            {
                                 println!("🔍 Plugin is direct workspace member at {:?}", parent);
                                 return Ok(Some(parent.to_path_buf()));
                             }
                             if contents.contains("members = [") {
                                 let patterns = [
-                                    format!("\"{}/*\"", rel_path_str.split('/').next().unwrap_or("")),
+                                    format!(
+                                        "\"{}/*\"",
+                                        rel_path_str.split('/').next().unwrap_or("")
+                                    ),
                                     format!("'{}/*'", rel_path_str.split('/').next().unwrap_or("")),
-                                    format!("\"{}/\"", rel_path_str.split('/').next().unwrap_or("")),
+                                    format!(
+                                        "\"{}/\"",
+                                        rel_path_str.split('/').next().unwrap_or("")
+                                    ),
                                     format!("'{}/", rel_path_str.split('/').next().unwrap_or("")),
                                 ];
-                                
+
                                 for pattern in patterns {
                                     if contents.contains(&pattern) {
-                                        println!("🔍 Plugin is in workspace member directory at {:?}", parent);
+                                        println!(
+                                            "🔍 Plugin is in workspace member directory at {:?}",
+                                            parent
+                                        );
                                         return Ok(Some(parent.to_path_buf()));
                                     }
                                 }
@@ -144,7 +162,9 @@ impl PluginInstaller {
         if let Ok(entries) = target_dir.read_dir() {
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
-                if !path.is_file() { continue; }
+                if !path.is_file() {
+                    continue;
+                }
 
                 let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                 let is_plugin = match std::env::consts::OS {
@@ -169,13 +189,17 @@ impl PluginInstaller {
             .and_then(|n| n.to_str())
             .ok_or_else(|| LlaError::Plugin("Invalid plugin directory name".to_string()))?;
 
-        let (build_dir, build_args) = if let Some(workspace_root) = self.is_workspace_member(plugin_dir)? {
-            println!("   📦 Building as workspace member");
-            (workspace_root, vec!["build", "--release", "-p", plugin_name])
-        } else {
-            println!("   📦 Building as standalone plugin");
-            (plugin_dir.to_path_buf(), vec!["build", "--release"])
-        };
+        let (build_dir, build_args) =
+            if let Some(workspace_root) = self.is_workspace_member(plugin_dir)? {
+                println!("   📦 Building as workspace member");
+                (
+                    workspace_root,
+                    vec!["build", "--release", "-p", plugin_name],
+                )
+            } else {
+                println!("   📦 Building as standalone plugin");
+                (plugin_dir.to_path_buf(), vec!["build", "--release"])
+            };
         let _ = Command::new("cargo")
             .args(["clean"])
             .current_dir(&build_dir)

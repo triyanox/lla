@@ -12,19 +12,19 @@ pub trait FileFormatter {
 }
 
 mod default;
-mod long;
-mod tree;
-mod table;
-mod grid;
-mod sizemap;
-mod timeline;
 mod git;
+mod grid;
+mod long;
+mod sizemap;
+mod table;
+mod timeline;
+mod tree;
 
 pub use default::DefaultFormatter;
-pub use long::LongFormatter;
-pub use tree::TreeFormatter;
-pub use table::TableFormatter;
-pub use grid::GridFormatter;
-pub use sizemap::SizeMapFormatter;
-pub use timeline::TimelineFormatter;
 pub use git::GitFormatter;
+pub use grid::GridFormatter;
+pub use long::LongFormatter;
+pub use sizemap::SizeMapFormatter;
+pub use table::TableFormatter;
+pub use timeline::TimelineFormatter;
+pub use tree::TreeFormatter;

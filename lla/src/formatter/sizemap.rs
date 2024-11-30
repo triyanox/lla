@@ -19,12 +19,15 @@ impl FileFormatter for SizeMapFormatter {
             return Ok(String::new());
         }
 
-        let term_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
-        
+        let term_width = terminal_size()
+            .map(|(Width(w), _)| w as usize)
+            .unwrap_or(80);
+
         let max_name_width = files
             .iter()
             .map(|f| {
-                f.path.file_name()
+                f.path
+                    .file_name()
                     .unwrap_or_default()
                     .to_string_lossy()
                     .len()
@@ -34,16 +37,16 @@ impl FileFormatter for SizeMapFormatter {
             .min(40);
 
         let max_size = files.iter().map(|f| f.metadata.len()).max().unwrap_or(1);
-        let size_column_width = 10; 
-        let percentage_width = 15; 
-        
+        let size_column_width = 10;
+        let percentage_width = 15;
+
         let header_text = "Relative Size";
         let bar_width = term_width
             .saturating_sub(max_name_width)
             .saturating_sub(size_column_width)
             .saturating_sub(percentage_width)
             .saturating_sub(5);
-        
+
         let mut output = format!(
             "{:<width$} {:>10} {}\n{}\n",
             "Filename".bold(),
@@ -60,7 +63,7 @@ impl FileFormatter for SizeMapFormatter {
             let size = file.metadata.len();
             let name = colorize_file_name(&file.path);
             let plugin_fields = plugin_manager.format_fields(file, "sizemap").join(" ");
-            
+
             let this_bar_width = if max_size == 0 {
                 0
             } else {
@@ -73,7 +76,7 @@ impl FileFormatter for SizeMapFormatter {
             } else {
                 format!("{:>4}%", 0)
             };
-            
+
             let size_str = format_size(size);
             let plugin_suffix = if plugin_fields.is_empty() {
                 String::new()
@@ -89,13 +92,9 @@ impl FileFormatter for SizeMapFormatter {
 
             let line = format!(
                 "{}{} {:>10} {}{}",
-                name,
-                padding,
-                size_str,
-                bar,
-                plugin_suffix
+                name, padding, size_str, bar, plugin_suffix
             );
-            
+
             output.push_str(&line);
             output.push('\n');
         }
@@ -114,11 +113,11 @@ fn format_size(size: u64) -> String {
     let base = 1024_f64;
     let exp = (size.ln() / base.ln()).floor() as i32;
     let exp = exp.clamp(0, (UNITS.len() - 1) as i32);
-    
+
     let size = size / base.powi(exp);
     if exp == 0 {
         format!("{:.0} {}", size, UNITS[exp as usize])
     } else {
         format!("{:.1} {}", size, UNITS[exp as usize])
     }
-} 
+}

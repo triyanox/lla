@@ -1,10 +1,10 @@
 use super::FileFormatter;
+use crate::config::Config;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
 use colored::*;
 use lla_plugin_interface::DecoratedEntry;
-use crate::config::Config;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 enum TreePart {
@@ -118,14 +118,17 @@ impl FileFormatter for TreeFormatter {
 
         let total_entries = entries.len();
         let start_index = if max_lines > 0 && total_entries > max_lines {
-            eprintln!("Note: Showing only the last {} entries out of {}", max_lines, total_entries);
+            eprintln!(
+                "Note: Showing only the last {} entries out of {}",
+                max_lines, total_entries
+            );
             total_entries - max_lines
         } else {
             0
         };
 
         let entries = &entries[start_index..];
-        
+
         let avg_line_len = entries
             .first()
             .map(|(e, d, _)| {
@@ -134,7 +137,7 @@ impl FileFormatter for TreeFormatter {
                 name_len + prefix_len + 1
             })
             .unwrap_or(64);
-        
+
         let mut result = String::with_capacity(entries.len() * avg_line_len);
         let mut prefix_buf = String::with_capacity(128);
         let mut entry_buf = String::with_capacity(256);
@@ -145,7 +148,8 @@ impl FileFormatter for TreeFormatter {
             for (i, (entry, depth, path)) in chunk.iter().enumerate() {
                 let is_last = if i + 1 < chunk_len {
                     let (next_entry, next_depth, _) = &chunk[i + 1];
-                    *depth > *next_depth || !next_entry.path.starts_with(path.parent().unwrap_or(path))
+                    *depth > *next_depth
+                        || !next_entry.path.starts_with(path.parent().unwrap_or(path))
                 } else {
                     true
                 };

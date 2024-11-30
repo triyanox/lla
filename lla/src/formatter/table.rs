@@ -2,10 +2,10 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::*;
+use colored::*;
 use lla_plugin_interface::DecoratedEntry;
 use std::cmp;
 use unicode_width::UnicodeWidthStr;
-use colored::*;
 
 pub struct TableFormatter;
 
@@ -62,10 +62,14 @@ impl TableFormatter {
         let headers = ["Permissions", "Size", "Modified", "Name"];
         let mut header = String::new();
         header.push('│');
-        
+
         for (&width, &title) in widths.iter().zip(headers.iter()) {
             header.push_str(&" ".repeat(Self::PADDING));
-            header.push_str(&format!("{:width$}", title, width = width).bold().to_string());
+            header.push_str(
+                &format!("{:width$}", title, width = width)
+                    .bold()
+                    .to_string(),
+            );
             header.push_str(&" ".repeat(Self::PADDING));
             header.push('│');
         }
@@ -101,7 +105,7 @@ impl TableFormatter {
     fn format_cell(content: &str, width: usize, align_right: bool) -> String {
         let visible_width = Self::visible_width(content);
         let padding = width.saturating_sub(visible_width);
-        
+
         if align_right {
             format!("{}{}", " ".repeat(padding), content)
         } else {

@@ -5,8 +5,8 @@ use crate::utils::color::colorize_file_name;
 use colored::*;
 use lla_plugin_interface::DecoratedEntry;
 use std::collections::HashMap;
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
 
 pub struct GitFormatter;
 
@@ -60,20 +60,20 @@ impl GitFormatter {
             "D." => "[deleted]".red(),
             "R." => "[renamed]".blue(),
             "C." => "[copied]".blue(),
-            
+
             ".M" => "[modified]".yellow(),
             ".D" => "[deleted]".red(),
-            
+
             "MM" => "[modified*]".yellow(),
             "AM" => "[added+]".green(),
             "DM" => "[deleted*]".red(),
-            
+
             "UU" => "[conflict]".red(),
-            
+
             "??" => "[untracked]".bright_black(),
             "!!" => "[ignored]".bright_black(),
             "." => "[unchanged]".normal(),
-            
+
             s if s.starts_with('M') => format!("[modified+{}]", &s[1..]).yellow(),
             s if s.starts_with('A') => format!("[added+{}]", &s[1..]).green(),
             s if s.starts_with('D') => format!("[deleted+{}]", &s[1..]).red(),
@@ -87,7 +87,7 @@ impl GitFormatter {
 
     fn get_git_status_map(workspace_root: &Path) -> HashMap<String, String> {
         let mut status_map = HashMap::new();
-        
+
         if let Ok(output) = Command::new("git")
             .args(["status", "--porcelain=v2", "--untracked-files=all"])
             .current_dir(workspace_root)
@@ -105,16 +105,16 @@ impl GitFormatter {
 
                 match parts[0] {
                     "1" | "2" if parts.len() >= 9 => {
-                        let xy = parts[1]; 
-                        let path = parts[8];    
+                        let xy = parts[1];
+                        let path = parts[8];
                         status_map.insert(path.to_string(), xy.to_string());
-                    },
+                    }
                     "?" if parts.len() >= 2 => {
                         status_map.insert(parts[1].to_string(), "??".to_string());
-                    },
+                    }
                     "!" if parts.len() >= 2 => {
                         status_map.insert(parts[1].to_string(), "!!".to_string());
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -126,11 +126,12 @@ impl GitFormatter {
             .output()
         {
             for line in String::from_utf8_lossy(&output.stdout).lines() {
-                status_map.entry(line.to_string())
+                status_map
+                    .entry(line.to_string())
                     .or_insert_with(|| ".".to_string());
             }
         }
-        
+
         status_map
     }
 
@@ -154,7 +155,11 @@ impl GitFormatter {
         let log = String::from_utf8_lossy(&output.stdout);
         let parts: Vec<&str> = log.trim().split('|').collect();
         if parts.len() >= 4 {
-            Some((parts[0].to_string(), parts[2].to_string(), parts[3].to_string()))
+            Some((
+                parts[0].to_string(),
+                parts[2].to_string(),
+                parts[3].to_string(),
+            ))
         } else {
             None
         }
@@ -172,9 +177,11 @@ impl FileFormatter for GitFormatter {
             return Ok(String::new());
         }
 
-        let workspace_root = files[0].path.ancestors().find(|p| {
-            p.join(".git").exists()
-        }).unwrap_or(Path::new("."));
+        let workspace_root = files[0]
+            .path
+            .ancestors()
+            .find(|p| p.join(".git").exists())
+            .unwrap_or(Path::new("."));
 
         let git_info = match GitFormatter::get_git_info(workspace_root) {
             Some(info) => info,
@@ -185,8 +192,16 @@ impl FileFormatter for GitFormatter {
             "{} {}{}{}\n{}\n\n",
             "⎇".bright_blue(),
             git_info.branch.green().bold(),
-            if git_info.ahead > 0 { format!(" ↑{}", git_info.ahead).yellow() } else { "".into() },
-            if git_info.behind > 0 { format!(" ↓{}", git_info.behind).red() } else { "".into() },
+            if git_info.ahead > 0 {
+                format!(" ↑{}", git_info.ahead).yellow()
+            } else {
+                "".into()
+            },
+            if git_info.behind > 0 {
+                format!(" ↓{}", git_info.behind).red()
+            } else {
+                "".into()
+            },
             "─".repeat(40).bright_black()
         );
 
@@ -228,7 +243,11 @@ impl FileFormatter for GitFormatter {
                 padding,
                 commit_info.0.bright_yellow(),
                 commit_info.1.bright_black(),
-                if commit_info.2 != "-" { format!("by {} ", commit_info.2.bright_blue()) } else { "".into() },
+                if commit_info.2 != "-" {
+                    format!("by {} ", commit_info.2.bright_blue())
+                } else {
+                    "".into()
+                },
                 status_str,
                 plugin_suffix
             ));
@@ -237,4 +256,4 @@ impl FileFormatter for GitFormatter {
 
         Ok(output)
     }
-} 
+}

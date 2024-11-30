@@ -19,20 +19,21 @@ impl FileFormatter for GridFormatter {
             return Ok(String::new());
         }
 
-        let term_width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
+        let term_width = terminal_size()
+            .map(|(Width(w), _)| w as usize)
+            .unwrap_or(80);
         let max_width = files
             .iter()
             .map(|file| {
-                let name = file.path.file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy();
+                let name = file.path.file_name().unwrap_or_default().to_string_lossy();
                 let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
                 let total_str = if plugin_fields.is_empty() {
                     name.to_string()
                 } else {
                     format!("{} {}", name, plugin_fields)
                 };
-                String::from_utf8_lossy(&strip_ansi_escapes::strip(&total_str).unwrap_or_default()).width()
+                String::from_utf8_lossy(&strip_ansi_escapes::strip(&total_str).unwrap_or_default())
+                    .width()
             })
             .max()
             .unwrap_or(0);
@@ -71,4 +72,4 @@ impl FileFormatter for GridFormatter {
         output.push('\n');
         Ok(output)
     }
-} 
+}
