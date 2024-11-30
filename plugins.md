@@ -14,11 +14,33 @@ Or you can install individual plugins as described below.
 
 ## Available Plugins
 
+### file_tagger
+
+**Description:** A plugin for tagging files and filtering by tags
+
+**Version:** 0.2.0
+
+**Installation Options:**
+
+1. Using LLA install command:
+```bash
+lla install --dir path/to/lla/plugins/file_tagger
+```
+
+2. Manual installation:
+```bash
+git clone https://github.com/triyanox/lla
+cd lla/plugins/file_tagger
+cargo build --release
+```
+
+Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
+
 ### last_git_commit
 
 **Description:** A plugin for the LLA that provides the last git commit hash
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -36,11 +58,33 @@ cargo build --release
 
 Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
 
+### code_snippet_extractor
+
+**Description:** A plugin for extracting and managing code snippets
+
+**Version:** 0.2.0
+
+**Installation Options:**
+
+1. Using LLA install command:
+```bash
+lla install --dir path/to/lla/plugins/code_snippet_extractor
+```
+
+2. Manual installation:
+```bash
+git clone https://github.com/triyanox/lla
+cd lla/plugins/code_snippet_extractor
+cargo build --release
+```
+
+Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
+
 ### file_type
 
 **Description:** Displays the file type of each file using emojis
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -62,7 +106,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Code complexity plugin for LLA
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -84,7 +128,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** File size visualizer plugin for LLA
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -106,7 +150,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Displays the hash of each file
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -128,7 +172,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Categorizer plugin for LLA
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -150,7 +194,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** A plugin for the LLA that detects duplicate files.
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -172,7 +216,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Searches for specific keywords within text-based files
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -194,7 +238,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Searches file contents for user-specified keywords
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -216,7 +260,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Shows the git status of each file
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -238,7 +282,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Shows directories metadata
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
@@ -260,7 +304,7 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Displays the file metadata of each file
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 **Installation Options:**
 
