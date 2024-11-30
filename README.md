@@ -155,7 +155,7 @@ lla -t -d 3           # Tree view, max depth 3
 
 ## Plugin System
 
-<video src="https://github.com/triyanox/lla/blob/main/docs/videos/plugins-use.mp4" width="100%" controls></video>
+https://github.com/user-attachments/assets/6064b70e-1275-4d60-88ed-3370c0068ebd
 
 `lla` uses a plugin system to extend its functionality so you can enhance it with custom functionality based on your needs.
 You can install plugins from a local directory or from a Git repository.
