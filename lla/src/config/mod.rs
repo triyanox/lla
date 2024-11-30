@@ -87,9 +87,16 @@ impl Config {
 
         if path.exists() {
             let contents = fs::read_to_string(path)?;
-            let config: Config = toml::from_str(&contents)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-            Ok(config)
+            match toml::from_str(&contents) {
+                Ok(config) => Ok(config),
+                Err(e) => {
+                    eprintln!("Error loading config: {}. Reinitializing with default configuration...", e);
+                    let config = Config::default();
+                    config.ensure_plugins_dir()?;
+                    config.save(path)?;
+                    Ok(config)
+                }
+            }
         } else {
             let config = Config::default();
             config.ensure_plugins_dir()?;
