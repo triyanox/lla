@@ -13,7 +13,7 @@ use args::{Args, Command, ConfigAction, InstallSource};
 use config::{initialize_config, Config};
 use error::{LlaError, Result};
 use filter::{ExtensionFilter, FileFilter, PatternFilter};
-use formatter::{DefaultFormatter, FileFormatter, LongFormatter, TreeFormatter, TableFormatter};
+use formatter::{DefaultFormatter, FileFormatter, LongFormatter, TreeFormatter, TableFormatter, GridFormatter};
 use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
 use lla_plugin_interface::DecoratedEntry;
@@ -92,6 +92,8 @@ fn get_format(args: &Args) -> &'static str {
         "tree"
     } else if args.table_format {
         "table"
+    } else if args.grid_format {
+        "grid"
     } else {
         "default"
     }
@@ -204,6 +206,8 @@ fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
         Arc::new(TreeFormatter)
     } else if args.table_format {
         Arc::new(TableFormatter)
+    } else if args.grid_format {
+        Arc::new(GridFormatter)
     } else {
         Arc::new(DefaultFormatter)
     }

@@ -15,8 +15,10 @@ mod default;
 mod long;
 mod tree;
 mod table;
+mod grid;
 
 pub use default::DefaultFormatter;
 pub use long::LongFormatter;
 pub use tree::TreeFormatter;
 pub use table::TableFormatter;
+pub use grid::GridFormatter;

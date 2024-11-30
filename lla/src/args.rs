@@ -8,6 +8,7 @@ pub struct Args {
     pub long_format: bool,
     pub tree_format: bool,
     pub table_format: bool,
+    pub grid_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
     pub enable_plugin: Vec<String>,
@@ -71,6 +72,12 @@ impl Args {
                     .short('T')
                     .long("table")
                     .help("Use table listing format"),
+            )
+            .arg(
+                Arg::with_name("grid")
+                    .short('g')
+                    .long("grid")
+                    .help("Use grid listing format"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -184,6 +191,8 @@ impl Args {
             "tree"
         } else if matches.is_present("table") {
             "table"
+        } else if matches.is_present("grid") {
+            "grid"
         } else {
             &config.default_format
         };
@@ -233,6 +242,7 @@ impl Args {
             long_format: format == "long",
             tree_format: format == "tree",
             table_format: format == "table",
+            grid_format: format == "grid",
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)

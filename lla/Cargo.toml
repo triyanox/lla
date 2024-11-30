@@ -32,3 +32,4 @@ once_cell.workspace = true
 dashmap.workspace = true
 unicode-width.workspace = true
 strip-ansi-escapes.workspace = true
+terminal_size.workspace = true
