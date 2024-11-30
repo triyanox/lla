@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 keywords = ["cli", "ls", "lightweight"]
 categories = ["command-line-utilities"]
-exclude = ["lla.png"]
+exclude = ["docs/images"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
