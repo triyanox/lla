@@ -12,11 +12,10 @@ impl FileLister for BasicLister {
         _recursive: bool,
         _depth: Option<usize>,
     ) -> Result<Vec<PathBuf>> {
-        let entries = fs::read_dir(directory)?;
-        let mut files = Vec::new();
+        let mut files = Vec::with_capacity(16);
 
-        for entry in entries {
-            let entry = entry?;
+        let entries = fs::read_dir(directory)?;
+        for entry in entries.flatten() {
             files.push(entry.path());
         }
 

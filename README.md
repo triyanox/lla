@@ -1,193 +1,257 @@
-# `lla` - A modern alternative to ls
+# `lla` - A Modern Alternative to ls
 
-`lla` is a high-performance, extensible alternative to the traditional `ls` command, written in Rust. It offers enhanced functionality, customizable output, and a plugin system for extended capabilities.
+`lla` is a high-performance file explorer written in Rust that enhances the traditional `ls` command with modern features, rich formatting options, and a powerful plugin system.
 
-![lla in action](https://github.com/triyanox/lla/blob/main/lla.png?raw=true)
+## Display Formats
 
-## Features
+### Default View
 
-- **Efficient file listing**: Optimized for speed, even in large directories
-- **Multiple view modes**:
-  - Default view
-  - Long format (`-l`)
-  - Tree view (`-t`)
-  - Recursive listing (`-R`)
-- **Advanced sorting**:
-  - Alphabetical (default)
-  - File size (`-s size`)
-  - Modification date (`-s date`)
-- **Flexible filtering**: Filter by filename or extension (`-f, --filter`)
-- **Customizable recursion**: Set maximum depth for subdirectory traversal
-- **Extensible plugin system**: Develop and integrate custom functionality
-- **Color-coded output**: Easily distinguish file types and permissions
-- **Git integration**: Show git status for files (with plugin)
-- **File categorization**: Categorize files by type (with plugin)
-- **Keyword search**: Search file contents for specified keywords (with plugin)
-- **File hash display**: Show file hashes (with plugin)
-- **Code complexity analysis**: Analyze code complexity (with plugin)
-- **File size visualization**: Visualize file sizes (with plugin)
-- **Duplicate file detection**: Identify duplicate files (with plugin)
-- **Directory metadata**: Display detailed directory information (with plugin)
-- **File metadata**: Show extended file metadata (with plugin)
-- **Last git commit info**: Display information about the last git commit (with plugin)
-
-and more!
-
-## Installation
-
-### From crates.io
+Quick and clean directory listing
 
 ```bash
-cargo install lla
+lla
 ```
 
-### For NetBSD users
+![Default View](docs/images/default.png)
+
+### Long Format
+
+Detailed file information with metadata
 
 ```bash
+lla -l
+```
+
+![Long Format](docs/images/long.png)
+
+### Tree View
+
+Hierarchical directory visualization
+
+```bash
+lla -t
+```
+
+![Tree View](docs/images/tree.png)
+
+### Table View
+
+Structured data display
+
+```bash
+lla -T
+```
+
+![Table View](docs/images/table.png)
+
+### Grid View
+
+Organized layout for better readability
+
+```bash
+lla -g
+```
+
+![Grid View](docs/images/grid.png)
+
+### Git-Aware View
+
+Repository status and insights
+
+```bash
+lla -G
+```
+
+![Git View](docs/images/git.png)
+
+### Timeline View
+
+Group files by dates
+
+```bash
+lla --timeline
+```
+
+![Timeline View](docs/images/timeline.png)
+
+## Core Features
+
+- **Smart Display Formats**
+
+  - Default view for quick browsing
+  - Long format (`-l`) with detailed metadata
+  - Tree view (`-t`) for directory visualization
+  - Grid view (`-g`) for organized layouts
+  - Table view (`-T`) for structured data
+  - Size map (`-S`) for visual space analysis [experimental]
+  - Timeline view (`--timeline`) for temporal organization
+  - Git-aware view (`-G`) for repository insights
+
+- **Intelligent Organization**
+
+  - Sort by name, size, or date (`-s`)
+  - Filter by name or extension (`-f`)
+  - Recursive listing with depth control (`-d`)
+  - Performance-optimized for large directories
+
+- **Plugin Ecosystem**
+  - Git integration for repository insights
+  - File categorization and tagging
+  - Code complexity analysis
+  - Content keyword search
+  - File hash calculation
+  - Size visualization
+  - Duplicate detection
+  - Extended metadata display
+
+## Quick Start
+
+1. Install `lla`:
+
+```bash
+# Using Cargo
+cargo install lla
+
+# On macOS
+brew install lla
+
+# On Arch Linux (btw)
+paru -S lla
+
+# On NetBSD (we see you)
 pkgin install lla
 ```
 
-(we see you, netbsd. we appreciate you.)
+2. Initialize your setup:
 
-### For Arch Linux users
-
-`lla` is available in the [AUR](https://aur.archlinux.org/packages/lla). You can install it with your favorite [AUR helper](https://wiki.archlinux.org/title/AUR_helpers), e.g.:
-
-```sh
-paru -S lla
-```
-
-(btw)
-
-### For macOS users with Homebrew
-
-[`lla`](https://formulae.brew.sh/formula/lla#default) is available in the [Homebrew](https://brew.sh) package manager. You can install it with:
+`lla` uses a TOML configuration file located at `~/.config/lla/config.toml`.
 
 ```bash
-brew install lla
-```
-
-## Usage
-
-First you need to initialize the configuration file:
-
-```bash
+# Create default config
 lla init
-lla config # to view the config file
+
+# View your config
+lla config
 ```
 
-Then you can start using `lla`:
-
-```
-lla [OPTIONS] [DIRECTORY]
-```
-
-### Core Options
-
-- `-l, --long`: Use long listing format
-- `-R, --recursive`: List subdirectories recursively
-- `-t, --tree`: Display files in a tree structure
-- `-s, --sort <CRITERIA>`: Sort by "name", "size", or "date"
-- `-f, --filter <PATTERN>`: Filter files by name or extension
-- `-d, --depth <DEPTH>`: Set maximum recursion depth
-
-### Plugin Management
-
-- `--enable-plugin <NAME>`: Enable a specific plugin
-- `--disable-plugin <NAME>`: Disable a specific plugin
-- `--plugins-dir <PATH>`: Specify custom plugins directory
-- `--plugin-arg <ARG>`: Pass arguments to enabled plugins
-
-### Plugin Actions
-
-`lla` supports plugin-specific actions, allowing you to interact with plugins directly:
-
-```
-lla plugin --name <PLUGIN_NAME> --action <ACTION_NAME> [--args <ARG1> <ARG2> ...]
-```
-
-- `--name <PLUGIN_NAME>`: Specify the name of the plugin
-- `--action <ACTION_NAME>`: Specify the action to perform
-- `--args <ARG1> <ARG2> ...`: Provide arguments for the action (optional)
-
-### Utility Commands
-
-- `lla install`: Install plugins
-  - `--git <URL>`: Install from a Git repository
-  - `--dir <PATH>`: Install from a local directory
-- `lla list-plugins`: Display all available plugins
-- `lla init`: Initialize configuration file
-- `lla config`: View configuration file
-
-## Configuration
-
-`lla` uses a TOML configuration file located at `~/.config/lla/config.toml`. Initialize with default settings:
+3. Start exploring:
 
 ```bash
-lla init
-lla config # to view the config file
+# Basic usage
+lla                     # List current directory
+lla -l                  # Long format with details
+lla -t                  # Tree view
+lla -g                  # Grid view
+lla -T                  # Table view
+lla -S                  # Size map view
+lla --timeline          # Timeline view
+lla -G                  # Git-aware view
+
+# Advanced usage
+lla -ls size           # Sort by size in long format
+lla -f .rs            # Show only Rust files
+lla -t -d 3           # Tree view, max depth 3
 ```
 
-You can modify configuration values using the `config --set` command:
+## Plugin System
 
-```bash
-lla config --set plugins_dir /new/path/to/plugins  # Change plugins directory
-lla config --set default_sort size                 # Change default sort
-lla config --set default_format long              # Change default format
-lla config --set default_depth 5                  # Change default depth
-```
+<video src="https://github.com/triyanox/lla/blob/main/docs/videos/plugins-use.mp4" width="100%" controls></video>
 
-Example configuration:
-
-```toml
-default_sort = "name"
-default_format = "default"
-enabled_plugins = ["git_status", "file_hash"]
-plugins_dir = "/home/user/.config/lla/plugins"
-default_depth = 3
-```
-
-## Install Plugins
-
+`lla` uses a plugin system to extend its functionality so you can enhance it with custom functionality based on your needs.
 You can install plugins from a local directory or from a Git repository.
 
 You can find official plugins [here](https://github.com/triyanox/lla/blob/main/plugins.md).
 
-### From Git
+1. Install plugins:
 
 ```bash
-lla install --git <github_url>
+# From Git repository
+lla install --git https://github.com/user/plugin
+
+# From local directory
+lla install --dir path/to/plugin
 ```
 
-### From Local Directory
+2. Manage plugins:
 
 ```bash
-lla install --dir <path>
+# Enable plugins
+lla --enable-plugin git_status
+lla --enable-plugin keyword_search
+
+# Disable plugins
+lla --disable-plugin git_status
+
+# Interactive plugin manager
+lla use
+
+# Update plugins
+lla update              # Update all plugins
+lla update plugin_name  # Update specific plugin
+```
+
+3. Plugin actions:
+
+```bash
+# Execute plugin actions
+lla plugin --name keyword_search --action set-keywords --args "TODO" "FIXME"
+lla plugin --name git_status --action show-status
+```
+
+## Configuration
+
+Your config lives at `~/.config/lla/config.toml`:
+
+```toml
+# Core settings
+default_sort = "name"          # name, size, date
+default_format = "default"     # default, long, tree, grid
+enabled_plugins = ["git_status", "file_hash"]
+plugins_dir = "/home/user/.config/lla/plugins"
+default_depth = 3
+
+# Performance settings
+[formatters.tree]
+max_lines = 20000             # Max entries in tree view
+[listers.recursive]
+max_entries = 20000           # Max entries in recursive listing
+```
+
+Modify settings via CLI:
+
+```bash
+lla config --set default_sort size
+lla config --set default_format long
+lla config --set plugins_dir /custom/path
+lla config --set default_depth 5
 ```
 
 ## Plugin Development
 
-Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libraries that implement the `Plugin` trait from the `lla_plugin_interface` crate.
+Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libraries that implement the `Plugin` trait from the [lla_plugin_interface](https://github.com/triyanox/lla/tree/main/lla_plugin_interface) crate.
 
-### Plugin Structure
+1. Create a new plugin:
 
-1. Create a new Rust library:
+```bash
+cargo new --lib my_lla_plugin
+```
 
-   ```bash
-   cargo new --lib my_lla_plugin
-   ```
+2. Configure `Cargo.toml`:
 
-2. Add dependencies to `Cargo.toml`:
+```toml
+[package]
+name = "my_plugin"
+version = "0.1.0"
+edition = "2021"
 
-   ```toml
-   [dependencies]
-   lla_plugin_interface = "*"
+[dependencies]
+lla_plugin_interface = "*"
 
-   [lib]
-   crate-type = ["cdylib"]
-   ```
+[lib]
+crate-type = ["cdylib"]
+```
 
-3. Implement the `Plugin` trait:
+3. Implement the plugin interface:
 
 ```rust
 use lla_plugin_interface::{Plugin, DecoratedEntry, EntryDecorator, CliArg};
@@ -253,66 +317,41 @@ lla_plugin_interface::declare_plugin!(MyPlugin);
 
 4. Build your plugin:
 
-   ```bash
-   cargo build --release
-   ```
+```bash
+cargo build --release
+```
 
-5. Install the plugin:
-   ```bash
-   lla install --dir /path/to/my_lla_plugin
-   ```
-   or
-   ```bash
-   lla install --git <git_repo>
-   ```
+5. Install your plugin:
+
+```bash
+lla install --dir path/to/plugin
+```
+
+or
+
+```bash
+lla install --git https://github.com/user/plugin
+```
 
 ### Plugin Interface
 
-The `lla_plugin_interface` crate provides the following key components:
+The [lla_plugin_interface](https://github.com/triyanox/lla/tree/main/lla_plugin_interface) crate provides the following key components:
 
 - `Plugin` trait: Core interface for plugin functionality
 - `EntryDecorator` trait: Methods for decorating and formatting file entries
 - `DecoratedEntry` struct: Represents a file entry with metadata and custom fields
 - `CliArg` struct: Defines command-line arguments for the plugin
 
-## Examples
-
-```bash
-# Long format, sorted by size, showing only .rs files
-lla -ls size -f .rs
-
-# Enable git status plugin
-lla --enable-plugin git_status
-
-# Enable multiple plugins
-lla --enable-plugin git_status categorizer
-
-# Disable git status plugin
-lla --disable-plugin git_status
-
-# Disable multiple plugins
-lla --disable-plugin git_status categorizer
-
-# Set keywords for the keyword search plugin using plugin action
-lla plugin --name keyword_search --action set-keywords --args "TODO" "FIXME" "BUG"
-
-# Show current keywords for the keyword search plugin
-lla plugin --name keyword_search --action show-keywords
-
-# Use the keyword search plugin with the set keywords
-lla --enable-plugin keyword_search
-```
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests, report bugs, and suggest features.
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -m 'Add some new-feature'`)
-4. Push to the branch (`git push origin feature/new-feature`)
+2. Create your feature branch (git checkout -b feature/new-feature)
+3. Commit your changes (git commit -m 'Add some new-feature')
+4. Push to the branch (git push origin feature/new-feature)
 5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/triyanox/lla/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

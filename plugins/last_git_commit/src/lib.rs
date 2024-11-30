@@ -71,7 +71,7 @@ impl EntryDecorator for LastGitCommitPlugin {
                     time.bright_green()
                 ))
             }
-            "default" | "tree" => {
+            "default" => {
                 let hash = entry.custom_fields.get("commit_hash")?;
                 let time = entry.custom_fields.get("commit_time")?;
                 Some(format!("Commit: {} {}", hash, time))
@@ -81,7 +81,7 @@ impl EntryDecorator for LastGitCommitPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
 }
 

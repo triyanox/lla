@@ -51,7 +51,7 @@ impl EntryDecorator for FileHashPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" => {
+            "long" | "default" => {
                 let sha1 = entry
                     .custom_fields
                     .get("sha1")
@@ -69,7 +69,7 @@ impl EntryDecorator for FileHashPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["long"]
+        vec!["default", "long"]
     }
 }
 

@@ -4,15 +4,19 @@ use std::path::PathBuf;
 
 pub struct Args {
     pub directory: String,
-    pub recursive: bool,
+    pub depth: Option<usize>,
     pub long_format: bool,
     pub tree_format: bool,
+    pub table_format: bool,
+    pub grid_format: bool,
+    pub sizemap_format: bool,
+    pub timeline_format: bool,
+    pub git_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
-    pub depth: Option<usize>,
     pub command: Option<Command>,
     pub plugin_args: Vec<String>,
 }
@@ -20,9 +24,11 @@ pub struct Args {
 pub enum Command {
     Install(InstallSource),
     ListPlugins,
+    Use,
     InitConfig,
     Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
+    Update(Option<String>),
 }
 
 pub enum InstallSource {
@@ -48,17 +54,11 @@ impl Args {
                     .default_value("."),
             )
             .arg(
-                Arg::with_name("recursive")
-                    .short('R')
-                    .long("recursive")
-                    .help("Recursively list subdirectories"),
-            )
-            .arg(
                 Arg::with_name("depth")
                     .short('d')
                     .long("depth")
                     .takes_value(true)
-                    .help("Set the depth for recursive listing"),
+                    .help("Set the depth for tree listing"),
             )
             .arg(
                 Arg::with_name("long")
@@ -71,6 +71,35 @@ impl Args {
                     .short('t')
                     .long("tree")
                     .help("Use tree listing format"),
+            )
+            .arg(
+                Arg::with_name("table")
+                    .short('T')
+                    .long("table")
+                    .help("Use table listing format"),
+            )
+            .arg(
+                Arg::with_name("grid")
+                    .short('g')
+                    .long("grid")
+                    .help("Use grid listing format"),
+            )
+            .arg(
+                Arg::with_name("sizemap")
+                    .short('S')
+                    .long("sizemap")
+                    .help("Show visual representation of file sizes"),
+            )
+            .arg(
+                Arg::with_name("timeline")
+                    .long("timeline")
+                    .help("Group files by time periods"),
+            )
+            .arg(
+                Arg::with_name("git")
+                    .short('G')
+                    .long("git")
+                    .help("Show git status and information"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -172,18 +201,36 @@ impl Args {
                             .help("Set a configuration value (e.g., --set plugins_dir /new/path)"),
                     ),
             )
+            .subcommand(SubCommand::with_name("use").about("Interactive plugin manager"))
+            .subcommand(
+                SubCommand::with_name("update")
+                    .about("Update installed plugins")
+                    .arg(
+                        Arg::with_name("name")
+                            .help("Name of the plugin to update (updates all if not specified)")
+                            .index(1),
+                    ),
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
     }
 
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let format = if matches.is_present("recursive") {
-            "recursive"
-        } else if matches.is_present("long") {
+        let format = if matches.is_present("long") {
             "long"
         } else if matches.is_present("tree") {
             "tree"
+        } else if matches.is_present("table") {
+            "table"
+        } else if matches.is_present("grid") {
+            "grid"
+        } else if matches.is_present("sizemap") {
+            "sizemap"
+        } else if matches.is_present("timeline") {
+            "timeline"
+        } else if matches.is_present("git") {
+            "git"
         } else {
             &config.default_format
         };
@@ -200,6 +247,8 @@ impl Args {
             }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)
+        } else if matches.subcommand_matches("use").is_some() {
+            Some(Command::Use)
         } else if matches.subcommand_matches("init").is_some() {
             Some(Command::InitConfig)
         } else if let Some(config_matches) = matches.subcommand_matches("config") {
@@ -221,14 +270,24 @@ impl Args {
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
         } else {
-            None
+            matches.subcommand_matches("update").map(|update_matches| {
+                Command::Update(update_matches.value_of("name").map(String::from))
+            })
         };
 
         Args {
             directory: matches.value_of("directory").unwrap().to_string(),
-            recursive: format == "recursive",
+            depth: matches
+                .value_of("depth")
+                .map(|d| d.parse().unwrap())
+                .or(config.default_depth),
             long_format: format == "long",
             tree_format: format == "tree",
+            table_format: format == "table",
+            grid_format: format == "grid",
+            sizemap_format: format == "sizemap",
+            timeline_format: format == "timeline",
+            git_format: format == "git",
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)
@@ -246,10 +305,6 @@ impl Args {
                 .value_of("plugins-dir")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
-            depth: matches
-                .value_of("depth")
-                .map(|d| d.parse().unwrap())
-                .or(config.default_depth),
             command,
             plugin_args: matches
                 .values_of("plugin-arg")

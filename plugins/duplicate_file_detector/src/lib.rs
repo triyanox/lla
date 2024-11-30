@@ -93,7 +93,7 @@ impl EntryDecorator for DuplicateFileDetectorPlugin {
                 .custom_fields
                 .get("duplicate_count")
                 .map(|count| format!("Potential duplicates: {}", count.bright_red())),
-            "default" | "tree" => entry
+            "default" => entry
                 .custom_fields
                 .get("duplicate_count")
                 .map(|count| format!("Duplicates: {}", count)),
@@ -102,7 +102,7 @@ impl EntryDecorator for DuplicateFileDetectorPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
 }
 

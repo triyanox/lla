@@ -1,7 +1,7 @@
 use crate::error::Result;
 use std::path::PathBuf;
 
-pub trait FileSorter {
+pub trait FileSorter: Send + Sync {
     fn sort_files(&self, files: &mut [PathBuf]) -> Result<()>;
 }
 

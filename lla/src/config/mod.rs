@@ -6,12 +6,56 @@ use std::path::{Path, PathBuf};
 use crate::error::LlaError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TreeFormatterConfig {
+    #[serde(default)]
+    pub max_lines: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RecursiveConfig {
+    #[serde(default)]
+    pub max_entries: Option<usize>,
+}
+
+impl Default for RecursiveConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: Some(20_000),
+        }
+    }
+}
+
+impl Default for TreeFormatterConfig {
+    fn default() -> Self {
+        Self {
+            max_lines: Some(20_000),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct FormatterConfig {
+    #[serde(default)]
+    pub tree: TreeFormatterConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ListerConfig {
+    #[serde(default)]
+    pub recursive: RecursiveConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub default_sort: String,
     pub default_format: String,
     pub enabled_plugins: Vec<String>,
     pub plugins_dir: PathBuf,
     pub default_depth: Option<usize>,
+    #[serde(default)]
+    pub formatters: FormatterConfig,
+    #[serde(default)]
+    pub listers: ListerConfig,
 }
 
 impl Config {
@@ -27,7 +71,19 @@ impl Config {
 
         if path.exists() {
             let contents = fs::read_to_string(path)?;
-            toml::from_str(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+            match toml::from_str(&contents) {
+                Ok(config) => Ok(config),
+                Err(e) => {
+                    eprintln!(
+                        "Error loading config: {}. Reinitializing with default configuration...",
+                        e
+                    );
+                    let config = Config::default();
+                    config.ensure_plugins_dir()?;
+                    config.save(path)?;
+                    Ok(config)
+                }
+            }
         } else {
             let config = Config::default();
             config.ensure_plugins_dir()?;
@@ -36,15 +92,63 @@ impl Config {
         }
     }
 
+    fn generate_config_content(&self) -> String {
+        format!(
+            r#"# LLA Configuration File
+
+# Default sorting method for file listings
+# Possible values: "name", "size", "date"
+default_sort = "{}"
+
+# Default format for displaying files
+# Possible values: "default", "long", "tree", "grid"
+default_format = "{}"
+
+# List of enabled plugins
+enabled_plugins = {:?}
+
+# Directory where plugins are stored
+plugins_dir = "{}"
+
+# Maximum depth for recursive directory traversal
+# Set to None for unlimited depth
+default_depth = {}
+
+# Formatter-specific configurations
+[formatters]
+
+# Tree formatter configuration
+[formatters.tree]
+# Maximum number of entries to display in tree view
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_lines = {}
+
+# Lister-specific configurations
+[listers]
+
+# Recursive lister configuration
+[listers.recursive]
+# Maximum number of entries to display in recursive lister
+# Set to 0 to show all entries (may impact performance with large directories)
+# Default: 20000
+max_entries = {}"#,
+            self.default_sort,
+            self.default_format,
+            self.enabled_plugins,
+            self.plugins_dir.to_string_lossy(),
+            self.default_depth.unwrap_or(3),
+            self.formatters.tree.max_lines.unwrap_or(20000),
+            self.listers.recursive.max_entries.unwrap_or(100000),
+        )
+    }
+
     pub fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
         self.ensure_plugins_dir()?;
-
-        let contents = toml::to_string_pretty(self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        fs::write(path, contents)
+        fs::write(path, self.generate_config_content())
     }
 
     pub fn get_config_path() -> PathBuf {
@@ -83,6 +187,8 @@ impl Default for Config {
             enabled_plugins: vec![],
             plugins_dir: default_plugins_dir,
             default_depth: Some(3),
+            formatters: FormatterConfig::default(),
+            listers: ListerConfig::default(),
         }
     }
 }
@@ -98,12 +204,12 @@ pub fn initialize_config() -> Result<(), LlaError> {
 
     let config = Config::default();
     config.ensure_plugins_dir().map_err(LlaError::Io)?;
-    config.save(&config_path).map_err(LlaError::Io)?;
+
+    fs::write(&config_path, config.generate_config_content()).map_err(LlaError::Io)?;
 
     println!("Config file initialized at {:?}", config_path);
     println!("Plugins directory created at {:?}", config.plugins_dir);
-    println!("Default configuration:");
-    println!("{:#?}", config);
+    println!("Default configuration has been created with comments explaining each option.");
 
     Ok(())
 }

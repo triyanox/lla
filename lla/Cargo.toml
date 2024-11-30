@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 keywords = ["cli", "ls", "lightweight"]
 categories = ["command-line-utilities"]
-exclude = ["lla.png"]
+exclude = ["docs"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -26,4 +26,14 @@ serde_json.workspace = true
 walkdir.workspace = true
 tempfile.workspace = true
 users.workspace = true
-lla_plugin_interface = { version = "0.2.9", path = "../lla_plugin_interface" }
+parking_lot.workspace = true
+lla_plugin_interface = { version = "0.2.10", path = "../lla_plugin_interface" }
+once_cell.workspace = true
+dashmap.workspace = true
+unicode-width.workspace = true
+strip-ansi-escapes.workspace = true
+terminal_size.workspace = true
+dialoguer.workspace = true
+atty.workspace = true
+indicatif.workspace = true
+console.workspace = true

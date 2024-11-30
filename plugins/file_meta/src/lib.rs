@@ -74,7 +74,7 @@ impl EntryDecorator for FileMetadataPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" => Some(format!(
+            "long" | "default" => Some(format!(
                 "\nAccessed: {}\nModified: {}\nCreated: {}\nInode: {}\nDevice: {}\nLinks: {}\nUID: {}\nGID: {}\nSize: {}\nBlocks: {}\nBlock Size: {}",
                 entry.custom_fields.get("accessed").unwrap(),
                 entry.custom_fields.get("modified").unwrap(),

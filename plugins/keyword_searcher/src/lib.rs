@@ -80,7 +80,7 @@ impl EntryDecorator for KeywordSearcherPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" | "tree" => {
+            "long" | "default" => {
                 let matches: Vec<(String, usize)> =
                     serde_json::from_str(entry.custom_fields.get("keyword_matches")?).ok()?;
                 if !matches.is_empty() {
@@ -99,7 +99,7 @@ impl EntryDecorator for KeywordSearcherPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["long", "tree"]
+        vec!["default", "long"]
     }
 }
 

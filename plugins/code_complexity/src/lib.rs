@@ -97,7 +97,7 @@ impl EntryDecorator for CodeComplexityEstimatorPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" | "tree" => {
+            "default" | "long" => {
                 let lines = entry
                     .custom_fields
                     .get("code_lines")?
@@ -121,7 +121,7 @@ impl EntryDecorator for CodeComplexityEstimatorPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["long", "tree"]
+        vec!["default", "long"]
     }
 }
 

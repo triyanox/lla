@@ -81,7 +81,7 @@ impl EntryDecorator for FileCategoryPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "default" | "long" | "tree" => {
+            "default" | "long" => {
                 let category = entry.custom_fields.get("category")?;
                 let color_str = entry.custom_fields.get("category_color")?;
                 let color = color_str.parse::<colored::Color>().ok()?;
@@ -92,7 +92,7 @@ impl EntryDecorator for FileCategoryPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
 }
 

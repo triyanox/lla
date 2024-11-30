@@ -1,16 +1,24 @@
 use crate::config::Config;
 use crate::error::{LlaError, Result};
+use dashmap::DashMap;
 use libloading::{Library, Symbol};
-use lla_plugin_interface::{CliArg, Plugin};
+use lla_plugin_interface::{CliArg, DecoratedEntry, Plugin};
+use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+
+type DecorationCache = DashMap<(u64, String), HashMap<String, String>>;
+static DECORATION_CACHE: Lazy<DecorationCache> = Lazy::new(DashMap::new);
 
 pub struct PluginManager {
     plugins: HashMap<String, Box<dyn Plugin>>,
     libraries: Vec<Library>,
     loaded_paths: HashSet<PathBuf>,
-    enabled_plugins: HashSet<String>,
+    pub enabled_plugins: HashSet<String>,
     config: Config,
 }
 
@@ -104,10 +112,6 @@ impl PluginManager {
             self.libraries.push(library);
             self.loaded_paths.insert(path);
 
-            if self.config.enabled_plugins.contains(&name) {
-                self.enabled_plugins.insert(name);
-            }
-
             Ok(())
         }
     }
@@ -115,10 +119,12 @@ impl PluginManager {
     pub fn discover_plugins<P: AsRef<Path>>(&mut self, plugin_dir: P) -> Result<()> {
         let plugin_dir = plugin_dir.as_ref();
         if !plugin_dir.is_dir() {
-            return Err(LlaError::Plugin(format!(
-                "Plugin directory does not exist: {:?}",
-                plugin_dir
-            )));
+            fs::create_dir_all(plugin_dir).map_err(|e| {
+                LlaError::Plugin(format!(
+                    "Failed to create plugin directory {:?}: {}",
+                    plugin_dir, e
+                ))
+            })?;
         }
 
         for entry in fs::read_dir(plugin_dir)? {
@@ -157,24 +163,79 @@ impl PluginManager {
         }
     }
 
-    pub fn decorate_entry(&self, entry: &mut lla_plugin_interface::DecoratedEntry, format: &str) {
-        for (name, plugin) in &self.plugins {
-            if self.enabled_plugins.contains(name) && plugin.supported_formats().contains(&format) {
-                plugin.decorate(entry);
-            }
+    pub fn decorate_entry(&self, entry: &mut DecoratedEntry, format: &str) {
+        if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
+            return;
+        }
+
+        #[cfg(unix)]
+        let file_id = entry.metadata.ino();
+        #[cfg(windows)]
+        let file_id = entry.metadata.file_index().unwrap_or(0);
+
+        let cache_key = (file_id, format.to_string());
+
+        if let Some(fields) = DECORATION_CACHE.get(&cache_key) {
+            entry
+                .custom_fields
+                .extend(fields.value().iter().map(|(k, v)| (k.clone(), v.clone())));
+            return;
+        }
+
+        let enabled_plugins: Vec<_> = self
+            .plugins
+            .iter()
+            .filter(|(name, plugin)| {
+                self.enabled_plugins.contains(*name) && plugin.supported_formats().contains(&format)
+            })
+            .collect();
+
+        if enabled_plugins.is_empty() {
+            return;
+        }
+
+        let mut new_decorations = HashMap::with_capacity(enabled_plugins.len() * 2);
+
+        let plugin_results: Vec<_> = enabled_plugins
+            .into_par_iter()
+            .map(|(_name, plugin)| {
+                let temp_fields = HashMap::with_capacity(2);
+                let mut temp_entry = DecoratedEntry {
+                    path: entry.path.clone(),
+                    metadata: entry.metadata.clone(),
+                    custom_fields: temp_fields,
+                };
+                plugin.decorate(&mut temp_entry);
+                temp_entry.custom_fields
+            })
+            .collect();
+
+        for fields in plugin_results {
+            new_decorations.extend(fields);
+        }
+
+        if !new_decorations.is_empty() {
+            entry
+                .custom_fields
+                .extend(new_decorations.iter().map(|(k, v)| (k.clone(), v.clone())));
+            DECORATION_CACHE.insert(cache_key, new_decorations);
         }
     }
 
-    pub fn format_fields(
-        &self,
-        entry: &lla_plugin_interface::DecoratedEntry,
-        format: &str,
-    ) -> Vec<String> {
-        self.plugins
-            .iter()
-            .filter(|(name, _)| self.enabled_plugins.contains(*name))
-            .filter(|(_, p)| p.supported_formats().contains(&format))
-            .filter_map(|(_, p)| p.format_field(entry, format))
-            .collect()
+    #[inline]
+    pub fn format_fields(&self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
+        if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
+            return Vec::new();
+        }
+
+        let mut result = Vec::with_capacity(self.enabled_plugins.len());
+        for (name, plugin) in &self.plugins {
+            if self.enabled_plugins.contains(name) && plugin.supported_formats().contains(&format) {
+                if let Some(field) = plugin.format_field(entry, format) {
+                    result.push(field);
+                }
+            }
+        }
+        result
     }
 }

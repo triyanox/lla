@@ -158,7 +158,7 @@ impl EntryDecorator for KeywordSearchPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
 }
 
