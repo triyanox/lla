@@ -64,13 +64,13 @@ impl TableFormatter {
         header.push('│');
 
         for (&width, &title) in widths.iter().zip(headers.iter()) {
-            header.push_str(&" ".repeat(Self::PADDING));
+            header.push(' ');
             header.push_str(
                 &format!("{:width$}", title, width = width)
                     .bold()
                     .to_string(),
             );
-            header.push_str(&" ".repeat(Self::PADDING));
+            header.push(' ');
             header.push('│');
         }
         header.bright_black().to_string()
@@ -160,7 +160,7 @@ impl FileFormatter for TableFormatter {
                 formatted_date,
                 formatted_name,
                 plugin_suffix,
-                pad = " ".repeat(Self::PADDING),
+                pad = " ",
             ));
         }
 

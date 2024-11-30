@@ -10,7 +10,6 @@ mod sorter;
 mod utils;
 
 use args::{Args, Command, ConfigAction, InstallSource};
-use atty;
 use colored::*;
 use config::{initialize_config, Config};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};

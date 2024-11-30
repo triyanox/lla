@@ -15,10 +15,8 @@ impl FileLister for BasicLister {
         let mut files = Vec::with_capacity(16);
 
         let entries = fs::read_dir(directory)?;
-        for entry in entries {
-            if let Ok(entry) = entry {
-                files.push(entry.path());
-            }
+        for entry in entries.flatten() {
+            files.push(entry.path());
         }
 
         Ok(files)

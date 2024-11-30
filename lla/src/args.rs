@@ -269,12 +269,11 @@ impl Args {
                 .map(|v| v.map(String::from).collect())
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
-        } else if let Some(update_matches) = matches.subcommand_matches("update") {
-            Some(Command::Update(
-                update_matches.value_of("name").map(String::from),
-            ))
         } else {
-            None
+            matches.subcommand_matches("update")
+                .map(|update_matches| Command::Update(
+                    update_matches.value_of("name").map(String::from),
+                ))
         };
 
         Args {

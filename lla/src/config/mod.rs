@@ -33,32 +33,16 @@ impl Default for TreeFormatterConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FormatterConfig {
     #[serde(default)]
     pub tree: TreeFormatterConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ListerConfig {
     #[serde(default)]
     pub recursive: RecursiveConfig,
-}
-
-impl Default for ListerConfig {
-    fn default() -> Self {
-        Self {
-            recursive: RecursiveConfig::default(),
-        }
-    }
-}
-
-impl Default for FormatterConfig {
-    fn default() -> Self {
-        Self {
-            tree: TreeFormatterConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
