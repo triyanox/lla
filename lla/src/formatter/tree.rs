@@ -35,23 +35,10 @@ impl TreePart {
 pub struct TreeFormatter;
 
 impl TreeFormatter {
-    fn format_entry(
-        entry: &DecoratedEntry,
-        plugin_manager: &PluginManager,
-        prefix: &str,
-        has_plugins: bool,
-    ) -> String {
+    fn format_entry(entry: &DecoratedEntry, prefix: &str) -> String {
         let mut line = String::with_capacity(prefix.len() + 64);
         line.push_str(prefix);
         line.push_str(&colorize_file_name(&entry.path).to_string());
-
-        if has_plugins {
-            let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
-            if !plugin_fields.is_empty() {
-                line.push(' ');
-                line.push_str(&plugin_fields);
-            }
-        }
         line.push('\n');
         line
     }
@@ -107,14 +94,13 @@ impl FileFormatter for TreeFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        _plugin_manager: &PluginManager,
         max_depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
             return Ok(String::new());
         }
 
-        let has_plugins = !plugin_manager.enabled_plugins.is_empty();
         let mut trunk = TreeTrunk::default();
 
         let mut entries: Vec<_> = files
@@ -144,7 +130,7 @@ impl FileFormatter for TreeFormatter {
             .map(|(e, d, _, _)| {
                 let name_len = e.path.file_name().map_or(0, |n| n.len());
                 let prefix_len = *d * 4;
-                name_len + prefix_len + if has_plugins { 20 } else { 0 }
+                name_len + prefix_len
             })
             .unwrap_or(64);
         let mut result = String::with_capacity(entries.len() * avg_line_len);
@@ -161,7 +147,7 @@ impl FileFormatter for TreeFormatter {
                 };
 
                 let prefix = trunk.get_prefix(*depth, is_last);
-                result.push_str(&Self::format_entry(entry, plugin_manager, &prefix, has_plugins));
+                result.push_str(&Self::format_entry(entry, &prefix));
             }
         }
 

@@ -102,7 +102,7 @@ impl EntryDecorator for DirectorySummaryPlugin {
                     total_size.bright_yellow()
                 ))
             }
-            "default" | "tree" => {
+            "default" => {
                 let file_count = entry.custom_fields.get("file_count")?;
                 let total_size = entry.custom_fields.get("total_size")?;
                 Some(format!("{} files, {}", file_count, total_size))
@@ -112,7 +112,7 @@ impl EntryDecorator for DirectorySummaryPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
 }
 

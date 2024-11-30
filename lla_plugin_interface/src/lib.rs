@@ -20,7 +20,7 @@ pub trait EntryDecorator: Send + Sync {
     fn name(&self) -> &'static str;
     fn decorate(&self, entry: &mut DecoratedEntry);
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+        vec!["default", "long"]
     }
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String>;
 }

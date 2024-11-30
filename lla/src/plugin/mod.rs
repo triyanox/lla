@@ -173,7 +173,7 @@ impl PluginManager {
     }
 
     pub fn decorate_entry(&self, entry: &mut DecoratedEntry, format: &str) {
-        if self.enabled_plugins.is_empty() {
+        if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return;
         }
 
@@ -233,7 +233,7 @@ impl PluginManager {
 
     #[inline]
     pub fn format_fields(&self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
-        if self.enabled_plugins.is_empty() {
+        if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return Vec::new();
         }
 

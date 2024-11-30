@@ -54,7 +54,7 @@ impl EntryDecorator for FileSizeVisualizerPlugin {
 
     fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
         match format {
-            "long" | "tree" => {
+            "long" | "default" => {
                 let size = entry.custom_fields.get("size")?.parse::<u64>().ok()?;
                 let max_size = 1_073_741_824;
                 let bar = Self::size_to_bar(size, max_size, 10);
@@ -66,7 +66,7 @@ impl EntryDecorator for FileSizeVisualizerPlugin {
     }
 
     fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["long", "tree"]
+        vec!["default", "long"]
     }
 }
 
