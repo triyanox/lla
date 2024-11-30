@@ -270,10 +270,9 @@ impl Args {
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
         } else {
-            matches.subcommand_matches("update")
-                .map(|update_matches| Command::Update(
-                    update_matches.value_of("name").map(String::from),
-                ))
+            matches.subcommand_matches("update").map(|update_matches| {
+                Command::Update(update_matches.value_of("name").map(String::from))
+            })
         };
 
         Args {
