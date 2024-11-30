@@ -96,7 +96,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "categorizer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "code_complexity"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -165,7 +165,7 @@ dependencies = [
 
 [[package]]
 name = "code_snippet_extractor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "colored",
@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -334,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "duplicate_file_detector"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -377,7 +377,7 @@ checksum = "486f806e73c5707928240ddc295403b1b93c96a02038563881c4a2fd84b81ac4"
 
 [[package]]
 name = "file_hash"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -387,7 +387,7 @@ dependencies = [
 
 [[package]]
 name = "file_meta"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "lla_plugin_interface",
@@ -395,7 +395,7 @@ dependencies = [
 
 [[package]]
 name = "file_tagger"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "dirs 5.0.1",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "file_type"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "lla_plugin_interface",
 ]
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "git_status"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -535,7 +535,7 @@ dependencies = [
 
 [[package]]
 name = "keyword_search"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "dirs 5.0.1",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "keyword_searcher"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "last_git_commit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "flate2",
@@ -600,7 +600,7 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "lla"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "atty",
  "chrono",
@@ -627,7 +627,7 @@ dependencies = [
 
 [[package]]
 name = "lla_plugin_interface"
-version = "0.2.9"
+version = "0.2.10"
 
 [[package]]
 name = "lock_api"
@@ -952,7 +952,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sizeviz"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "colored",
  "lla_plugin_interface",
