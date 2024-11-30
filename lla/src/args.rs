@@ -28,6 +28,7 @@ pub enum Command {
     InitConfig,
     Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
+    Update(Option<String>),
 }
 
 pub enum InstallSource {
@@ -201,6 +202,15 @@ impl Args {
                     ),
             )
             .subcommand(SubCommand::with_name("use").about("Interactive plugin manager"))
+            .subcommand(
+                SubCommand::with_name("update")
+                    .about("Update installed plugins")
+                    .arg(
+                        Arg::with_name("name")
+                            .help("Name of the plugin to update (updates all if not specified)")
+                            .index(1),
+                    ),
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
@@ -259,6 +269,8 @@ impl Args {
                 .map(|v| v.map(String::from).collect())
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
+        } else if let Some(update_matches) = matches.subcommand_matches("update") {
+            Some(Command::Update(update_matches.value_of("name").map(String::from)))
         } else {
             None
         };

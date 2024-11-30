@@ -47,4 +47,10 @@ impl From<dialoguer::Error> for LlaError {
     }
 }
 
+impl From<serde_json::Error> for LlaError {
+    fn from(err: serde_json::Error) -> Self {
+        LlaError::Plugin(err.to_string())
+    }
+}
+
 pub type Result<T> = std::result::Result<T, LlaError>;

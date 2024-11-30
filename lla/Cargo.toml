@@ -35,3 +35,5 @@ strip-ansi-escapes.workspace = true
 terminal_size.workspace = true
 dialoguer.workspace = true
 atty.workspace = true
+indicatif.workspace = true
+console.workspace = true

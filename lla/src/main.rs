@@ -37,13 +37,15 @@ fn main() -> Result<()> {
 
     match args.command {
         Some(Command::Install(source)) => {
-            let plugin_installer = PluginInstaller::new(&args.plugins_dir);
+            let installer = PluginInstaller::new(&args.plugins_dir);
             match source {
-                InstallSource::GitHub(url) => install_plugin_from_git(&plugin_installer, &url),
-                InstallSource::LocalDir(dir) => {
-                    install_plugin_from_directory(&plugin_installer, &dir)
-                }
+                InstallSource::GitHub(url) => installer.install_from_git(&url),
+                InstallSource::LocalDir(dir) => installer.install_from_directory(&dir),
             }
+        }
+        Some(Command::Update(plugin_name)) => {
+            let installer = PluginInstaller::new(&args.plugins_dir);
+            installer.update_plugins(plugin_name.as_deref())
         }
         Some(Command::ListPlugins) => list_plugins(&mut plugin_manager),
         Some(Command::Use) => list_plugins(&mut plugin_manager),
@@ -94,7 +96,7 @@ fn list_directory(
         decorated_files
     };
 
-    let formatted_output = formatter.format_files(&decorated_files, plugin_manager, args.depth)?;
+    let formatted_output = formatter.format_files(decorated_files.as_slice(), plugin_manager, args.depth)?;
     println!("{}", formatted_output);
     Ok(())
 }
@@ -335,16 +337,4 @@ fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
     } else {
         Arc::new(DefaultFormatter)
     }
-}
-
-fn install_plugin_from_git(installer: &PluginInstaller, url: &str) -> Result<()> {
-    installer.install_from_git(url)?;
-    println!("Plugin(s) installed successfully from GitHub");
-    Ok(())
-}
-
-fn install_plugin_from_directory(installer: &PluginInstaller, dir: &str) -> Result<()> {
-    installer.install_from_directory(dir)?;
-    println!("Plugin(s) installed successfully from local directory");
-    Ok(())
 }
