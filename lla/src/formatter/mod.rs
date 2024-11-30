@@ -18,6 +18,7 @@ mod table;
 mod grid;
 mod sizemap;
 mod timeline;
+mod git;
 
 pub use default::DefaultFormatter;
 pub use long::LongFormatter;
@@ -26,3 +27,4 @@ pub use table::TableFormatter;
 pub use grid::GridFormatter;
 pub use sizemap::SizeMapFormatter;
 pub use timeline::TimelineFormatter;
+pub use git::GitFormatter;

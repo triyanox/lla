@@ -11,6 +11,7 @@ pub struct Args {
     pub grid_format: bool,
     pub sizemap_format: bool,
     pub timeline_format: bool,
+    pub git_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
     pub enable_plugin: Vec<String>,
@@ -91,6 +92,12 @@ impl Args {
                 Arg::with_name("timeline")
                     .long("timeline")
                     .help("Group files by time periods"),
+            )
+            .arg(
+                Arg::with_name("git")
+                    .short('G')
+                    .long("git")
+                    .help("Show git status and information"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -210,6 +217,8 @@ impl Args {
             "sizemap"
         } else if matches.is_present("timeline") {
             "timeline"
+        } else if matches.is_present("git") {
+            "git"
         } else {
             &config.default_format
         };
@@ -262,6 +271,7 @@ impl Args {
             grid_format: format == "grid",
             sizemap_format: format == "sizemap",
             timeline_format: format == "timeline",
+            git_format: format == "git",
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)

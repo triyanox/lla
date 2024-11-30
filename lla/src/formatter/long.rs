@@ -4,6 +4,7 @@ use crate::plugin::PluginManager;
 use crate::utils::color::*;
 use lla_plugin_interface::DecoratedEntry;
 use once_cell::sync::Lazy;
+
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::sync::Mutex;
