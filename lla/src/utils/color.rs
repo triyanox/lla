@@ -37,7 +37,7 @@ fn get_extension_color(path: &Path) -> Option<Color> {
             "css" | "scss" | "sass" | "less" | "conf" | "config" | "ini" | "env" => STYLE_COLOR,
             "py" | "pyi" | "pyw" | "sh" | "bash" | "zsh" | "fish" | "bat" | "cmd" | "ps1" => EXECUTABLE_COLOR,
             "md" | "rst" | "txt" | "doc" | "docx" | "pdf" | "org" | "wiki" => DOC_COLOR,
-            "png" | "jpg" | "jpeg" | "gif" | "svg" | "bmp" | "ico" | "webp" | "tiff" => MEDIA_COLOR,
+            "png" | "jpg" | "jpeg" | "gif" | "svg" | "bmp" | "ico" | "webp" | "tiff" | "mp4" | "mov" | "avi" | "mkv" | "flv" | "wmv" | "webm" | "m4v" | "3gp" => MEDIA_COLOR,
             "zip" | "tar" | "gz" | "rar" | "7z" | "iso" | "dmg" | "exe" | "dll" => ARCHIVE_COLOR,
             "csv" | "tsv" | "sqlite" | "db" => DATA_COLOR,
             _ => FILE_COLOR,
