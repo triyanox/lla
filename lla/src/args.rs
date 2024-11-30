@@ -9,6 +9,7 @@ pub struct Args {
     pub tree_format: bool,
     pub table_format: bool,
     pub grid_format: bool,
+    pub sizemap_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
     pub enable_plugin: Vec<String>,
@@ -78,6 +79,12 @@ impl Args {
                     .short('g')
                     .long("grid")
                     .help("Use grid listing format"),
+            )
+            .arg(
+                Arg::with_name("sizemap")
+                    .short('S')
+                    .long("sizemap")
+                    .help("Show visual representation of file sizes"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -193,6 +200,8 @@ impl Args {
             "table"
         } else if matches.is_present("grid") {
             "grid"
+        } else if matches.is_present("sizemap") {
+            "sizemap"
         } else {
             &config.default_format
         };
@@ -243,6 +252,7 @@ impl Args {
             tree_format: format == "tree",
             table_format: format == "table",
             grid_format: format == "grid",
+            sizemap_format: format == "sizemap",
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)

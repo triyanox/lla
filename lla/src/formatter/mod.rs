@@ -16,9 +16,11 @@ mod long;
 mod tree;
 mod table;
 mod grid;
+mod sizemap;
 
 pub use default::DefaultFormatter;
 pub use long::LongFormatter;
 pub use tree::TreeFormatter;
 pub use table::TableFormatter;
 pub use grid::GridFormatter;
+pub use sizemap::SizeMapFormatter;
