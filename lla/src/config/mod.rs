@@ -90,7 +90,10 @@ impl Config {
             match toml::from_str(&contents) {
                 Ok(config) => Ok(config),
                 Err(e) => {
-                    eprintln!("Error loading config: {}. Reinitializing with default configuration...", e);
+                    eprintln!(
+                        "Error loading config: {}. Reinitializing with default configuration...",
+                        e
+                    );
                     let config = Config::default();
                     config.ensure_plugins_dir()?;
                     config.save(path)?;

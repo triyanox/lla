@@ -96,7 +96,8 @@ fn list_directory(
         decorated_files
     };
 
-    let formatted_output = formatter.format_files(decorated_files.as_slice(), plugin_manager, args.depth)?;
+    let formatted_output =
+        formatter.format_files(decorated_files.as_slice(), plugin_manager, args.depth)?;
     println!("{}", formatted_output);
     Ok(())
 }
