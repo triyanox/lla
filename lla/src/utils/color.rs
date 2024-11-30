@@ -1,14 +1,44 @@
 use colored::*;
 use std::path::Path;
 
+fn get_extension_color(path: &Path) -> Option<Color> {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| match ext.to_lowercase().as_str() {
+            "rs" | "toml" | "lock" => Color::Red,
+            "js" | "mjs" | "cjs" | "jsx" | "json" | "json5" | "yaml" | "yml" => Color::Yellow,
+            "ts" | "tsx" | "d.ts" => Color::Blue,
+            "html" | "htm" | "xml" | "vue" | "ejs" => Color::Magenta,
+            "css" | "scss" | "sass" | "less" | "conf" | "config" | "ini" | "env" => Color::Cyan,
+            "py" | "pyi" | "pyw" | "sh" | "bash" | "zsh" | "fish" | "bat" | "cmd" | "ps1" => Color::Green,
+            "md" | "rst" | "txt" | "doc" | "docx" | "pdf" | "org" | "wiki" => Color::White,
+            "png" | "jpg" | "jpeg" | "gif" | "svg" | "bmp" | "ico" | "webp" | "tiff" => Color::Magenta,
+            "zip" | "tar" | "gz" | "rar" | "7z" | "iso" | "dmg" | "exe" | "dll" => Color::Red,
+            "csv" | "tsv" | "sqlite" | "db" => Color::Yellow,
+            _ => Color::White,
+        })
+}
+
 pub fn colorize_file_name(path: &Path) -> ColoredString {
     let name = path.file_name().unwrap().to_str().unwrap();
+    
     if path.is_dir() {
         format!("{}/", name).bright_blue().bold()
     } else if path.is_symlink() {
-        name.bright_cyan().italic()
+        name.bright_cyan().italic().underline()
     } else if is_executable(path) {
-        name.bright_green()
+        name.bright_green().bold()
+    } else if let Some(color) = get_extension_color(path) {
+        match color {
+            Color::Red => name.bright_red(),
+            Color::Green => name.bright_green(),
+            Color::Yellow => name.bright_yellow(),
+            Color::Blue => name.bright_blue(),
+            Color::Magenta => name.bright_magenta(),
+            Color::Cyan => name.bright_cyan(),
+            Color::White => name.bright_white(),
+            _ => name.normal(),
+        }
     } else {
         name.normal()
     }
