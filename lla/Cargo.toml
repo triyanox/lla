@@ -30,3 +30,5 @@ parking_lot.workspace = true
 lla_plugin_interface = { version = "0.2.9", path = "../lla_plugin_interface" }
 once_cell.workspace = true
 dashmap.workspace = true
+unicode-width.workspace = true
+strip-ansi-escapes.workspace = true

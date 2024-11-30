@@ -26,3 +26,5 @@ lla_plugin_interface = { path = "lla_plugin_interface" }
 dashmap = "5.5.3"
 parking_lot = "0.12"
 once_cell = "1.18"
+unicode-width = "0.1.11"
+strip-ansi-escapes = "0.1.1"

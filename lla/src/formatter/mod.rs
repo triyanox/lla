@@ -14,7 +14,9 @@ pub trait FileFormatter {
 mod default;
 mod long;
 mod tree;
+mod table;
 
 pub use default::DefaultFormatter;
 pub use long::LongFormatter;
 pub use tree::TreeFormatter;
+pub use table::TableFormatter;
