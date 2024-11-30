@@ -13,7 +13,7 @@ use args::{Args, Command, ConfigAction, InstallSource};
 use config::{initialize_config, Config};
 use error::{LlaError, Result};
 use filter::{ExtensionFilter, FileFilter, PatternFilter};
-use formatter::{DefaultFormatter, FileFormatter, LongFormatter, TreeFormatter, TableFormatter, GridFormatter, SizeMapFormatter};
+use formatter::{DefaultFormatter, FileFormatter, LongFormatter, TreeFormatter, TableFormatter, GridFormatter, SizeMapFormatter, TimelineFormatter};
 use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
 use lla_plugin_interface::DecoratedEntry;
@@ -210,6 +210,8 @@ fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
         Arc::new(GridFormatter)
     } else if args.sizemap_format {
         Arc::new(SizeMapFormatter)
+    } else if args.timeline_format {
+        Arc::new(TimelineFormatter)
     } else {
         Arc::new(DefaultFormatter)
     }

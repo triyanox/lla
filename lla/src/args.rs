@@ -10,6 +10,7 @@ pub struct Args {
     pub table_format: bool,
     pub grid_format: bool,
     pub sizemap_format: bool,
+    pub timeline_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
     pub enable_plugin: Vec<String>,
@@ -85,6 +86,11 @@ impl Args {
                     .short('S')
                     .long("sizemap")
                     .help("Show visual representation of file sizes"),
+            )
+            .arg(
+                Arg::with_name("timeline")
+                    .long("timeline")
+                    .help("Group files by time periods"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -202,6 +208,8 @@ impl Args {
             "grid"
         } else if matches.is_present("sizemap") {
             "sizemap"
+        } else if matches.is_present("timeline") {
+            "timeline"
         } else {
             &config.default_format
         };
@@ -253,6 +261,7 @@ impl Args {
             table_format: format == "table",
             grid_format: format == "grid",
             sizemap_format: format == "sizemap",
+            timeline_format: format == "timeline",
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)
