@@ -89,15 +89,6 @@ impl PluginManager {
             return Ok(());
         }
 
-        if !self.enabled_plugins.iter().any(|name| {
-            path.file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| s.contains(name))
-                .unwrap_or(false)
-        }) {
-            return Ok(());
-        }
-
         unsafe {
             let library = Library::new(&path)
                 .map_err(|e| LlaError::Plugin(format!("Failed to load plugin library: {}", e)))?;

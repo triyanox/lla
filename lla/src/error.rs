@@ -41,4 +41,10 @@ impl From<toml::de::Error> for LlaError {
     }
 }
 
+impl From<dialoguer::Error> for LlaError {
+    fn from(err: dialoguer::Error) -> Self {
+        LlaError::Plugin(format!("Interactive mode error: {}", err))
+    }
+}
+
 pub type Result<T> = std::result::Result<T, LlaError>;

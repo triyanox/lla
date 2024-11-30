@@ -21,6 +21,10 @@ use plugin::PluginManager;
 use rayon::prelude::*;
 use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
 use std::sync::Arc;
+use atty;
+use std::collections::HashSet;
+use colored::*;
+use dialoguer::{MultiSelect, theme::ColorfulTheme};
 
 fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
@@ -36,7 +40,8 @@ fn main() -> Result<()> {
                 InstallSource::LocalDir(dir) => install_plugin_from_directory(&plugin_installer, &dir),
             }
         }
-        Some(Command::ListPlugins) => list_plugins(&plugin_manager),
+        Some(Command::ListPlugins) => list_plugins(&mut plugin_manager),
+        Some(Command::Use) => list_plugins(&mut plugin_manager),
         Some(Command::InitConfig) => initialize_config(),
         Some(Command::Config(action)) => match action {
             Some(ConfigAction::View) => config::view_config(),
@@ -164,10 +169,98 @@ fn initialize_plugin_manager(args: &Args, config: &Config) -> Result<PluginManag
     Ok(plugin_manager)
 }
 
-fn list_plugins(plugin_manager: &PluginManager) -> Result<()> {
-    println!("Available plugins:");
-    for (name, version, description) in plugin_manager.list_plugins() {
-        println!("  {} v{} - {}", name, version, description);
+fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
+    if atty::is(atty::Stream::Stdout) {
+        let plugins: Vec<(String, String, String)> = plugin_manager
+            .list_plugins()
+            .into_iter()
+            .map(|(name, version, desc)| (name.to_string(), version.to_string(), desc.to_string()))
+            .collect();
+
+        let plugin_names: Vec<String> = plugins
+            .iter()
+            .map(|(name, version, desc)| {
+                format!("{} {} - {}", 
+                    name.cyan(),
+                    format!("v{}", version).yellow(),
+                    desc
+                )
+            })
+            .collect();
+
+        println!("\n{}", "Plugin Manager".cyan().bold());
+        println!("{}\n", "Space to toggle, Enter to confirm".bright_black());
+
+        let theme = ColorfulTheme {
+            active_item_style: dialoguer::console::Style::new().cyan().bold(),
+            active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string()).for_stderr().cyan(),
+            checked_item_prefix: dialoguer::console::style("  ◉ ".to_string()).for_stderr().green(),
+            unchecked_item_prefix: dialoguer::console::style("  ○ ".to_string()).for_stderr().red(),
+            prompt_prefix: dialoguer::console::style("│ ".to_string()).for_stderr().cyan(),
+            prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
+            success_prefix: dialoguer::console::style("│ ".to_string()).for_stderr().cyan(),
+            ..ColorfulTheme::default()
+        };
+
+        let selections = MultiSelect::with_theme(&theme)
+            .with_prompt("Select plugins")
+            .items(&plugin_names)
+            .defaults(&plugins
+                .iter()
+                .map(|(name, _, _)| plugin_manager.enabled_plugins.contains(name))
+                .collect::<Vec<_>>())
+            .interact()?;
+
+        let mut updated_plugins = HashSet::new();
+        
+        for idx in selections {
+            let (name, _, _) = &plugins[idx];
+            updated_plugins.insert(name.clone());
+        }
+
+        for (name, _, _) in &plugins {
+            if updated_plugins.contains(name) {
+                plugin_manager.enable_plugin(name)?;
+            } else {
+                plugin_manager.disable_plugin(name)?;
+            }
+        }
+        
+        print!("\x1B[1A\x1B[2K"); 
+        println!("\n{}", "Enabled plugins:".cyan().bold());
+        let enabled: Vec<_> = plugins
+            .iter()
+            .filter(|(name, _, _)| updated_plugins.contains(name))
+            .collect();
+
+        if enabled.is_empty() {
+            println!("  {}", "No plugins enabled".bright_black().italic());
+        } else {
+            for (name, version, _) in enabled {
+                println!("  {} {} {}", 
+                    "◉".green(),
+                    name.cyan(),
+                    format!("v{}", version).yellow()
+                );
+            }
+        }
+        
+        println!("\n{}", "Configuration updated successfully".green());
+    } else {
+        println!("{}", "Available plugins:".cyan().bold());
+        for (name, version, description) in plugin_manager.list_plugins() {
+            let status = if plugin_manager.enabled_plugins.contains(name) {
+                "◉".green()
+            } else {
+                "○".red()
+            };
+            println!("  {} {} {} - {}", 
+                status,
+                name.cyan(),
+                format!("v{}", version).yellow(),
+                description
+            );
+        }
     }
     Ok(())
 }

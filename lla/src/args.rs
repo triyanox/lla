@@ -24,6 +24,7 @@ pub struct Args {
 pub enum Command {
     Install(InstallSource),
     ListPlugins,
+    Use,
     InitConfig,
     Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
@@ -199,6 +200,7 @@ impl Args {
                             .help("Set a configuration value (e.g., --set plugins_dir /new/path)"),
                     ),
             )
+            .subcommand(SubCommand::with_name("use").about("Interactive plugin manager"))
             .get_matches();
 
         Self::from_matches(&matches, config)
@@ -235,6 +237,8 @@ impl Args {
             }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)
+        } else if matches.subcommand_matches("use").is_some() {
+            Some(Command::Use)
         } else if matches.subcommand_matches("init").is_some() {
             Some(Command::InitConfig)
         } else if let Some(config_matches) = matches.subcommand_matches("config") {
