@@ -16,7 +16,7 @@ Quick and clean directory listing
 lla
 ```
 
-![Default View](docs/images/default.png)
+![default](https://github.com/user-attachments/assets/8e170a91-0084-406c-a5d2-746cce8fc33d)
 
 ### Long Format
 
@@ -26,7 +26,7 @@ Detailed file information with metadata
 lla -l
 ```
 
-![Long Format](docs/images/long.png)
+![long](https://github.com/user-attachments/assets/68682c3e-5190-4708-9472-df850a66e6fc)
 
 ### Tree View
 
@@ -36,7 +36,7 @@ Hierarchical directory visualization
 lla -t
 ```
 
-![Tree View](docs/images/tree.png)
+![tree](https://github.com/user-attachments/assets/f0a38062-bd10-4891-b621-13205a3b7268)
 
 ### Table View
 
@@ -46,7 +46,7 @@ Structured data display
 lla -T
 ```
 
-![Table View](docs/images/table.png)
+![table](https://github.com/user-attachments/assets/49609647-970e-4d3b-bb87-32693989ee13)
 
 ### Grid View
 
@@ -56,7 +56,7 @@ Organized layout for better readability
 lla -g
 ```
 
-![Grid View](docs/images/grid.png)
+![grid](https://github.com/user-attachments/assets/29e4cc3e-81e6-4b08-80fc-8272f2ac2433)
 
 ### Git-Aware View
 
@@ -66,7 +66,7 @@ Repository status and insights
 lla -G
 ```
 
-![Git View](docs/images/git.png)
+![git](https://github.com/user-attachments/assets/a0d68240-adfe-411b-90e3-8c6749c063b9)
 
 ### Timeline View
 
@@ -76,7 +76,7 @@ Group files by dates
 lla --timeline
 ```
 
-![Timeline View](docs/images/timeline.png)
+![timeline](https://github.com/user-attachments/assets/11cc4b85-8a53-457f-a0e6-38e3c9f83b83)
 
 ## Core Features
 
