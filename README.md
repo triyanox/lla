@@ -1,7 +1,19 @@
 # `lla` - A Modern Alternative to ls
 
-<a href="https://repology.org/project/lla/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/lla.svg" alt="Packaging status" align="right">
+<a href="https://repology.org/project/lla-ls/versions">
+  <img src="https://repology.org/badge/version-for-repo/aur/lla-ls.svg" alt="AUR package">
+</a>
+<a href="https://repology.org/project/lla-ls/versions">
+  <img src="https://repology.org/badge/version-for-repo/crates_io/lla-ls.svg" alt="crates.io package">
+</a>
+<a href="https://repology.org/project/lla-ls/versions">
+  <img src="https://repology.org/badge/version-for-repo/homebrew/lla-ls.svg" alt="Homebrew package">
+</a>
+<a href="https://repology.org/project/lla-ls/versions">
+  <img src="https://repology.org/badge/version-for-repo/nix_unstable/lla-ls.svg" alt="nixpkgs unstable package">
+</a>
+<a href="https://repology.org/project/lla-ls/versions">
+  <img src="https://repology.org/badge/version-for-repo/pkgsrc_current/lla-ls.svg" alt="pkgsrc current package">
 </a>
 
 `lla` is a high-performance file explorer written in Rust that enhances the traditional `ls` command with modern features, rich formatting options, and a powerful plugin system.
