@@ -1,8 +1,22 @@
 use colored::Colorize;
+use lazy_static::lazy_static;
 use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
+use parking_lot::RwLock;
+use rayon::prelude::*;
+use std::collections::HashMap;
 use std::env;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::time::SystemTime;
 use walkdir::WalkDir;
+
+type DirStats = (usize, usize, u64);
+type CacheEntry = (SystemTime, DirStats);
+type DirCache = HashMap<String, CacheEntry>;
+
+lazy_static! {
+    static ref CACHE: RwLock<DirCache> = RwLock::new(HashMap::new());
+}
 
 pub struct DirectorySummaryPlugin;
 
@@ -13,21 +27,50 @@ impl DirectorySummaryPlugin {
     }
 
     fn analyze_directory(path: &Path) -> Option<(usize, usize, u64)> {
-        let mut file_count = 0;
-        let mut dir_count = 0;
-        let mut total_size = 0;
-
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-            let metadata = entry.metadata().ok()?;
-            if metadata.is_file() {
-                file_count += 1;
-                total_size += metadata.len();
-            } else if metadata.is_dir() {
-                dir_count += 1;
+        let path_str = path.to_string_lossy().to_string();
+        if let Ok(metadata) = path.metadata() {
+            if let Ok(modified_time) = metadata.modified() {
+                let cache = CACHE.read();
+                if let Some((cached_time, stats)) = cache.get(&path_str) {
+                    if *cached_time >= modified_time {
+                        return Some(*stats);
+                    }
+                }
             }
         }
 
-        Some((file_count, dir_count, total_size))
+        let file_count = AtomicUsize::new(0);
+        let dir_count = AtomicUsize::new(0);
+        let total_size = AtomicU64::new(0);
+
+        WalkDir::new(path)
+            .into_iter()
+            .par_bridge()
+            .filter_map(|e| e.ok())
+            .for_each(|entry| {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_file() {
+                        file_count.fetch_add(1, Ordering::Relaxed);
+                        total_size.fetch_add(metadata.len(), Ordering::Relaxed);
+                    } else if metadata.is_dir() {
+                        dir_count.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+            });
+
+        let result = (
+            file_count.load(Ordering::Relaxed),
+            dir_count.load(Ordering::Relaxed),
+            total_size.load(Ordering::Relaxed),
+        );
+        if let Ok(metadata) = path.metadata() {
+            if let Ok(modified_time) = metadata.modified() {
+                let mut cache = CACHE.write();
+                cache.insert(path_str, (modified_time, result));
+            }
+        }
+
+        Some(result)
     }
 
     fn format_size(size: u64) -> String {
@@ -95,11 +138,33 @@ impl EntryDecorator for DirectorySummaryPlugin {
                 let file_count = entry.custom_fields.get("file_count")?;
                 let dir_count = entry.custom_fields.get("dir_count")?;
                 let total_size = entry.custom_fields.get("total_size")?;
+
+                let modified = entry
+                    .path
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.elapsed().ok())
+                    .map(|e| {
+                        let secs = e.as_secs();
+                        if secs < 60 {
+                            format!("{} secs ago", secs)
+                        } else if secs < 3600 {
+                            format!("{} mins ago", secs / 60)
+                        } else if secs < 86400 {
+                            format!("{} hours ago", secs / 3600)
+                        } else {
+                            format!("{} days ago", secs / 86400)
+                        }
+                    })
+                    .unwrap_or_else(|| "unknown time".to_string());
+
                 Some(format!(
-                    "{} files, {} dirs, {}",
+                    "{} files, {} dirs, {} (modified {})",
                     file_count.bright_cyan(),
                     dir_count.bright_green(),
-                    total_size.bright_yellow()
+                    total_size.bright_yellow(),
+                    modified.bright_magenta()
                 ))
             }
             "default" => {

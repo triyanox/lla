@@ -18,16 +18,14 @@ impl GitStatusPlugin {
     }
 
     fn is_git_repo(path: &Path) -> bool {
-        let mut current_dir = path;
-        loop {
-            if current_dir.join(".git").exists() {
+        let mut current_dir = Some(path);
+        while let Some(dir) = current_dir {
+            if dir.join(".git").exists() {
                 return true;
             }
-            match current_dir.parent() {
-                Some(parent) => current_dir = parent,
-                None => return false,
-            }
+            current_dir = dir.parent();
         }
+        false
     }
 
     fn get_git_status(path: &Path) -> Option<String> {
@@ -35,37 +33,43 @@ impl GitStatusPlugin {
             return None;
         }
 
+        let path_str = path.to_string_lossy();
+
         let output = Command::new("git")
-            .args(["status", "--porcelain", "--ignored", path.to_str().unwrap()])
+            .args(["status", "--porcelain", "--ignored"])
+            .arg(&*path_str)
+            .current_dir(path.parent().unwrap_or(path))
             .output()
             .ok()?;
 
-        let status = String::from_utf8(output.stdout).ok()?;
-
-        Some(status)
+        String::from_utf8(output.stdout).ok()
     }
 
     fn format_git_status(status: &str) -> String {
-        let mut chars = status.chars();
-        let index_status = chars.next().unwrap_or(' ');
-        let worktree_status = chars.next().unwrap_or(' ');
+        let mut status_chars = status.chars().take(2).collect::<Vec<_>>();
+        while status_chars.len() < 2 {
+            status_chars.push(' ');
+        }
+
+        let index_status = status_chars[0];
+        let worktree_status = status_chars[1];
 
         let index_formatted = match index_status {
-            'M' => "M".bright_yellow().to_string(),
-            'A' => "A".bright_green().to_string(),
-            'D' => "D".bright_red().to_string(),
-            'R' => "R".bright_purple().to_string(),
-            'C' => "C".bright_cyan().to_string(),
-            'U' => "U".bright_magenta().to_string(),
-            '!' => "!".bright_red().to_string(),
-            _ => " ".normal().to_string(),
+            'M' => "M".bright_yellow(),
+            'A' => "A".bright_green(),
+            'D' => "D".bright_red(),
+            'R' => "R".bright_purple(),
+            'C' => "C".bright_cyan(),
+            'U' => "U".bright_magenta(),
+            '!' => "!".bright_red(),
+            _ => " ".normal(),
         };
 
         let worktree_formatted = match worktree_status {
-            'M' => "M".bright_yellow().to_string(),
-            '?' => "?".bright_blue().to_string(),
-            '!' => "!".bright_red().to_string(),
-            _ => " ".normal().to_string(),
+            'M' => "M".bright_yellow(),
+            '?' => "?".bright_blue(),
+            '!' => "!".bright_red(),
+            _ => " ".normal(),
         };
 
         format!("{}{}", index_formatted, worktree_formatted)

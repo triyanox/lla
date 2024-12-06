@@ -304,10 +304,13 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "colored",
+ "lazy_static",
  "lla_plugin_interface",
+ "parking_lot",
+ "rayon",
  "walkdir",
 ]
 
@@ -442,7 +445,7 @@ dependencies = [
 
 [[package]]
 name = "git_status"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "colored",
  "lla_plugin_interface",
