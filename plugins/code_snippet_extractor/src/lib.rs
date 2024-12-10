@@ -1,6 +1,6 @@
 use base64::Engine as _;
 use colored::Colorize;
-use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{DecoratedEntry, Plugin};
 use ring::digest;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -57,12 +57,6 @@ impl CodeSnippet {
 pub struct CodeSnippetExtractorPlugin {
     snippet_file: PathBuf,
     snippets: HashMap<String, Vec<CodeSnippet>>,
-}
-
-impl Default for CodeSnippetExtractorPlugin {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl CodeSnippetExtractorPlugin {
@@ -260,45 +254,70 @@ impl CodeSnippetExtractorPlugin {
 }
 
 impl Plugin for CodeSnippetExtractorPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        use lla_plugin_interface::proto::{self, plugin_message};
+        use prost::Message as ProstMessage;
+
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(plugin_message::Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg: plugin_message::Message = match proto_msg.message {
+            Some(plugin_message::Message::GetName(_)) => {
+                plugin_message::Message::NameResponse(env!("CARGO_PKG_NAME").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["snippet_count".to_string()])
+            Some(plugin_message::Message::GetVersion(_)) => {
+                plugin_message::Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::PerformAction(action, args) => {
-                match action.as_str() {
+            Some(plugin_message::Message::GetDescription(_)) => {
+                plugin_message::Message::DescriptionResponse(
+                    env!("CARGO_PKG_DESCRIPTION").to_string(),
+                )
+            }
+            Some(plugin_message::Message::GetSupportedFormats(_)) => {
+                plugin_message::Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(plugin_message::Message::Action(req)) => {
+                let result: Result<(), String> = match req.action.as_str() {
                     "extract" => {
-                        if args.len() < 4 || args.len() > 5 {
-                            println!("{} extract <file_path> <snippet_name> <start_line> <end_line> [context_lines]",
-                                "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() < 4 || req.args.len() > 5 {
+                            return self.encode_error("{} extract <file_path> <snippet_name> <start_line> <end_line> [context_lines]");
                         }
-                        let start_line = match args[2].parse() {
+                        let start_line = match req.args[2].parse() {
                             Ok(n) => n,
                             Err(_) => {
-                                println!("{} Invalid start line", "Error:".bright_red());
-                                return PluginResponse::ActionResult(Ok(()));
+                                return self.encode_error(
+                                    format!("{} Invalid start line", "Error:".bright_red())
+                                        .as_str(),
+                                );
                             }
                         };
-                        let end_line = match args[3].parse() {
+                        let end_line = match req.args[3].parse() {
                             Ok(n) => n,
                             Err(_) => {
-                                println!("{} Invalid end line", "Error:".bright_red());
-                                return PluginResponse::ActionResult(Ok(()));
+                                return self.encode_error(
+                                    format!("{} Invalid end line", "Error:".bright_red()).as_str(),
+                                );
                             }
                         };
-                        let context_lines = args.get(4).and_then(|s| s.parse().ok());
+                        let context_lines = req.args.get(4).and_then(|s| s.parse().ok());
 
                         match self.extract_snippet(
-                            &args[0],
-                            &args[1],
+                            &req.args[0],
+                            &req.args[1],
                             start_line,
                             end_line,
                             context_lines,
@@ -307,49 +326,55 @@ impl Plugin for CodeSnippetExtractorPlugin {
                                 println!(
                                     "{} extracted snippet '{}' from {} (lines {}-{})",
                                     "Successfully".bright_green(),
-                                    args[1].bright_yellow(),
-                                    args[0].bright_blue(),
+                                    req.args[1].bright_yellow(),
+                                    req.args[0].bright_blue(),
                                     start_line.to_string().bright_cyan(),
                                     end_line.to_string().bright_cyan()
                                 );
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             Err(e) => {
                                 println!("{} {}", "Error:".bright_red(), e);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
                     "list" => {
-                        if args.len() != 1 {
-                            println!("{} list <file_path>", "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() != 1 {
+                            return self.encode_error(
+                                format!("{} list <file_path>", "Usage:".bright_cyan()).as_str(),
+                            );
                         }
-                        let snippets = self.list_snippets(&args[0]);
+                        let snippets = self.list_snippets(&req.args[0]);
                         if snippets.is_empty() {
                             println!(
                                 "{} No snippets found in {}",
                                 "Info:".bright_blue(),
-                                args[0].bright_yellow()
+                                req.args[0].bright_yellow()
                             );
                         } else {
                             println!(
                                 "{} in {}:",
                                 "Snippets".bright_green(),
-                                args[0].bright_blue()
+                                req.args[0].bright_blue()
                             );
                             for snippet in snippets {
                                 println!("  {}", snippet);
                             }
                         }
-                        PluginResponse::ActionResult(Ok(()))
+                        Ok(())
                     }
                     "get" => {
-                        if args.len() != 2 {
-                            println!("{} get <file_path> <snippet_name>", "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() != 2 {
+                            return self.encode_error(
+                                format!(
+                                    "{} get <file_path> <snippet_name>",
+                                    "Usage:".bright_cyan()
+                                )
+                                .as_str(),
+                            );
                         }
-                        match self.get_snippet(&args[0], &args[1]) {
+                        match self.get_snippet(&req.args[0], &req.args[1]) {
                             Some(snippet) => {
                                 println!("{}", "┌─ Context Before ─────────────────".bright_cyan());
                                 if let Some(ctx) = &snippet.context_before {
@@ -375,36 +400,37 @@ impl Plugin for CodeSnippetExtractorPlugin {
                                         .join(" ")
                                 );
                                 println!("{}", "└────────────────────────────────".bright_cyan());
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             None => {
                                 println!(
                                     "{} Snippet '{}' not found in {}",
                                     "Error:".bright_red(),
-                                    args[1].bright_yellow(),
-                                    args[0].bright_blue()
+                                    req.args[1].bright_yellow(),
+                                    req.args[0].bright_blue()
                                 );
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
                     "search" => {
-                        if args.len() != 1 {
-                            println!("{} search <query>", "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() != 1 {
+                            return self.encode_error(
+                                format!("{} search <query>", "Usage:".bright_cyan()).as_str(),
+                            );
                         }
-                        let results = self.search_snippets(&args[0]);
+                        let results = self.search_snippets(&req.args[0]);
                         if results.is_empty() {
                             println!(
                                 "{} No matching snippets found for query: {}",
                                 "Info:".bright_blue(),
-                                args[0].bright_yellow()
+                                req.args[0].bright_yellow()
                             );
                         } else {
                             println!(
                                 "{} snippets for query: {}",
                                 "Found".bright_green(),
-                                args[0].bright_yellow()
+                                req.args[0].bright_yellow()
                             );
                             for (file, snippet) in results {
                                 println!(
@@ -421,18 +447,21 @@ impl Plugin for CodeSnippetExtractorPlugin {
                                 );
                             }
                         }
-                        PluginResponse::ActionResult(Ok(()))
+                        Ok(())
                     }
                     "add-tags" => {
-                        if args.len() < 3 {
-                            println!(
-                                "{} add-tags <file_path> <snippet_name> <tag1> [tag2...]",
-                                "Usage:".bright_cyan()
+                        if req.args.len() < 3 {
+                            return self.encode_error(
+                                format!(
+                                    "{} add-tags <file_path> <snippet_name> <tag1> [tag2...]",
+                                    "Usage:".bright_cyan()
+                                )
+                                .as_str(),
                             );
-                            return PluginResponse::ActionResult(Ok(()));
                         }
-                        let tags: Vec<String> = args[2..].iter().map(|s| s.to_string()).collect();
-                        match self.add_tags(&args[0], &args[1], &tags) {
+                        let tags: Vec<String> =
+                            req.args[2..].iter().map(|s| s.to_string()).collect();
+                        match self.add_tags(&req.args[0], &req.args[1], &tags) {
                             Ok(()) => {
                                 println!(
                                     "{} tags {} to snippet '{}'",
@@ -441,26 +470,29 @@ impl Plugin for CodeSnippetExtractorPlugin {
                                         .map(|t| format!("#{}", t.bright_magenta()))
                                         .collect::<Vec<_>>()
                                         .join(" "),
-                                    args[1].bright_yellow()
+                                    req.args[1].bright_yellow()
                                 );
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             Err(e) => {
                                 println!("{} {}", "Error:".bright_red(), e);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
                     "remove-tags" => {
-                        if args.len() < 3 {
-                            println!(
-                                "{} remove-tags <file_path> <snippet_name> <tag1> [tag2...]",
-                                "Usage:".bright_cyan()
+                        if req.args.len() < 3 {
+                            return self.encode_error(
+                                format!(
+                                    "{} remove-tags <file_path> <snippet_name> <tag1> [tag2...]",
+                                    "Usage:".bright_cyan()
+                                )
+                                .as_str(),
                             );
-                            return PluginResponse::ActionResult(Ok(()));
                         }
-                        let tags: Vec<String> = args[2..].iter().map(|s| s.to_string()).collect();
-                        match self.remove_tags(&args[0], &args[1], &tags) {
+                        let tags: Vec<String> =
+                            req.args[2..].iter().map(|s| s.to_string()).collect();
+                        match self.remove_tags(&req.args[0], &req.args[1], &tags) {
                             Ok(()) => {
                                 println!(
                                     "{} tags {} from snippet '{}'",
@@ -469,54 +501,60 @@ impl Plugin for CodeSnippetExtractorPlugin {
                                         .map(|t| format!("#{}", t.bright_magenta()))
                                         .collect::<Vec<_>>()
                                         .join(" "),
-                                    args[1].bright_yellow()
+                                    req.args[1].bright_yellow()
                                 );
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             Err(e) => {
                                 println!("{} {}", "Error:".bright_red(), e);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
                     "export" => {
-                        if args.len() != 1 {
-                            println!("{} export <file_path>", "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() != 1 {
+                            return self.encode_error(
+                                format!("{} export <file_path>", "Usage:".bright_cyan()).as_str(),
+                            );
                         }
-                        match self.export_snippets(&args[0]) {
+                        match self.export_snippets(&req.args[0]) {
                             Ok(toml) => {
                                 println!(
                                     "{} Exported snippets from {}",
                                     "Successfully".bright_green(),
-                                    args[0].bright_blue()
+                                    req.args[0].bright_blue()
                                 );
                                 println!("{}", toml);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             Err(e) => {
                                 println!("{} {}", "Error:".bright_red(), e);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
                     "import" => {
-                        if args.len() != 2 {
-                            println!("{} import <file_path> <toml_data>", "Usage:".bright_cyan());
-                            return PluginResponse::ActionResult(Ok(()));
+                        if req.args.len() != 2 {
+                            return self.encode_error(
+                                format!(
+                                    "{} import <file_path> <toml_data>",
+                                    "Usage:".bright_cyan()
+                                )
+                                .as_str(),
+                            );
                         }
-                        match self.import_snippets(&args[0], &args[1]) {
+                        match self.import_snippets(&req.args[0], &req.args[1]) {
                             Ok(()) => {
                                 println!(
                                     "{} imported snippets to {}",
                                     "Successfully".bright_green(),
-                                    args[0].bright_blue()
+                                    req.args[0].bright_blue()
                                 );
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                             Err(e) => {
                                 println!("{} {}", "Error:".bright_red(), e);
-                                PluginResponse::ActionResult(Ok(()))
+                                Ok(())
                             }
                         }
                     }
@@ -565,15 +603,25 @@ impl Plugin for CodeSnippetExtractorPlugin {
                         println!("");
                         println!("  {} Add tags to a snippet:", "→".bright_cyan());
                         println!("    lla plugin --name code_snippet_extractor --action add-tags --args \"file.rs\" \"my_func\" \"rust\" \"function\"");
-                        PluginResponse::ActionResult(Ok(()))
+                        Ok(())
                     }
                     _ => {
-                        println!("{} Unknown action: {}", "Error:".bright_red(), action);
-                        PluginResponse::ActionResult(Ok(()))
+                        println!("{} Unknown action: {}", "Error:".bright_red(), req.action);
+                        Ok(())
                     }
-                }
+                };
+                plugin_message::Message::ActionResponse(proto::ActionResponse {
+                    success: result.is_ok(),
+                    error: result.err(),
+                })
             }
-            PluginRequest::Decorate(mut entry) => {
+            Some(plugin_message::Message::Decorate(entry)) => {
+                let mut entry = match DecoratedEntry::try_from(entry.clone()) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
                 if let Some(file_path) = entry.path.to_str() {
                     let snippet_count = self.snippets.get(file_path).map(|s| s.len()).unwrap_or(0);
                     if snippet_count > 0 {
@@ -583,23 +631,66 @@ impl Plugin for CodeSnippetExtractorPlugin {
                         );
                     }
                 }
-                PluginResponse::Decorated(entry)
+                plugin_message::Message::DecoratedResponse(entry.into())
             }
-            PluginRequest::FormatField(entry, format) => {
-                if format == "snippet_count" {
+            Some(plugin_message::Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
+
+                if req.format == "snippet_count" {
                     if let Some(count) = entry.custom_fields.get("snippet_count") {
-                        PluginResponse::FormattedField(Some(format!(
-                            "[{} snippets]",
-                            count.bright_yellow()
-                        )))
+                        plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
+                            field: Some(format!("[{} snippets]", count.bright_yellow())),
+                        })
                     } else {
-                        PluginResponse::FormattedField(None)
+                        plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
+                            field: None,
+                        })
                     }
                 } else {
-                    PluginResponse::FormattedField(None)
+                    plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
+                        field: None,
+                    })
                 }
             }
-        }
+            _ => plugin_message::Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+}
+
+impl CodeSnippetExtractorPlugin {
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+}
+
+impl Default for CodeSnippetExtractorPlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
