@@ -1,5 +1,5 @@
 use colored::Colorize;
-use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -26,50 +26,62 @@ impl FileHashPlugin {
 }
 
 impl Plugin for FileHashPlugin {
-    fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    fn description(&self) -> &'static str {
-        env!("CARGO_PKG_DESCRIPTION")
-    }
-}
-
-impl EntryDecorator for FileHashPlugin {
-    fn name(&self) -> &'static str {
-        env!("CARGO_PKG_NAME")
-    }
-
-    fn decorate(&self, entry: &mut DecoratedEntry) {
-        if entry.path.is_file() {
-            if let Some((sha1, sha256)) = Self::calculate_hashes(&entry.path) {
-                entry.custom_fields.insert("sha1".to_string(), sha1);
-                entry.custom_fields.insert("sha256".to_string(), sha256);
+    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
+        match request {
+            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
+            PluginRequest::GetVersion => {
+                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
             }
-        }
-    }
-
-    fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
-        match format {
-            "long" | "default" => {
-                let sha1 = entry
-                    .custom_fields
-                    .get("sha1")
-                    .map(|s| s[..8].to_string())
-                    .unwrap_or_default();
-                let sha256 = entry
-                    .custom_fields
-                    .get("sha256")
-                    .map(|s| s[..8].to_string())
-                    .unwrap_or_default();
-                Some(format!("{} {}", sha1.green(), sha256.yellow()))
+            PluginRequest::GetDescription => {
+                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
             }
-            _ => None,
+            PluginRequest::GetSupportedFormats => {
+                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            }
+            PluginRequest::Decorate(mut entry) => {
+                if entry.path.is_file() {
+                    if let Some((sha1, sha256)) = Self::calculate_hashes(&entry.path) {
+                        entry.custom_fields.insert("sha1".to_string(), sha1);
+                        entry.custom_fields.insert("sha256".to_string(), sha256);
+                    }
+                }
+                PluginResponse::Decorated(entry)
+            }
+            PluginRequest::FormatField(entry, format) => {
+                let formatted = match format.as_str() {
+                    "long" | "default" => {
+                        if entry.path.is_dir() {
+                            None
+                        } else {
+                            let sha1 = entry
+                                .custom_fields
+                                .get("sha1")
+                                .map(|s| s[..8].to_string())
+                                .unwrap_or_default();
+                            let sha256 = entry
+                                .custom_fields
+                                .get("sha256")
+                                .map(|s| s[..8].to_string())
+                                .unwrap_or_default();
+                            Some(format!(
+                                "\n{} {} {}{}\n{} {} {}{}",
+                                "┌".bright_black(),
+                                "SHA1".bright_green().bold(),
+                                "→".bright_black(),
+                                sha1.green(),
+                                "└".bright_black(),
+                                "SHA256".bright_yellow().bold(),
+                                "→".bright_black(),
+                                sha256.yellow()
+                            ))
+                        }
+                    }
+                    _ => None,
+                };
+                PluginResponse::FormattedField(formatted)
+            }
+            PluginRequest::PerformAction(_, _) => PluginResponse::ActionResult(Ok(())),
         }
-    }
-
-    fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long"]
     }
 }
 
