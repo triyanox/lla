@@ -1,5 +1,5 @@
 use colored::Colorize;
-use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use std::path::Path;
 use std::process::Command;
 
@@ -32,56 +32,64 @@ impl LastGitCommitPlugin {
 }
 
 impl Plugin for LastGitCommitPlugin {
-    fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    fn description(&self) -> &'static str {
-        env!("CARGO_PKG_DESCRIPTION")
-    }
-}
-
-impl EntryDecorator for LastGitCommitPlugin {
-    fn name(&self) -> &'static str {
-        env!("CARGO_PKG_NAME")
-    }
-
-    fn decorate(&self, entry: &mut DecoratedEntry) {
-        if let Some((commit_hash, author, time)) = Self::get_last_commit_info(&entry.path) {
-            entry
-                .custom_fields
-                .insert("commit_hash".to_string(), commit_hash);
-            entry
-                .custom_fields
-                .insert("commit_author".to_string(), author);
-            entry.custom_fields.insert("commit_time".to_string(), time);
-        }
-    }
-
-    fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
-        match format {
-            "long" => {
-                let hash = entry.custom_fields.get("commit_hash")?;
-                let author = entry.custom_fields.get("commit_author")?;
-                let time = entry.custom_fields.get("commit_time")?;
-                Some(format!(
-                    "Last commit: {} by {} {}",
-                    hash.bright_yellow(),
-                    author.bright_cyan(),
-                    time.bright_green()
-                ))
+    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
+        match request {
+            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
+            PluginRequest::GetVersion => {
+                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
             }
-            "default" => {
-                let hash = entry.custom_fields.get("commit_hash")?;
-                let time = entry.custom_fields.get("commit_time")?;
-                Some(format!("Commit: {} {}", hash, time))
+            PluginRequest::GetDescription => {
+                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
             }
-            _ => None,
+            PluginRequest::GetSupportedFormats => {
+                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            }
+            PluginRequest::Decorate(mut entry) => {
+                if let Some((commit_hash, author, time)) = Self::get_last_commit_info(&entry.path) {
+                    entry
+                        .custom_fields
+                        .insert("commit_hash".to_string(), commit_hash);
+                    entry
+                        .custom_fields
+                        .insert("commit_author".to_string(), author);
+                    entry.custom_fields.insert("commit_time".to_string(), time);
+                }
+                PluginResponse::Decorated(entry)
+            }
+            PluginRequest::FormatField(entry, format) => {
+                let formatted = match format.as_str() {
+                    "long" => {
+                        if let (Some(hash), Some(author), Some(time)) = (
+                            entry.custom_fields.get("commit_hash"),
+                            entry.custom_fields.get("commit_author"),
+                            entry.custom_fields.get("commit_time"),
+                        ) {
+                            Some(format!(
+                                "Last commit: {} by {} {}",
+                                hash.bright_yellow(),
+                                author.bright_cyan(),
+                                time.bright_green()
+                            ))
+                        } else {
+                            None
+                        }
+                    }
+                    "default" => {
+                        if let (Some(hash), Some(time)) = (
+                            entry.custom_fields.get("commit_hash"),
+                            entry.custom_fields.get("commit_time"),
+                        ) {
+                            Some(format!("Commit: {} {}", hash, time))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                PluginResponse::FormattedField(formatted)
+            }
+            PluginRequest::PerformAction(_, _) => PluginResponse::ActionResult(Ok(())),
         }
-    }
-
-    fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long"]
     }
 }
 
