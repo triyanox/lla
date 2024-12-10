@@ -9,6 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e60d3430d3a69478ad0993f19238d2df97c507009a52b3c10addcd7f6bcb916"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -66,15 +75,6 @@ checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
 name = "block-buffer"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
-name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
@@ -99,7 +99,10 @@ name = "categorizer"
 version = "0.2.0"
 dependencies = [
  "colored",
+ "dirs 5.0.1",
  "lla_plugin_interface",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -160,7 +163,10 @@ name = "code_complexity"
 version = "0.2.0"
 dependencies = [
  "colored",
+ "dirs 5.0.1",
  "lla_plugin_interface",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -173,6 +179,8 @@ dependencies = [
  "lla_plugin_interface",
  "rand",
  "ring",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -285,20 +293,11 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
-name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer 0.10.4",
+ "block-buffer",
  "crypto-common",
 ]
 
@@ -340,8 +339,10 @@ name = "duplicate_file_detector"
 version = "0.2.0"
 dependencies = [
  "colored",
+ "lazy_static",
  "lla_plugin_interface",
- "sha2 0.9.9",
+ "parking_lot",
+ "sha2",
 ]
 
 [[package]]
@@ -385,7 +386,7 @@ dependencies = [
  "colored",
  "lla_plugin_interface",
  "sha1",
- "sha2 0.10.8",
+ "sha2",
 ]
 
 [[package]]
@@ -393,6 +394,7 @@ name = "file_meta"
 version = "0.2.0"
 dependencies = [
  "chrono",
+ "colored",
  "lla_plugin_interface",
 ]
 
@@ -402,13 +404,6 @@ version = "0.2.0"
 dependencies = [
  "colored",
  "dirs 5.0.1",
- "lla_plugin_interface",
-]
-
-[[package]]
-name = "file_type"
-version = "0.2.0"
-dependencies = [
  "lla_plugin_interface",
 ]
 
@@ -556,15 +551,9 @@ dependencies = [
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
-]
-
-[[package]]
-name = "keyword_searcher"
-version = "0.2.0"
-dependencies = [
- "colored",
- "lla_plugin_interface",
- "serde_json",
+ "regex",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -646,6 +635,10 @@ dependencies = [
 [[package]]
 name = "lla_plugin_interface"
 version = "0.2.10"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "lock_api"
@@ -698,12 +691,6 @@ name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
-
-[[package]]
-name = "opaque-debug"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "option-ext"
@@ -844,6 +831,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "809e8dc61f6de73b46c85f4c96486310fe304c434cfa43669d7b40f711150908"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
 name = "ring"
 version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -941,20 +957,7 @@ checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.10.7",
-]
-
-[[package]]
-name = "sha2"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
-dependencies = [
- "block-buffer 0.9.0",
- "cfg-if",
- "cpufeatures",
- "digest 0.9.0",
- "opaque-debug",
+ "digest",
 ]
 
 [[package]]
@@ -965,7 +968,7 @@ checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest 0.10.7",
+ "digest",
 ]
 
 [[package]]
