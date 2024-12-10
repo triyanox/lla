@@ -677,7 +677,6 @@ dependencies = [
 name = "lla_plugin_interface"
 version = "0.2.10"
 dependencies = [
- "bytes",
  "prost",
  "prost-build",
  "serde",

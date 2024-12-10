@@ -1,4 +1,3 @@
-use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -109,82 +108,6 @@ impl TryFrom<proto::DecoratedEntry> for DecoratedEntry {
 
 pub trait Plugin: Send + Sync {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8>;
-
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        use prost::Message;
-
-        let proto_msg = proto::PluginMessage {
-            message: Some(match request {
-                PluginRequest::GetName => proto::plugin_message::Message::GetName(true),
-                PluginRequest::GetVersion => proto::plugin_message::Message::GetVersion(true),
-                PluginRequest::GetDescription => {
-                    proto::plugin_message::Message::GetDescription(true)
-                }
-                PluginRequest::GetSupportedFormats => {
-                    proto::plugin_message::Message::GetSupportedFormats(true)
-                }
-                PluginRequest::Decorate(entry) => {
-                    proto::plugin_message::Message::Decorate(entry.into())
-                }
-                PluginRequest::FormatField(entry, format) => {
-                    proto::plugin_message::Message::FormatField(proto::FormatFieldRequest {
-                        entry: Some(entry.into()),
-                        format,
-                    })
-                }
-                PluginRequest::PerformAction(action, args) => {
-                    proto::plugin_message::Message::Action(proto::ActionRequest { action, args })
-                }
-            }),
-        };
-
-        let mut buf = BytesMut::with_capacity(proto_msg.encoded_len());
-        proto_msg.encode(&mut buf).unwrap();
-        let response_bytes = self.handle_raw_request(&buf);
-
-        match proto::PluginMessage::decode(&*response_bytes) {
-            Ok(proto_msg) => match proto_msg.message {
-                Some(proto::plugin_message::Message::NameResponse(name)) => {
-                    PluginResponse::Name(name)
-                }
-                Some(proto::plugin_message::Message::VersionResponse(version)) => {
-                    PluginResponse::Version(version)
-                }
-                Some(proto::plugin_message::Message::DescriptionResponse(desc)) => {
-                    PluginResponse::Description(desc)
-                }
-                Some(proto::plugin_message::Message::FormatsResponse(formats)) => {
-                    PluginResponse::SupportedFormats(formats.formats)
-                }
-                Some(proto::plugin_message::Message::DecoratedResponse(entry)) => {
-                    match DecoratedEntry::try_from(entry) {
-                        Ok(entry) => PluginResponse::Decorated(entry),
-                        Err(e) => PluginResponse::Error(format!(
-                            "Failed to convert decorated entry: {}",
-                            e
-                        )),
-                    }
-                }
-                Some(proto::plugin_message::Message::FieldResponse(field)) => {
-                    PluginResponse::FormattedField(field.field)
-                }
-                Some(proto::plugin_message::Message::ActionResponse(result)) => {
-                    if result.success {
-                        PluginResponse::ActionResult(Ok(()))
-                    } else {
-                        PluginResponse::ActionResult(Err(result
-                            .error
-                            .unwrap_or_else(|| "Unknown error".to_string())))
-                    }
-                }
-                Some(proto::plugin_message::Message::ErrorResponse(error)) => {
-                    PluginResponse::Error(error)
-                }
-                _ => PluginResponse::Error("Invalid response type".to_string()),
-            },
-            Err(e) => PluginResponse::Error(format!("Failed to decode response: {}", e)),
-        }
-    }
 }
 
 #[macro_export]
