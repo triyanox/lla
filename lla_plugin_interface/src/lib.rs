@@ -108,87 +108,83 @@ impl TryFrom<proto::DecoratedEntry> for DecoratedEntry {
 }
 
 pub trait Plugin: Send + Sync {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse;
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8>;
 
-    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
         use prost::Message;
 
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => return encode_error(&format!("Failed to decode request: {}", e)),
+        let proto_msg = proto::PluginMessage {
+            message: Some(match request {
+                PluginRequest::GetName => proto::plugin_message::Message::GetName(true),
+                PluginRequest::GetVersion => proto::plugin_message::Message::GetVersion(true),
+                PluginRequest::GetDescription => {
+                    proto::plugin_message::Message::GetDescription(true)
+                }
+                PluginRequest::GetSupportedFormats => {
+                    proto::plugin_message::Message::GetSupportedFormats(true)
+                }
+                PluginRequest::Decorate(entry) => {
+                    proto::plugin_message::Message::Decorate(entry.into())
+                }
+                PluginRequest::FormatField(entry, format) => {
+                    proto::plugin_message::Message::FormatField(proto::FormatFieldRequest {
+                        entry: Some(entry.into()),
+                        format,
+                    })
+                }
+                PluginRequest::PerformAction(action, args) => {
+                    proto::plugin_message::Message::Action(proto::ActionRequest { action, args })
+                }
+            }),
         };
 
-        let request = match proto_to_request(proto_msg) {
-            Ok(req) => req,
-            Err(e) => return encode_error(&format!("Failed to convert request: {}", e)),
-        };
+        let mut buf = BytesMut::with_capacity(proto_msg.encoded_len());
+        proto_msg.encode(&mut buf).unwrap();
+        let response_bytes = self.handle_raw_request(&buf);
 
-        let response = self.handle_request(request);
-
-        let proto_response = response_to_proto(response);
-        let mut buf = BytesMut::with_capacity(proto_response.encoded_len());
-        proto_response.encode(&mut buf).unwrap();
-        buf.to_vec()
-    }
-}
-
-fn proto_to_request(msg: proto::PluginMessage) -> Result<PluginRequest, std::io::Error> {
-    use proto::plugin_message::Message;
-
-    match msg.message {
-        Some(Message::GetName(_)) => Ok(PluginRequest::GetName),
-        Some(Message::GetVersion(_)) => Ok(PluginRequest::GetVersion),
-        Some(Message::GetDescription(_)) => Ok(PluginRequest::GetDescription),
-        Some(Message::GetSupportedFormats(_)) => Ok(PluginRequest::GetSupportedFormats),
-        Some(Message::Decorate(entry)) => Ok(PluginRequest::Decorate(entry.try_into()?)),
-        Some(Message::FormatField(req)) => Ok(PluginRequest::FormatField(
-            req.entry.unwrap_or_default().try_into()?,
-            req.format,
-        )),
-        Some(Message::Action(req)) => Ok(PluginRequest::PerformAction(req.action, req.args)),
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid request type",
-        )),
-    }
-}
-
-fn response_to_proto(response: PluginResponse) -> proto::PluginMessage {
-    use proto::plugin_message::Message;
-
-    let message = match response {
-        PluginResponse::Name(name) => Message::NameResponse(name),
-        PluginResponse::Version(version) => Message::VersionResponse(version),
-        PluginResponse::Description(desc) => Message::DescriptionResponse(desc),
-        PluginResponse::SupportedFormats(formats) => {
-            Message::FormatsResponse(proto::SupportedFormatsResponse { formats })
+        match proto::PluginMessage::decode(&*response_bytes) {
+            Ok(proto_msg) => match proto_msg.message {
+                Some(proto::plugin_message::Message::NameResponse(name)) => {
+                    PluginResponse::Name(name)
+                }
+                Some(proto::plugin_message::Message::VersionResponse(version)) => {
+                    PluginResponse::Version(version)
+                }
+                Some(proto::plugin_message::Message::DescriptionResponse(desc)) => {
+                    PluginResponse::Description(desc)
+                }
+                Some(proto::plugin_message::Message::FormatsResponse(formats)) => {
+                    PluginResponse::SupportedFormats(formats.formats)
+                }
+                Some(proto::plugin_message::Message::DecoratedResponse(entry)) => {
+                    match DecoratedEntry::try_from(entry) {
+                        Ok(entry) => PluginResponse::Decorated(entry),
+                        Err(e) => PluginResponse::Error(format!(
+                            "Failed to convert decorated entry: {}",
+                            e
+                        )),
+                    }
+                }
+                Some(proto::plugin_message::Message::FieldResponse(field)) => {
+                    PluginResponse::FormattedField(field.field)
+                }
+                Some(proto::plugin_message::Message::ActionResponse(result)) => {
+                    if result.success {
+                        PluginResponse::ActionResult(Ok(()))
+                    } else {
+                        PluginResponse::ActionResult(Err(result
+                            .error
+                            .unwrap_or_else(|| "Unknown error".to_string())))
+                    }
+                }
+                Some(proto::plugin_message::Message::ErrorResponse(error)) => {
+                    PluginResponse::Error(error)
+                }
+                _ => PluginResponse::Error("Invalid response type".to_string()),
+            },
+            Err(e) => PluginResponse::Error(format!("Failed to decode response: {}", e)),
         }
-        PluginResponse::Decorated(entry) => Message::DecoratedResponse(entry.into()),
-        PluginResponse::FormattedField(field) => {
-            Message::FieldResponse(proto::FormattedFieldResponse { field })
-        }
-        PluginResponse::ActionResult(result) => Message::ActionResponse(proto::ActionResponse {
-            success: result.is_ok(),
-            error: result.err(),
-        }),
-        PluginResponse::Error(error) => Message::ErrorResponse(error),
-    };
-
-    proto::PluginMessage {
-        message: Some(message),
     }
-}
-
-fn encode_error(error: &str) -> Vec<u8> {
-    use prost::Message;
-    let response = proto::PluginMessage {
-        message: Some(proto::plugin_message::Message::ErrorResponse(
-            error.to_string(),
-        )),
-    };
-    let mut buf = BytesMut::with_capacity(response.encoded_len());
-    response.encode(&mut buf).unwrap();
-    buf.to_vec()
 }
 
 #[macro_export]
@@ -197,6 +193,14 @@ macro_rules! declare_plugin {
         #[no_mangle]
         pub extern "C" fn _plugin_create() -> *mut dyn $crate::Plugin {
             Box::into_raw(Box::new(<$plugin_type>::new()))
+        }
+
+        #[no_mangle]
+        pub extern "C" fn _plugin_handle_request(request: &[u8]) -> Vec<u8> {
+            let mut plugin = unsafe { Box::from_raw(_plugin_create() as *mut $plugin_type) };
+            let response = plugin.handle_raw_request(request);
+            Box::into_raw(plugin);
+            response
         }
     };
 }

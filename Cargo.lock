@@ -110,6 +110,7 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 name = "categorizer"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
@@ -175,9 +176,11 @@ dependencies = [
 name = "code_complexity"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
+ "prost",
  "serde",
  "toml",
 ]
@@ -187,9 +190,11 @@ name = "code_snippet_extractor"
 version = "0.2.0"
 dependencies = [
  "base64",
+ "bytes",
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
+ "prost",
  "rand",
  "ring",
  "serde",
