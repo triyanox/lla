@@ -37,3 +37,5 @@ dialoguer.workspace = true
 atty.workspace = true
 indicatif.workspace = true
 console.workspace = true
+prost = "0.12"
+bytes = "1.5"

@@ -33,3 +33,11 @@ dialoguer = "0.11.0"
 atty = "0.2.14"
 indicatif = "0.17.9"
 console = "0.15.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev.build-override]
+opt-level = 3

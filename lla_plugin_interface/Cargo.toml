@@ -13,3 +13,8 @@ exclude = ["docs"]
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+prost = "0.12"
+bytes = "1.5"
+
+[build-dependencies]
+prost-build = "0.12"
