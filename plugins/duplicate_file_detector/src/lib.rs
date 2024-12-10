@@ -1,7 +1,11 @@
 use colored::Colorize;
 use lazy_static::lazy_static;
-use lla_plugin_interface::{DecoratedEntry, Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message},
+    DecoratedEntry, Plugin,
+};
 use parking_lot::RwLock;
+use prost::Message as _;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs::File;
@@ -102,25 +106,66 @@ impl DuplicateFileDetectorPlugin {
 
         entry
     }
+
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
 }
 
 impl Plugin for DuplicateFileDetectorPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                return self.encode_error(&format!("Failed to decode request: {}", e));
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg = match proto_msg.message {
+            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
+            Some(Message::GetVersion(_)) => {
+                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            Some(Message::GetDescription(_)) => {
+                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
             }
-            PluginRequest::Decorate(entry) => PluginResponse::Decorated(self.process_entry(entry)),
-            PluginRequest::FormatField(entry, format) => {
+            Some(Message::GetSupportedFormats(_)) => {
+                Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(Message::Decorate(entry)) => {
+                let entry = match DecoratedEntry::try_from(entry.clone()) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
+                Message::DecoratedResponse(self.process_entry(entry).into())
+            }
+            Some(Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
+
                 let formatted = if let Some(_) = entry.custom_fields.get("has_duplicates") {
-                    match format.as_str() {
+                    match req.format.as_str() {
                         "long" => Some(format!(
                             "{} {}",
                             "HAS DUPLICATES".bright_yellow(),
@@ -151,7 +196,7 @@ impl Plugin for DuplicateFileDetectorPlugin {
                     });
 
                     if is_duplicate {
-                        match format.as_str() {
+                        match req.format.as_str() {
                             "long" => Some(format!(
                                 "{} {}",
                                 "DUPLICATE".bright_red(),
@@ -164,10 +209,21 @@ impl Plugin for DuplicateFileDetectorPlugin {
                         None
                     }
                 };
-                PluginResponse::FormattedField(formatted)
+                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
             }
-            PluginRequest::PerformAction(_, _) => PluginResponse::ActionResult(Ok(())),
-        }
+            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
+                success: true,
+                error: None,
+            }),
+            _ => Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
