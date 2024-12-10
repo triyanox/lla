@@ -1,12 +1,15 @@
 [package]
 name = "code_complexity"
-description = "Code complexity plugin for LLA"
+description = "Analyzes code complexity using various metrics"
 version = "0.2.0"
 edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
+dirs = "5.0.1"
+serde = { version = "1.0.200", features = ["derive"] }
+toml = "0.8.8"
 
 [lib]
 crate-type = ["cdylib"]
