@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
 
 pub trait FileFormatter {
     fn format_files(

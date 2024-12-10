@@ -113,6 +113,7 @@ dependencies = [
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
+ "prost",
  "serde",
  "toml",
 ]

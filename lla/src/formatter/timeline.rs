@@ -4,8 +4,9 @@ use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
 use chrono::{DateTime, Duration, Local};
 use colored::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 pub struct TimelineFormatter;
@@ -67,7 +68,8 @@ impl FileFormatter for TimelineFormatter {
         let mut groups: BTreeMap<TimeGroup, Vec<&DecoratedEntry>> = BTreeMap::new();
 
         for file in files {
-            let modified = UNIX_EPOCH + std::time::Duration::from_secs(file.metadata.modified);
+            let modified = file.metadata.as_ref().map_or(0, |m| m.modified);
+            let modified = UNIX_EPOCH + std::time::Duration::from_secs(modified);
             let dt = DateTime::<Local>::from(modified);
             let group = TimeGroup::from_datetime(dt);
             groups.entry(group).or_default().push(file);
@@ -77,61 +79,41 @@ impl FileFormatter for TimelineFormatter {
         let time_format = "%H:%M:%S";
         let date_format = "%Y-%m-%d";
 
-        for (group, entries) in groups.iter() {
-            let header = match group {
-                TimeGroup::Today => group.display_name().to_string(),
-                TimeGroup::Yesterday => {
-                    let yesterday = Local::now().date_naive() - Duration::days(1);
-                    format!(
-                        "{} ({})",
-                        group.display_name(),
-                        yesterday.format(date_format)
-                    )
-                }
-                _ => group.display_name().to_string(),
-            };
-            output.push_str(&format!("\n{}\n", header.bold().blue()));
-            output.push_str(&"─".repeat(header.len()));
-            output.push('\n');
-
-            let mut entries = entries.to_vec();
-            entries.sort_by_key(|e| std::cmp::Reverse(e.metadata.modified));
+        for (group, entries) in groups {
+            output.push_str(&format!(
+                "{}\n{}\n\n",
+                group.display_name().bright_blue().bold(),
+                "─".repeat(40).bright_black()
+            ));
 
             for entry in entries {
-                let name = colorize_file_name(&entry.path);
-                let modified = UNIX_EPOCH + std::time::Duration::from_secs(entry.metadata.modified);
+                let modified = entry.metadata.as_ref().map_or(0, |m| m.modified);
+                let modified = UNIX_EPOCH + std::time::Duration::from_secs(modified);
                 let dt = DateTime::<Local>::from(modified);
 
-                let datetime_str = match group {
-                    TimeGroup::Today | TimeGroup::Yesterday => dt.format(time_format).to_string(),
-                    _ => {
-                        format!("{} {}", dt.format(date_format), dt.format(time_format))
-                    }
+                let time_str = dt.format(time_format).to_string().bright_black();
+                let date_str = if group == TimeGroup::Older {
+                    dt.format(date_format).to_string().bright_black()
+                } else {
+                    "".bright_black()
                 };
+
+                let path = Path::new(&entry.path);
+                let name = colorize_file_name(path);
 
                 let plugin_fields = plugin_manager.format_fields(entry, "timeline").join(" ");
                 let git_info = if let Some(git_field) = plugin_fields
                     .split_whitespace()
                     .find(|s| s.contains("commit:"))
                 {
-                    format!(" [{}]", git_field.bright_yellow())
+                    format!(" {}", git_field.bright_yellow())
                 } else {
                     String::new()
                 };
 
-                output.push_str(&format!(
-                    "{} {} {}{}",
-                    datetime_str.bright_black(),
-                    name,
-                    git_info,
-                    if plugin_fields.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" {}", plugin_fields)
-                    }
-                ));
-                output.push('\n');
+                output.push_str(&format!("{} {} {}{}\n", time_str, date_str, name, git_info));
             }
+            output.push('\n');
         }
 
         Ok(output)

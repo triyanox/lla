@@ -2,7 +2,8 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
+use std::path::Path;
 use terminal_size::{terminal_size, Width};
 use unicode_width::UnicodeWidthStr;
 
@@ -27,7 +28,8 @@ impl FileFormatter for GridFormatter {
         let mut max_width = 0;
 
         for file in files {
-            let name = file.path.file_name().unwrap_or_default().to_string_lossy();
+            let path = Path::new(&file.path);
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
             let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
             let total_str = if plugin_fields.is_empty() {
                 name.to_string()
@@ -38,7 +40,7 @@ impl FileFormatter for GridFormatter {
                 String::from_utf8_lossy(&strip_ansi_escapes::strip(&total_str).unwrap_or_default())
                     .width();
             max_width = max_width.max(width);
-            formatted_entries.push((colorize_file_name(&file.path).to_string(), plugin_fields));
+            formatted_entries.push((colorize_file_name(path).to_string(), plugin_fields));
         }
 
         let column_width = max_width + 2;

@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
 use colored::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
@@ -177,8 +177,7 @@ impl FileFormatter for GitFormatter {
             return Ok(String::new());
         }
 
-        let workspace_root = files[0]
-            .path
+        let workspace_root = Path::new(&files[0].path)
             .ancestors()
             .find(|p| p.join(".git").exists())
             .unwrap_or(Path::new("."));
@@ -210,11 +209,12 @@ impl FileFormatter for GitFormatter {
 
         let mut formatted_entries = Vec::with_capacity(files.len());
         for file in files {
-            let name = colorize_file_name(&file.path);
+            let path = Path::new(&file.path);
+            let name = colorize_file_name(path);
             let name_width = name.chars().count();
             max_name_width = max_name_width.max(name_width);
 
-            let relative_path = file.path.strip_prefix(workspace_root).unwrap_or(&file.path);
+            let relative_path = path.strip_prefix(workspace_root).unwrap_or(path);
             let relative_path_str = relative_path.to_string_lossy();
 
             let (status_str, _) = status_map

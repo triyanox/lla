@@ -3,15 +3,14 @@ use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
 use colored::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
+use std::path::Path;
 use terminal_size::{terminal_size, Width};
 use unicode_width::UnicodeWidthStr;
 
 pub struct SizeMapFormatter;
 
 impl SizeMapFormatter {
-    const PADDING: usize = 2;
-
     fn strip_ansi(s: &str) -> String {
         String::from_utf8(strip_ansi_escapes::strip(s).unwrap_or_default()).unwrap_or_default()
     }
@@ -23,32 +22,22 @@ impl SizeMapFormatter {
     fn calculate_widths(files: &[DecoratedEntry], _term_width: usize) -> (usize, usize) {
         let max_name_width = files
             .iter()
-            .map(|f| Self::visible_width(&colorize_file_name(&f.path)))
+            .map(|f| Self::visible_width(&colorize_file_name(Path::new(&f.path))))
             .max()
             .unwrap_or(20)
             .min(40);
 
         let size_width = files
             .iter()
-            .map(|f| Self::visible_width(&format_size(f.metadata.size)))
+            .map(|f| {
+                let size = f.metadata.as_ref().map_or(0, |m| m.size);
+                Self::visible_width(&format_size(size))
+            })
             .max()
             .unwrap_or(8)
             .max(8);
 
         (max_name_width, size_width)
-    }
-
-    fn create_header(term_width: usize) -> String {
-        let title = " Size Distribution ";
-        let side_width = (term_width - title.len()) / 2;
-        format!(
-            "{}{}{}\n",
-            "─".repeat(side_width).bright_black(),
-            title.bold().bright_white(),
-            "─"
-                .repeat(term_width - side_width - title.len())
-                .bright_black()
-        )
     }
 
     fn create_bar(percentage: f64, width: usize) -> String {
@@ -121,23 +110,34 @@ impl FileFormatter for SizeMapFormatter {
             .unwrap_or(100);
 
         let (name_width, size_width) = Self::calculate_widths(files, term_width);
-        let max_size = files.iter().map(|f| f.metadata.size).max().unwrap_or(1);
-        let bar_width = term_width
-            .saturating_sub(name_width)
-            .saturating_sub(size_width)
-            .saturating_sub(Self::PADDING * 4);
+        let bar_width = term_width.saturating_sub(name_width + size_width + 6);
+
+        let total_size: u64 = files
+            .iter()
+            .map(|f| f.metadata.as_ref().map_or(0, |m| m.size))
+            .sum();
 
         let mut output = String::new();
-        output.push_str(&Self::create_header(term_width));
-        output.push('\n');
+        output.push_str(&format!(
+            "\n{}\n{}\n\n",
+            "Size Map".bright_blue().bold(),
+            "─".repeat(40).bright_black()
+        ));
 
-        let mut files: Vec<_> = files.to_vec();
-        files.sort_by_key(|f| std::cmp::Reverse(f.metadata.size));
+        let mut files = files.to_vec();
+        files.sort_by_key(|f| std::cmp::Reverse(f.metadata.as_ref().map_or(0, |m| m.size)));
 
         for file in &files {
-            let name = colorize_file_name(&file.path);
-            let size_str = format_size(file.metadata.size).bright_cyan();
-            let percentage = (file.metadata.size as f64 / max_size as f64 * 100.0) as f64;
+            let path = Path::new(&file.path);
+            let name = colorize_file_name(path);
+            let size = file.metadata.as_ref().map_or(0, |m| m.size);
+            let size_str = format_size(size);
+            let percentage = if total_size > 0 {
+                (size as f64 / total_size as f64) * 100.0
+            } else {
+                0.0
+            };
+
             let bar = Self::create_bar(percentage, bar_width);
 
             let plugin_fields = plugin_manager.format_fields(file, "sizemap").join(" ");
@@ -147,9 +147,13 @@ impl FileFormatter for SizeMapFormatter {
                 format!(" {}", plugin_fields)
             };
 
-            let line = Self::format_entry(&name, &size_str, &bar, name_width, size_width);
-            output.push_str(&line);
-            output.push_str(&plugin_suffix);
+            output.push_str(&Self::format_entry(
+                &name,
+                &size_str,
+                &format!("{}{}", bar, plugin_suffix),
+                name_width,
+                size_width,
+            ));
             output.push('\n');
         }
 

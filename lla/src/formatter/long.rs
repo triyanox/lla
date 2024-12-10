@@ -2,12 +2,13 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
 use once_cell::sync::Lazy;
 
 use std::collections::HashMap;
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use users::{get_group_by_gid, get_user_by_uid};
@@ -29,7 +30,7 @@ impl FileFormatter for LongFormatter {
         let max_user_len = files
             .iter()
             .map(|entry| {
-                let uid = entry.metadata.uid;
+                let uid = entry.metadata.as_ref().map_or(0, |m| m.uid);
                 let user = get_user_by_uid(uid)
                     .map(|u| u.name().to_string_lossy().into_owned())
                     .unwrap_or_else(|| uid.to_string());
@@ -41,7 +42,7 @@ impl FileFormatter for LongFormatter {
         let max_group_len = files
             .iter()
             .map(|entry| {
-                let gid = entry.metadata.gid;
+                let gid = entry.metadata.as_ref().map_or(0, |m| m.gid);
                 let group = get_group_by_gid(gid)
                     .map(|g| g.name().to_string_lossy().into_owned())
                     .unwrap_or_else(|| gid.to_string());
@@ -52,15 +53,16 @@ impl FileFormatter for LongFormatter {
 
         let mut output = String::new();
         for entry in files {
-            let size = colorize_size(entry.metadata.size);
-            let perms = Permissions::from_mode(entry.metadata.permissions);
+            let metadata = entry.metadata.as_ref().cloned().unwrap_or_default();
+            let size = colorize_size(metadata.size);
+            let perms = Permissions::from_mode(metadata.permissions);
             let permissions = colorize_permissions(&perms);
-            let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(entry.metadata.modified);
+            let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(metadata.modified);
             let modified_str = colorize_date(&modified);
-            let name = colorize_file_name(&entry.path);
+            let name = colorize_file_name(Path::new(&entry.path));
 
-            let uid = entry.metadata.uid;
-            let gid = entry.metadata.gid;
+            let uid = metadata.uid;
+            let gid = metadata.gid;
 
             let user = {
                 let mut cache = USER_CACHE.lock().unwrap();

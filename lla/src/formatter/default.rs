@@ -2,7 +2,8 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
+use std::path::Path;
 
 pub struct DefaultFormatter;
 
@@ -16,7 +17,7 @@ impl FileFormatter for DefaultFormatter {
         Ok(files
             .iter()
             .map(|file| {
-                let colored_name = colorize_file_name(&file.path).to_string();
+                let colored_name = colorize_file_name(Path::new(&file.path)).to_string();
                 let plugin_fields = plugin_manager.format_fields(file, "default").join(" ");
                 if plugin_fields.is_empty() {
                     colored_name

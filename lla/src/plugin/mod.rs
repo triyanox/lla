@@ -1,9 +1,10 @@
 use crate::config::Config;
 use crate::error::{LlaError, Result};
 use dashmap::DashMap;
-use libloading::{Library, Symbol};
-use lla_plugin_interface::{DecoratedEntry, EntryMetadata, Plugin, PluginRequest, PluginResponse};
+use libloading::Library;
+use lla_plugin_interface::proto::{self, plugin_message::Message, PluginMessage};
 use once_cell::sync::Lazy;
+use prost::Message as _;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::os::unix::fs::MetadataExt;
@@ -13,8 +14,7 @@ type DecorationCache = DashMap<(String, String), HashMap<String, String>>;
 static DECORATION_CACHE: Lazy<DecorationCache> = Lazy::new(DashMap::new);
 
 pub struct PluginManager {
-    plugins: HashMap<String, Box<dyn Plugin>>,
-    libraries: Vec<Library>,
+    plugins: HashMap<String, (Library, unsafe fn(&[u8]) -> Vec<u8>)>,
     loaded_paths: HashSet<PathBuf>,
     pub enabled_plugins: HashSet<String>,
     config: Config,
@@ -25,15 +25,14 @@ impl PluginManager {
         let enabled_plugins = HashSet::from_iter(config.enabled_plugins.clone());
         PluginManager {
             plugins: HashMap::new(),
-            libraries: Vec::new(),
             loaded_paths: HashSet::new(),
             enabled_plugins,
             config,
         }
     }
 
-    fn _convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
-        EntryMetadata {
+    fn _convert_metadata(metadata: &std::fs::Metadata) -> proto::EntryMetadata {
+        proto::EntryMetadata {
             size: metadata.len(),
             modified: metadata
                 .modified()
@@ -68,27 +67,15 @@ impl PluginManager {
         }
     }
 
-    pub fn perform_plugin_action(
-        &mut self,
-        plugin_name: &str,
-        action: &str,
-        args: &[String],
-    ) -> Result<()> {
-        if let Some(plugin) = self.plugins.get_mut(plugin_name) {
-            if self.enabled_plugins.contains(plugin_name) {
-                match plugin.handle_request(PluginRequest::PerformAction(
-                    action.to_string(),
-                    args.to_vec(),
-                )) {
-                    PluginResponse::ActionResult(result) => result.map_err(LlaError::Plugin),
-                    _ => Err(LlaError::Plugin("Invalid plugin response".to_string())),
-                }
-            } else {
-                Err(LlaError::Plugin(format!(
-                    "Plugin '{}' is not enabled",
-                    plugin_name
-                )))
-            }
+    fn send_request(&self, plugin_name: &str, request: PluginMessage) -> Result<PluginMessage> {
+        if let Some((_, plugin_fn)) = self.plugins.get(plugin_name) {
+            let mut buf = Vec::with_capacity(request.encoded_len());
+            request.encode(&mut buf).unwrap();
+
+            let response_buf = unsafe { plugin_fn(&buf) };
+
+            proto::PluginMessage::decode(&response_buf[..])
+                .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))
         } else {
             Err(LlaError::Plugin(format!(
                 "Plugin '{}' not found",
@@ -97,21 +84,90 @@ impl PluginManager {
         }
     }
 
+    pub fn perform_plugin_action(
+        &mut self,
+        plugin_name: &str,
+        action: &str,
+        args: &[String],
+    ) -> Result<()> {
+        if !self.enabled_plugins.contains(plugin_name) {
+            return Err(LlaError::Plugin(format!(
+                "Plugin '{}' is not enabled",
+                plugin_name
+            )));
+        }
+
+        let request = PluginMessage {
+            message: Some(Message::Action(proto::ActionRequest {
+                action: action.to_string(),
+                args: args.to_vec(),
+            })),
+        };
+
+        match self.send_request(plugin_name, request)?.message {
+            Some(Message::ActionResponse(response)) => {
+                if response.success {
+                    Ok(())
+                } else {
+                    Err(LlaError::Plugin(
+                        response
+                            .error
+                            .unwrap_or_else(|| "Unknown error".to_string()),
+                    ))
+                }
+            }
+            _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+        }
+    }
+
     pub fn list_plugins(&mut self) -> Vec<(String, String, String)> {
         let mut result = Vec::new();
-        for plugin in self.plugins.values_mut() {
-            let name = match plugin.handle_request(PluginRequest::GetName) {
-                PluginResponse::Name(name) => name,
-                _ => continue,
+        for plugin_name in self.plugins.keys() {
+            let name = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetName(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::NameResponse(name)) => Ok(name),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(name) => name,
+                Err(_) => continue,
             };
-            let version = match plugin.handle_request(PluginRequest::GetVersion) {
-                PluginResponse::Version(version) => version,
-                _ => continue,
+
+            let version = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetVersion(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::VersionResponse(version)) => Ok(version),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(version) => version,
+                Err(_) => continue,
             };
-            let description = match plugin.handle_request(PluginRequest::GetDescription) {
-                PluginResponse::Description(description) => description,
-                _ => continue,
+
+            let description = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetDescription(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::DescriptionResponse(description)) => Ok(description),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(description) => description,
+                Err(_) => continue,
             };
+
             result.push((name, version, description));
         }
         result
@@ -127,14 +183,25 @@ impl PluginManager {
             let library = Library::new(&path)
                 .map_err(|e| LlaError::Plugin(format!("Failed to load plugin library: {}", e)))?;
 
-            let constructor: Symbol<unsafe fn() -> *mut dyn Plugin> =
-                library.get(b"_plugin_create").map_err(|e| {
-                    LlaError::Plugin(format!("Plugin doesn't have a constructor: {}", e))
-                })?;
+            let plugin_fn = *library
+                .get::<unsafe fn(&[u8]) -> Vec<u8>>(b"_plugin_handle_request")
+                .map_err(|e| {
+                    LlaError::Plugin(format!("Plugin doesn't have a request handler: {}", e))
+                })?
+                .into_raw();
 
-            let mut plugin = Box::from_raw(constructor());
-            let name = match plugin.handle_request(PluginRequest::GetName) {
-                PluginResponse::Name(name) => name,
+            let request = PluginMessage {
+                message: Some(Message::GetName(true)),
+            };
+            let mut buf = Vec::with_capacity(request.encoded_len());
+            request.encode(&mut buf).unwrap();
+
+            let response_buf = plugin_fn(&buf);
+            let response = proto::PluginMessage::decode(&response_buf[..])
+                .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))?;
+
+            let name = match response.message {
+                Some(Message::NameResponse(name)) => name,
                 _ => return Err(LlaError::Plugin("Failed to get plugin name".to_string())),
             };
 
@@ -145,8 +212,7 @@ impl PluginManager {
                 )));
             }
 
-            self.plugins.insert(name, plugin);
-            self.libraries.push(library);
+            self.plugins.insert(name, (library, plugin_fn));
             self.loaded_paths.insert(path);
 
             Ok(())
@@ -200,48 +266,55 @@ impl PluginManager {
         }
     }
 
-    pub fn decorate_entry(&mut self, entry: &mut DecoratedEntry, format: &str) {
+    pub fn decorate_entry(&mut self, entry: &mut proto::DecoratedEntry, format: &str) {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return;
         }
-        let path_str = entry.path.to_string_lossy().to_string();
-        let cache_key = (path_str, format.to_string());
+
+        let path_str = entry.path.clone();
+        let cache_key = (path_str.clone(), format.to_string());
         if let Some(fields) = DECORATION_CACHE.get(&cache_key) {
             entry
                 .custom_fields
                 .extend(fields.value().iter().map(|(k, v)| (k.clone(), v.clone())));
             return;
         }
+
         let supported_names: Vec<_> = {
             let mut names = Vec::new();
             for name in self.enabled_plugins.iter() {
-                if let Some(plugin) = self.plugins.get_mut(name) {
-                    match plugin.handle_request(PluginRequest::GetSupportedFormats) {
-                        PluginResponse::SupportedFormats(formats)
-                            if formats.contains(&format.to_string()) =>
-                        {
+                let request = PluginMessage {
+                    message: Some(Message::GetSupportedFormats(true)),
+                };
+
+                if let Ok(response) = self.send_request(name, request) {
+                    if let Some(Message::FormatsResponse(formats_response)) = response.message {
+                        if formats_response.formats.contains(&format.to_string()) {
                             names.push(name.clone());
                         }
-                        _ => {}
                     }
                 }
             }
             names
         };
+
         if supported_names.is_empty() {
             return;
         }
 
         let mut new_decorations = HashMap::with_capacity(supported_names.len() * 2);
         for name in supported_names {
-            if let Some(plugin) = self.plugins.get_mut(&name) {
-                if let PluginResponse::Decorated(decorated) =
-                    plugin.handle_request(PluginRequest::Decorate(entry.clone()))
-                {
+            let request = PluginMessage {
+                message: Some(Message::Decorate(entry.clone())),
+            };
+
+            if let Ok(response) = self.send_request(&name, request) {
+                if let Some(Message::DecoratedResponse(decorated)) = response.message {
                     new_decorations.extend(decorated.custom_fields);
                 }
             }
         }
+
         if !new_decorations.is_empty() {
             entry
                 .custom_fields
@@ -250,29 +323,43 @@ impl PluginManager {
         }
     }
 
-    pub fn format_fields(&mut self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
+    pub fn format_fields(&mut self, entry: &proto::DecoratedEntry, format: &str) -> Vec<String> {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return Vec::new();
         }
 
         let mut result = Vec::with_capacity(self.enabled_plugins.len());
-        for (name, plugin) in self.plugins.iter_mut() {
-            if !self.enabled_plugins.contains(name) {
-                continue;
-            }
-
-            let supports_format = match plugin.handle_request(PluginRequest::GetSupportedFormats) {
-                PluginResponse::SupportedFormats(formats) => formats.contains(&format.to_string()),
-                _ => false,
+        for name in self.enabled_plugins.iter() {
+            let supports_format = match self.send_request(
+                name,
+                PluginMessage {
+                    message: Some(Message::GetSupportedFormats(true)),
+                },
+            ) {
+                Ok(response) => {
+                    if let Some(Message::FormatsResponse(formats)) = response.message {
+                        formats.formats.contains(&format.to_string())
+                    } else {
+                        false
+                    }
+                }
+                Err(_) => false,
             };
 
             if supports_format {
-                match plugin.handle_request(PluginRequest::FormatField(
-                    entry.clone(),
-                    format.to_string(),
-                )) {
-                    PluginResponse::FormattedField(Some(field)) => result.push(field),
-                    _ => {}
+                let request = PluginMessage {
+                    message: Some(Message::FormatField(proto::FormatFieldRequest {
+                        entry: Some(entry.clone()),
+                        format: format.to_string(),
+                    })),
+                };
+
+                if let Ok(response) = self.send_request(name, request) {
+                    if let Some(Message::FieldResponse(field_response)) = response.message {
+                        if let Some(field) = field_response.field {
+                            result.push(field);
+                        }
+                    }
                 }
             }
         }

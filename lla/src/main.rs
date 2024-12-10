@@ -21,12 +21,13 @@ use formatter::{
 };
 use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
-use lla_plugin_interface::{DecoratedEntry, EntryMetadata};
+use lla_plugin_interface::proto::{DecoratedEntry, EntryMetadata};
 use plugin::PluginManager;
 use rayon::prelude::*;
 use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
@@ -162,9 +163,9 @@ fn list_and_decorate_files(
             }
 
             Some(DecoratedEntry {
-                path,
-                metadata: convert_metadata(&fs_metadata),
-                custom_fields: std::collections::HashMap::with_capacity(8),
+                path: path.to_string_lossy().into_owned(),
+                metadata: Some(convert_metadata(&fs_metadata)),
+                custom_fields: Default::default(),
             })
         })
         .collect();
@@ -180,13 +181,16 @@ fn sort_files(
     mut files: Vec<DecoratedEntry>,
     sorter: &Arc<dyn FileSorter + Send + Sync>,
 ) -> Result<Vec<DecoratedEntry>> {
-    let mut paths: Vec<_> = files.iter().map(|entry| entry.path.clone()).collect();
+    let mut paths: Vec<PathBuf> = files
+        .iter()
+        .map(|entry| PathBuf::from(&entry.path))
+        .collect();
     sorter.sort_files(&mut paths)?;
 
     files.sort_by_key(|entry| {
         paths
             .iter()
-            .position(|p| p == &entry.path)
+            .position(|p| p == &PathBuf::from(&entry.path))
             .unwrap_or(usize::MAX)
     });
 
