@@ -1,6 +1,6 @@
 use colored::Colorize;
 use dirs::config_dir;
-use lla_plugin_interface::{DecoratedEntry, Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{DecoratedEntry, Plugin};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -271,37 +271,81 @@ impl FileCategoryPlugin {
 }
 
 impl Plugin for FileCategoryPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        use lla_plugin_interface::proto::{self, plugin_message};
+        use prost::Message as ProstMessage;
+
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(plugin_message::Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg = match proto_msg.message {
+            Some(plugin_message::Message::GetName(_)) => {
+                plugin_message::Message::NameResponse(env!("CARGO_PKG_NAME").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            Some(plugin_message::Message::GetVersion(_)) => {
+                plugin_message::Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::Decorate(mut entry) => {
-                if let Some((category, color, subcategory)) = self.get_category_info(&entry) {
-                    entry
+            Some(plugin_message::Message::GetDescription(_)) => {
+                plugin_message::Message::DescriptionResponse(
+                    env!("CARGO_PKG_DESCRIPTION").to_string(),
+                )
+            }
+            Some(plugin_message::Message::GetSupportedFormats(_)) => {
+                plugin_message::Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(plugin_message::Message::Decorate(entry)) => {
+                let mut decorated_entry = match DecoratedEntry::try_from(entry.clone()) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
+
+                if let Some((category, color, subcategory)) =
+                    self.get_category_info(&decorated_entry)
+                {
+                    decorated_entry
                         .custom_fields
                         .insert("category".to_string(), category.clone());
-                    entry
+                    decorated_entry
                         .custom_fields
                         .insert("category_color".to_string(), color);
                     if let Some(sub) = &subcategory {
-                        entry
+                        decorated_entry
                             .custom_fields
                             .insert("subcategory".to_string(), sub.clone());
                     }
-                    self.update_stats(&entry, &category, subcategory.as_deref());
+                    self.update_stats(&decorated_entry, &category, subcategory.as_deref());
                 }
-                PluginResponse::Decorated(entry)
+
+                plugin_message::Message::DecoratedResponse(decorated_entry.into())
             }
-            PluginRequest::FormatField(entry, format) => {
-                let formatted = match format.as_str() {
+            Some(plugin_message::Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
+
+                let formatted = match req.format.as_str() {
                     "default" => entry.custom_fields.get("category").map(|category| {
                         let color = entry
                             .custom_fields
@@ -325,76 +369,112 @@ impl Plugin for FileCategoryPlugin {
                     }),
                     _ => None,
                 };
-                PluginResponse::FormattedField(formatted)
+
+                plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
+                    field: formatted,
+                })
             }
-            PluginRequest::PerformAction(action, args) => match action.as_str() {
-                "add-category" => {
-                    if args.len() < 3 {
-                        return PluginResponse::Error(
-                            "Usage: add-category <name> <color> <ext1,ext2,...> [description]"
-                                .to_string(),
-                        );
-                    }
-                    let mut rule = CategoryRule::default();
-                    rule.name = args[0].clone();
-                    rule.color = args[1].clone();
-                    rule.extensions = args[2].split(',').map(String::from).collect();
-                    if let Some(desc) = args.get(3) {
-                        rule.description = desc.clone();
-                    }
-                    self.rules.push(rule);
-                    self.save_rules();
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                "add-subcategory" => {
-                    if args.len() != 4 {
-                        return PluginResponse::Error(
-                            "Usage: add-subcategory <category> <subcategory> <ext1,ext2,...>"
-                                .to_string(),
-                        );
-                    }
-                    if let Some(rule) = self.rules.iter_mut().find(|r| r.name == args[0]) {
-                        rule.subcategories.insert(
-                            args[1].clone(),
-                            args[2].split(',').map(String::from).collect(),
-                        );
-                        self.save_rules();
-                        PluginResponse::ActionResult(Ok(()))
-                    } else {
-                        PluginResponse::Error(format!("Category '{}' not found", args[0]))
-                    }
-                }
-                "show-stats" => {
-                    println!("{}", self.format_stats());
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                "list-categories" => {
-                    for rule in &self.rules {
-                        let color = Self::string_to_color(&rule.color);
-                        println!("\n{} ({})", rule.name.color(color), rule.description);
-                        println!("  Extensions: {}", rule.extensions.join(", "));
-                        if !rule.subcategories.is_empty() {
-                            println!("  Subcategories:");
-                            for (sub, exts) in &rule.subcategories {
-                                println!("    {}: {}", sub, exts.join(", "));
+            Some(plugin_message::Message::Action(req)) => {
+                let result: Result<(), String> = match req.action.as_str() {
+                    "add-category" => {
+                        if req.args.len() < 3 {
+                            Err(
+                                "Usage: add-category <n> <color> <ext1,ext2,...> [description]"
+                                    .to_string(),
+                            )
+                        } else {
+                            let mut rule = CategoryRule::default();
+                            rule.name = req.args[0].clone();
+                            rule.color = req.args[1].clone();
+                            rule.extensions = req.args[2].split(',').map(String::from).collect();
+                            if let Some(desc) = req.args.get(3) {
+                                rule.description = desc.clone();
                             }
+                            self.rules.push(rule);
+                            self.save_rules();
+                            Ok(())
                         }
                     }
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                "help" => {
-                    let help_text = "Available actions:\n\
-                            add-category <name> <color> <ext1,ext2,...> [description] - Add a new category\n\
-                            add-subcategory <category> <subcategory> <ext1,ext2,...> - Add a subcategory\n\
-                            show-stats - Show category statistics\n\
-                            list-categories - List all categories and their details\n\
-                            help - Show this help message\n\n";
-                    println!("{}", help_text);
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                _ => PluginResponse::Error(format!("Unknown action: {}", action)),
-            },
-        }
+                    "add-subcategory" => {
+                        if req.args.len() != 4 {
+                            Err(
+                                "Usage: add-subcategory <category> <subcategory> <ext1,ext2,...>"
+                                    .to_string(),
+                            )
+                        } else if let Some(rule) =
+                            self.rules.iter_mut().find(|r| r.name == req.args[0])
+                        {
+                            rule.subcategories.insert(
+                                req.args[1].clone(),
+                                req.args[2].split(',').map(String::from).collect(),
+                            );
+                            self.save_rules();
+                            Ok(())
+                        } else {
+                            Err(format!("Category '{}' not found", req.args[0]))
+                        }
+                    }
+                    "show-stats" => {
+                        println!("{}", self.format_stats());
+                        Ok(())
+                    }
+                    "list-categories" => {
+                        for rule in &self.rules {
+                            let color = Self::string_to_color(&rule.color);
+                            println!("\n{} ({})", rule.name.color(color), rule.description);
+                            println!("  Extensions: {}", rule.extensions.join(", "));
+                            if !rule.subcategories.is_empty() {
+                                println!("  Subcategories:");
+                                for (sub, exts) in &rule.subcategories {
+                                    println!("    {}: {}", sub, exts.join(", "));
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                    "help" => {
+                        let help_text = "Available actions:\n\
+                                add-category <n> <color> <ext1,ext2,...> [description] - Add a new category\n\
+                                add-subcategory <category> <subcategory> <ext1,ext2,...> - Add a subcategory\n\
+                                show-stats - Show category statistics\n\
+                                list-categories - List all categories and their details\n\
+                                help - Show this help message\n\n";
+                        println!("{}", help_text);
+                        Ok(())
+                    }
+                    _ => Err(format!("Unknown action: {}", req.action)),
+                };
+
+                plugin_message::Message::ActionResponse(proto::ActionResponse {
+                    success: result.is_ok(),
+                    error: result.err(),
+                })
+            }
+            _ => plugin_message::Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+}
+
+impl FileCategoryPlugin {
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
