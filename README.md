@@ -175,7 +175,6 @@ https://github.com/user-attachments/assets/6064b70e-1275-4d60-88ed-3370c0068ebd
 
 `lla` uses a plugin system to extend its functionality so you can enhance it with custom functionality based on your needs.
 You can install plugins from a local directory or from a Git repository.
-
 You can find official plugins [here](https://github.com/triyanox/lla/blob/main/plugins.md).
 
 1. Install plugins:
@@ -191,15 +190,15 @@ lla install --dir path/to/plugin
 2. Manage plugins:
 
 ```bash
+# Interactive plugin manager
+lla use
+
 # Enable plugins
 lla --enable-plugin git_status
 lla --enable-plugin keyword_search
 
 # Disable plugins
 lla --disable-plugin git_status
-
-# Interactive plugin manager
-lla use
 
 # Update plugins
 lla update              # Update all plugins
@@ -211,7 +210,17 @@ lla update plugin_name  # Update specific plugin
 ```bash
 # Execute plugin actions
 lla plugin --name keyword_search --action set-keywords --args "TODO" "FIXME"
-lla plugin --name git_status --action show-status
+
+# Example: Code snippet management through `code_snippet_extractor` plugin
+lla plugin --name code_snippet_extractor --action extract --args "path/to/file.rs" "snippet_name" 10 20  # Extract lines 10-20
+lla plugin --name code_snippet_extractor --action list --args "path/to/file.rs"                        # List snippets in file
+lla plugin --name code_snippet_extractor --action get --args "path/to/file.rs" "snippet_name"          # Get snippet content
+lla plugin --name code_snippet_extractor --action search --args "query"                                # Search snippets
+lla plugin --name code_snippet_extractor --action add-tags --args "path/to/file.rs" "snippet" "tag1"   # Add tags
+lla plugin --name code_snippet_extractor --action remove-tags --args "path/to/file.rs" "snippet" "tag1" # Remove tags
+lla plugin --name code_snippet_extractor --action export --args "path/to/file.rs"                      # Export snippets to JSON
+lla plugin --name code_snippet_extractor --action import --args "path/to/file.rs" "json_data"          # Import snippets
+lla plugin --name code_snippet_extractor --action help                                                 # Show help
 ```
 
 ## Configuration
@@ -244,7 +253,7 @@ lla config --set default_depth 5
 
 ## Plugin Development
 
-Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libraries that implement the `Plugin` trait from the [lla_plugin_interface](https://github.com/triyanox/lla/tree/main/lla_plugin_interface) crate.
+Develop custom plugins to extend `lla`'s functionality. Plugins are dynamic libraries that implement the `Plugin` trait from the [lla_plugin_interface](https://github.com/triyanox/lla/tree/main/lla_plugin_interface) crate. The plugin system uses a message-passing architecture to ensure ABI compatibility between different Rust versions.
 
 1. Create a new plugin:
 
@@ -262,6 +271,7 @@ edition = "2021"
 
 [dependencies]
 lla_plugin_interface = "*"
+serde = { version = "1.0", features = ["derive"] }
 
 [lib]
 crate-type = ["cdylib"]
@@ -270,66 +280,86 @@ crate-type = ["cdylib"]
 3. Implement the plugin interface:
 
 ```rust
-use lla_plugin_interface::{Plugin, DecoratedEntry, EntryDecorator, CliArg};
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse, DecoratedEntry, CliArg};
+use std::collections::HashMap;
 
-pub struct MyPlugin;
+pub struct MyPlugin {
+    // Your plugin state here
+}
 
-impl Plugin for MyPlugin {
-    fn name(&self) -> &'static str {
-        "my_plugin"
-    }
-
-    fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    fn description(&self) -> &'static str {
-        env!("CARGO_PKG_DESCRIPTION")
-    }
-
-    fn cli_args(&self) -> Vec<CliArg> {
-        vec![
-            CliArg {
-                name: "my-option".to_string(),
-                short: Some('m'),
-                long: Some("my-option".to_string()),
-                help: "Description of my option".to_string(),
-                takes_value: true,
-            }
-        ]
-    }
-
-    fn handle_cli_args(&self, args: &[String]) {
-        // Handle CLI arguments passed to the plugin
-    }
-
-    fn perform_action(&self, action: &str, args: &[String]) -> Result<(), String> {
-        match action {
-            "my-action" => {
-                // Perform custom action
-                Ok(())
-            }
-            _ => Err(format!("Unknown action: {}", action)),
+impl MyPlugin {
+    pub fn new() -> Self {
+        Self {
+            // Initialize your plugin
         }
     }
 }
 
-impl EntryDecorator for MyPlugin {
-    fn decorate(&self, entry: &mut DecoratedEntry) {
-        // Add custom fields or modify entry
-    }
-
-    fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
-        // Return formatted string for display
-    }
-
-    fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long", "tree"]
+impl Plugin for MyPlugin {
+    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
+        match request {
+            PluginRequest::GetName => {
+                PluginResponse::Name("my_plugin".to_string())
+            }
+            PluginRequest::GetVersion => {
+                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+            }
+            PluginRequest::GetDescription => {
+                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+            }
+            PluginRequest::GetSupportedFormats => {
+                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            }
+            PluginRequest::Decorate(mut entry) => {
+                // Add custom fields to the entry
+                entry.custom_fields.insert("my_field".to_string(), "value".to_string());
+                PluginResponse::Decorated(entry)
+            }
+            PluginRequest::FormatField(entry, format) => {
+                // Format a specific field for display
+                PluginResponse::FormattedField(Some("formatted value".to_string()))
+            }
+            PluginRequest::PerformAction(action, args) => {
+                match action.as_str() {
+                    "my-action" => {
+                        // Perform custom action
+                        PluginResponse::ActionResult(Ok(()))
+                    }
+                    _ => PluginResponse::Error(format!("Unknown action: {}", action))
+                }
+            }
+        }
     }
 }
 
 lla_plugin_interface::declare_plugin!(MyPlugin);
 ```
+
+### Plugin Architecture
+
+The new plugin system uses a message-passing architecture to ensure ABI compatibility between different Rust versions. Instead of direct trait method calls, plugins communicate through serializable request/response messages:
+
+- `PluginRequest`: Represents requests from the main application to the plugin
+
+  - `GetName`: Get the plugin name
+  - `GetVersion`: Get the plugin version
+  - `GetDescription`: Get the plugin description
+  - `GetSupportedFormats`: Get supported display formats
+  - `Decorate`: Add custom fields to an entry
+  - `FormatField`: Format a specific field for display
+  - `PerformAction`: Execute a custom action
+
+- `PluginResponse`: Represents responses from the plugin back to the application
+  - `Name`: Plugin name
+  - `Version`: Plugin version
+  - `Description`: Plugin description
+  - `SupportedFormats`: List of supported formats
+  - `Decorated`: Modified entry with custom fields
+  - `FormattedField`: Formatted field value
+  - `ActionResult`: Result of a custom action
+  - `Error`: Error message
+
+The `DecoratedEntry` struct now uses a platform-independent `EntryMetadata` struct instead of the OS-specific `std::fs::Metadata`, ensuring consistent behavior across different platforms and Rust versions.
 
 4. Build your plugin:
 
@@ -353,10 +383,10 @@ lla install --git https://github.com/user/plugin
 
 The [lla_plugin_interface](https://github.com/triyanox/lla/tree/main/lla_plugin_interface) crate provides the following key components:
 
-- `Plugin` trait: Core interface for plugin functionality
-- `EntryDecorator` trait: Methods for decorating and formatting file entries
+- `Plugin` trait: Core interface for handling plugin requests and responses
+- `PluginRequest`/`PluginResponse` enums: Message types for plugin communication
 - `DecoratedEntry` struct: Represents a file entry with metadata and custom fields
-- `CliArg` struct: Defines command-line arguments for the plugin
+- `EntryMetadata` struct: Platform-independent file metadata
 
 ## Contributing
 
