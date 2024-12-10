@@ -1,6 +1,6 @@
 use colored::Colorize;
 use dirs::config_dir;
-use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{DecoratedEntry, Plugin};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -308,7 +308,7 @@ impl CodeComplexityEstimatorPlugin {
     fn format_metrics(&self, metrics: &ComplexityMetrics, detailed: bool) -> String {
         let color = self.get_complexity_color(metrics);
         let mut output = format!(
-            "Complexity: {} (MI: {:.1})",
+            "\nComplexity: {} (MI: {:.1})",
             metrics.cyclomatic_complexity.to_string().color(color),
             metrics.maintainability_index
         );
@@ -393,19 +393,49 @@ impl CodeComplexityEstimatorPlugin {
 }
 
 impl Plugin for CodeComplexityEstimatorPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        use lla_plugin_interface::proto::{self, plugin_message};
+        use prost::Message as ProstMessage;
+
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(plugin_message::Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg = match proto_msg.message {
+            Some(plugin_message::Message::GetName(_)) => {
+                plugin_message::Message::NameResponse(env!("CARGO_PKG_NAME").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            Some(plugin_message::Message::GetVersion(_)) => {
+                plugin_message::Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::Decorate(mut entry) => {
+            Some(plugin_message::Message::GetDescription(_)) => {
+                plugin_message::Message::DescriptionResponse(
+                    env!("CARGO_PKG_DESCRIPTION").to_string(),
+                )
+            }
+            Some(plugin_message::Message::GetSupportedFormats(_)) => {
+                plugin_message::Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(plugin_message::Message::Decorate(entry)) => {
+                let mut entry = match DecoratedEntry::try_from(entry.clone()) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
                 if entry.path.is_file() {
                     if let Some(metrics) = self.analyze_file(&entry.path) {
                         entry.custom_fields.insert(
@@ -428,57 +458,99 @@ impl Plugin for CodeComplexityEstimatorPlugin {
                         }
                     }
                 }
-                PluginResponse::Decorated(entry)
+                plugin_message::Message::DecoratedResponse(entry.into())
             }
-            PluginRequest::FormatField(entry, format) => {
+            Some(plugin_message::Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
                 let formatted = entry
                     .custom_fields
                     .get("complexity_metrics")
                     .and_then(|toml_str| toml::from_str::<ComplexityMetrics>(toml_str).ok())
-                    .map(|metrics| self.format_metrics(&metrics, format == "long"));
-                PluginResponse::FormattedField(formatted)
+                    .map(|metrics| self.format_metrics(&metrics, req.format == "long"));
+                plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
+                    field: formatted,
+                })
             }
-            PluginRequest::PerformAction(action, args) => match action.as_str() {
-                "set-thresholds" => {
-                    if args.len() != 4 {
-                        return PluginResponse::Error(
-                            "Usage: set-thresholds <low> <medium> <high> <very-high>".to_string(),
-                        );
+            Some(plugin_message::Message::Action(req)) => {
+                let result: Result<(), String> = match req.action.as_str() {
+                    "set-thresholds" => {
+                        if req.args.len() != 4 {
+                            return self.encode_error(
+                                "Usage: set-thresholds <low> <medium> <high> <very-high>",
+                            );
+                        }
+                        if let (Ok(low), Ok(medium), Ok(high), Ok(very_high)) = (
+                            req.args[0].parse::<f32>(),
+                            req.args[1].parse::<f32>(),
+                            req.args[2].parse::<f32>(),
+                            req.args[3].parse::<f32>(),
+                        ) {
+                            self.config.thresholds = ComplexityThresholds {
+                                low,
+                                medium,
+                                high,
+                                very_high,
+                            };
+                            self.save_config();
+                            println!("Updated complexity thresholds");
+                            Ok(())
+                        } else {
+                            Err("Invalid threshold values".to_string())
+                        }
                     }
-                    if let (Ok(low), Ok(medium), Ok(high), Ok(very_high)) = (
-                        args[0].parse::<f32>(),
-                        args[1].parse::<f32>(),
-                        args[2].parse::<f32>(),
-                        args[3].parse::<f32>(),
-                    ) {
-                        self.config.thresholds = ComplexityThresholds {
-                            low,
-                            medium,
-                            high,
-                            very_high,
-                        };
-                        self.save_config();
-                        println!("Updated complexity thresholds");
-                        PluginResponse::ActionResult(Ok(()))
-                    } else {
-                        PluginResponse::Error("Invalid threshold values".to_string())
+                    "show-report" => {
+                        println!("{}", self.generate_report());
+                        Ok(())
                     }
-                }
-                "show-report" => {
-                    println!("{}", self.generate_report());
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                "help" => {
-                    let help_text = "Available actions:\n\
+                    "help" => {
+                        let help_text = "Available actions:\n\
                             set-thresholds <low> <medium> <high> <very-high> - Set complexity thresholds\n\
                             show-report - Show detailed complexity report\n\
                             help - Show this help message\n\n";
-                    println!("{}", help_text);
-                    PluginResponse::ActionResult(Ok(()))
-                }
-                _ => PluginResponse::Error(format!("Unknown action: {}", action)),
-            },
-        }
+                        println!("{}", help_text);
+                        Ok(())
+                    }
+                    _ => Err(format!("Unknown action: {}", req.action)),
+                };
+
+                plugin_message::Message::ActionResponse(proto::ActionResponse {
+                    success: result.is_ok(),
+                    error: result.err(),
+                })
+            }
+            _ => plugin_message::Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+}
+
+impl CodeComplexityEstimatorPlugin {
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
