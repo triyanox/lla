@@ -18,7 +18,6 @@ pub struct Args {
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
     pub command: Option<Command>,
-    pub plugin_args: Vec<String>,
 }
 
 pub enum Command {
@@ -157,7 +156,9 @@ impl Args {
                     .long("plugin-arg")
                     .takes_value(true)
                     .multiple(true)
-                    .help("Arguments to pass to enabled plugins"),
+                    .number_of_values(2)
+                    .value_names(&["PLUGIN", "ARG"])
+                    .help("Arguments to pass to specific plugins (e.g., --plugin-arg keyword_search -k=TODO)"),
             )
             .subcommand(
                 SubCommand::with_name("plugin")
@@ -306,10 +307,6 @@ impl Args {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
             command,
-            plugin_args: matches
-                .values_of("plugin-arg")
-                .map(|v| v.map(String::from).collect())
-                .unwrap_or_default(),
         }
     }
 }

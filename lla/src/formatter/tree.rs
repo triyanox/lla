@@ -31,11 +31,23 @@ impl TreePart {
 pub struct TreeFormatter;
 
 impl TreeFormatter {
-    fn format_entry(entry: &DecoratedEntry, prefix: &str, buf: &mut String) {
+    fn format_entry(
+        entry: &DecoratedEntry,
+        prefix: &str,
+        plugin_manager: &mut PluginManager,
+        buf: &mut String,
+    ) {
         buf.clear();
         buf.reserve(prefix.len() + entry.path.as_os_str().len() + 1);
         buf.push_str(prefix);
         buf.push_str(&colorize_file_name(&entry.path).to_string());
+        
+        let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
+        if !plugin_fields.is_empty() {
+            buf.push(' ');
+            buf.push_str(&plugin_fields);
+        }
+        
         buf.push('\n');
     }
 }
@@ -90,7 +102,7 @@ impl FileFormatter for TreeFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        _plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         max_depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -155,7 +167,7 @@ impl FileFormatter for TreeFormatter {
                 };
 
                 trunk.get_prefix(*depth, is_last, &mut prefix_buf);
-                Self::format_entry(entry, &prefix_buf, &mut entry_buf);
+                Self::format_entry(entry, &prefix_buf, plugin_manager, &mut entry_buf);
                 result.push_str(&entry_buf);
             }
         }

@@ -6,6 +6,7 @@ use chrono::{DateTime, Duration, Local};
 use colored::*;
 use lla_plugin_interface::DecoratedEntry;
 use std::collections::BTreeMap;
+use std::time::UNIX_EPOCH;
 
 pub struct TimelineFormatter;
 
@@ -56,7 +57,7 @@ impl FileFormatter for TimelineFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -66,8 +67,8 @@ impl FileFormatter for TimelineFormatter {
         let mut groups: BTreeMap<TimeGroup, Vec<&DecoratedEntry>> = BTreeMap::new();
 
         for file in files {
-            let modified = file.metadata.modified()?;
-            let dt: DateTime<Local> = modified.into();
+            let modified = UNIX_EPOCH + std::time::Duration::from_secs(file.metadata.modified);
+            let dt = DateTime::<Local>::from(modified);
             let group = TimeGroup::from_datetime(dt);
             groups.entry(group).or_default().push(file);
         }
@@ -94,12 +95,12 @@ impl FileFormatter for TimelineFormatter {
             output.push('\n');
 
             let mut entries = entries.to_vec();
-            entries.sort_by_key(|e| std::cmp::Reverse(e.metadata.modified().unwrap()));
+            entries.sort_by_key(|e| std::cmp::Reverse(e.metadata.modified));
 
             for entry in entries {
                 let name = colorize_file_name(&entry.path);
-                let modified = entry.metadata.modified()?;
-                let dt: DateTime<Local> = modified.into();
+                let modified = UNIX_EPOCH + std::time::Duration::from_secs(entry.metadata.modified);
+                let dt = DateTime::<Local>::from(modified);
 
                 let datetime_str = match group {
                     TimeGroup::Today | TimeGroup::Yesterday => dt.format(time_format).to_string(),

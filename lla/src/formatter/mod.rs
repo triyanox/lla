@@ -6,7 +6,7 @@ pub trait FileFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         depth: Option<usize>,
     ) -> Result<String>;
 }

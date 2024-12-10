@@ -170,7 +170,7 @@ impl FileFormatter for GitFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -208,14 +208,12 @@ impl FileFormatter for GitFormatter {
         let status_map = GitFormatter::get_git_status_map(workspace_root);
         let mut max_name_width = 0;
 
+        let mut formatted_entries = Vec::with_capacity(files.len());
         for file in files {
             let name = colorize_file_name(&file.path);
             let name_width = name.chars().count();
             max_name_width = max_name_width.max(name_width);
-        }
 
-        for file in files {
-            let name = colorize_file_name(&file.path);
             let relative_path = file.path.strip_prefix(workspace_root).unwrap_or(&file.path);
             let relative_path_str = relative_path.to_string_lossy();
 
@@ -228,6 +226,10 @@ impl FileFormatter for GitFormatter {
                 .unwrap_or_else(|| ("-".to_string(), "never".to_string(), "-".to_string()));
 
             let plugin_fields = plugin_manager.format_fields(file, "git").join(" ");
+            formatted_entries.push((name, status_str, commit_info, plugin_fields));
+        }
+
+        for (name, status_str, commit_info, plugin_fields) in formatted_entries {
             let plugin_suffix = if plugin_fields.is_empty() {
                 String::new()
             } else {

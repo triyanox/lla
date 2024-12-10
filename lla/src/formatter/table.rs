@@ -5,6 +5,9 @@ use crate::utils::color::*;
 use colored::*;
 use lla_plugin_interface::DecoratedEntry;
 use std::cmp;
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
+use std::time::{Duration, UNIX_EPOCH};
 use unicode_width::UnicodeWidthStr;
 
 pub struct TableFormatter;
@@ -29,13 +32,15 @@ impl TableFormatter {
         ];
 
         for entry in files {
-            let perms = colorize_permissions(&entry.metadata.permissions());
+            let perms = Permissions::from_mode(entry.metadata.permissions);
+            let perms = colorize_permissions(&perms);
             widths[0] = cmp::max(widths[0], Self::visible_width(&perms));
 
-            let size: ColoredString = colorize_size(entry.metadata.len());
+            let size: ColoredString = colorize_size(entry.metadata.size);
             widths[1] = cmp::max(widths[1], Self::visible_width(&size));
 
-            let date = colorize_date(&entry.metadata.modified().unwrap());
+            let modified = UNIX_EPOCH + Duration::from_secs(entry.metadata.modified);
+            let date = colorize_date(&modified);
             widths[2] = cmp::max(widths[2], Self::visible_width(&date));
 
             let name = colorize_file_name(&entry.path);
@@ -118,7 +123,7 @@ impl FileFormatter for TableFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -136,9 +141,11 @@ impl FileFormatter for TableFormatter {
         output.push('\n');
 
         for entry in files {
-            let perms = colorize_permissions(&entry.metadata.permissions());
-            let size = colorize_size(entry.metadata.len());
-            let date = colorize_date(&entry.metadata.modified()?);
+            let perms = Permissions::from_mode(entry.metadata.permissions);
+            let perms = colorize_permissions(&perms);
+            let size = colorize_size(entry.metadata.size);
+            let modified = UNIX_EPOCH + Duration::from_secs(entry.metadata.modified);
+            let date = colorize_date(&modified);
             let name = colorize_file_name(&entry.path);
 
             let plugin_fields = plugin_manager.format_fields(entry, "table").join(" ");

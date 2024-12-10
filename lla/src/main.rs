@@ -21,18 +21,19 @@ use formatter::{
 };
 use installer::PluginInstaller;
 use lister::{BasicLister, FileLister, RecursiveLister};
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::{DecoratedEntry, EntryMetadata};
 use plugin::PluginManager;
 use rayon::prelude::*;
 use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
 use std::collections::HashSet;
+use std::os::unix::fs::MetadataExt;
 use std::sync::Arc;
+use std::time::UNIX_EPOCH;
 
 fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
     let args = Args::parse(&config);
     let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
-    plugin_manager.handle_plugin_args(&args.plugin_args);
 
     match args.command {
         Some(Command::Install(source)) => {
@@ -115,18 +116,42 @@ fn get_format(args: &Args) -> &'static str {
     }
 }
 
+fn convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
+    EntryMetadata {
+        size: metadata.len(),
+        modified: metadata
+            .modified()
+            .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
+            .unwrap_or(0),
+        accessed: metadata
+            .accessed()
+            .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
+            .unwrap_or(0),
+        created: metadata
+            .created()
+            .map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
+            .unwrap_or(0),
+        is_dir: metadata.is_dir(),
+        is_file: metadata.is_file(),
+        is_symlink: metadata.is_symlink(),
+        permissions: metadata.mode(),
+        uid: metadata.uid(),
+        gid: metadata.gid(),
+    }
+}
+
 fn list_and_decorate_files(
     args: &Args,
     lister: &Arc<dyn FileLister + Send + Sync>,
     filter: &Arc<dyn FileFilter + Send + Sync>,
-    plugin_manager: &PluginManager,
+    plugin_manager: &mut PluginManager,
     format: &str,
 ) -> Result<Vec<DecoratedEntry>> {
-    Ok(lister
+    let mut entries: Vec<DecoratedEntry> = lister
         .list_files(&args.directory, args.tree_format, args.depth)?
         .into_par_iter()
         .filter_map(|path| {
-            let metadata = path.metadata().ok()?;
+            let fs_metadata = path.metadata().ok()?;
 
             if !filter
                 .filter_files(std::slice::from_ref(&path))
@@ -136,15 +161,19 @@ fn list_and_decorate_files(
                 return None;
             }
 
-            let mut entry = DecoratedEntry {
+            Some(DecoratedEntry {
                 path,
-                metadata,
+                metadata: convert_metadata(&fs_metadata),
                 custom_fields: std::collections::HashMap::with_capacity(8),
-            };
-            plugin_manager.decorate_entry(&mut entry, format);
-            Some(entry)
+            })
         })
-        .collect())
+        .collect();
+
+    for entry in &mut entries {
+        plugin_manager.decorate_entry(entry, format);
+    }
+
+    Ok(entries)
 }
 
 fn sort_files(
@@ -185,7 +214,7 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
         let plugins: Vec<(String, String, String)> = plugin_manager
             .list_plugins()
             .into_iter()
-            .map(|(name, version, desc)| (name.to_string(), version.to_string(), desc.to_string()))
+            .map(|(name, version, desc)| (name, version, desc))
             .collect();
 
         let plugin_names: Vec<String> = plugins
@@ -239,7 +268,7 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
 
         for idx in selections {
             let (name, _, _) = &plugins[idx];
-            updated_plugins.insert(name.clone());
+            updated_plugins.insert(name.to_string());
         }
 
         for (name, _, _) in &plugins {
@@ -249,45 +278,17 @@ fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
                 plugin_manager.disable_plugin(name)?;
             }
         }
-
-        print!("\x1B[1A\x1B[2K");
-        println!("\n{}", "Enabled plugins:".cyan().bold());
-        let enabled: Vec<_> = plugins
-            .iter()
-            .filter(|(name, _, _)| updated_plugins.contains(name))
-            .collect();
-
-        if enabled.is_empty() {
-            println!("  {}", "No plugins enabled".bright_black().italic());
-        } else {
-            for (name, version, _) in enabled {
-                println!(
-                    "  {} {} {}",
-                    "◉".green(),
-                    name.cyan(),
-                    format!("v{}", version).yellow()
-                );
-            }
-        }
-
-        println!("\n{}", "Configuration updated successfully".green());
     } else {
-        println!("{}", "Available plugins:".cyan().bold());
-        for (name, version, description) in plugin_manager.list_plugins() {
-            let status = if plugin_manager.enabled_plugins.contains(name) {
-                "◉".green()
-            } else {
-                "○".red()
-            };
+        for (name, version, desc) in plugin_manager.list_plugins() {
             println!(
-                "  {} {} {} - {}",
-                status,
+                "{} {} - {}",
                 name.cyan(),
                 format!("v{}", version).yellow(),
-                description
+                desc
             );
         }
     }
+
     Ok(())
 }
 

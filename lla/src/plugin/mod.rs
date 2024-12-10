@@ -2,16 +2,14 @@ use crate::config::Config;
 use crate::error::{LlaError, Result};
 use dashmap::DashMap;
 use libloading::{Library, Symbol};
-use lla_plugin_interface::{CliArg, DecoratedEntry, Plugin};
+use lla_plugin_interface::{DecoratedEntry, EntryMetadata, Plugin, PluginRequest, PluginResponse};
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-type DecorationCache = DashMap<(u64, String), HashMap<String, String>>;
+type DecorationCache = DashMap<(String, String), HashMap<String, String>>;
 static DECORATION_CACHE: Lazy<DecorationCache> = Lazy::new(DashMap::new);
 
 pub struct PluginManager {
@@ -34,25 +32,57 @@ impl PluginManager {
         }
     }
 
-    pub fn handle_plugin_args(&self, args: &[String]) {
-        for (name, plugin) in &self.plugins {
-            if self.enabled_plugins.contains(name) {
-                plugin.handle_cli_args(args);
-            }
+    fn _convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
+        EntryMetadata {
+            size: metadata.len(),
+            modified: metadata
+                .modified()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            accessed: metadata
+                .accessed()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            created: metadata
+                .created()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            is_dir: metadata.is_dir(),
+            is_file: metadata.is_file(),
+            is_symlink: metadata.is_symlink(),
+            permissions: metadata.mode(),
+            uid: metadata.uid(),
+            gid: metadata.gid(),
         }
     }
 
     pub fn perform_plugin_action(
-        &self,
+        &mut self,
         plugin_name: &str,
         action: &str,
         args: &[String],
     ) -> Result<()> {
-        if let Some(plugin) = self.plugins.get(plugin_name) {
+        if let Some(plugin) = self.plugins.get_mut(plugin_name) {
             if self.enabled_plugins.contains(plugin_name) {
-                plugin
-                    .perform_action(action, args)
-                    .map_err(LlaError::Plugin)
+                match plugin.handle_request(PluginRequest::PerformAction(
+                    action.to_string(),
+                    args.to_vec(),
+                )) {
+                    PluginResponse::ActionResult(result) => result.map_err(LlaError::Plugin),
+                    _ => Err(LlaError::Plugin("Invalid plugin response".to_string())),
+                }
             } else {
                 Err(LlaError::Plugin(format!(
                     "Plugin '{}' is not enabled",
@@ -67,20 +97,24 @@ impl PluginManager {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn get_cli_args(&self) -> Vec<CliArg> {
-        self.plugins
-            .iter()
-            .filter(|(name, _)| self.enabled_plugins.contains(*name))
-            .flat_map(|(_, plugin)| plugin.cli_args())
-            .collect()
-    }
-
-    pub fn list_plugins(&self) -> Vec<(&str, &str, &str)> {
-        self.plugins
-            .values()
-            .map(|p| (p.name(), p.version(), p.description()))
-            .collect()
+    pub fn list_plugins(&mut self) -> Vec<(String, String, String)> {
+        let mut result = Vec::new();
+        for plugin in self.plugins.values_mut() {
+            let name = match plugin.handle_request(PluginRequest::GetName) {
+                PluginResponse::Name(name) => name,
+                _ => continue,
+            };
+            let version = match plugin.handle_request(PluginRequest::GetVersion) {
+                PluginResponse::Version(version) => version,
+                _ => continue,
+            };
+            let description = match plugin.handle_request(PluginRequest::GetDescription) {
+                PluginResponse::Description(description) => description,
+                _ => continue,
+            };
+            result.push((name, version, description));
+        }
+        result
     }
 
     pub fn load_plugin<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
@@ -98,8 +132,11 @@ impl PluginManager {
                     LlaError::Plugin(format!("Plugin doesn't have a constructor: {}", e))
                 })?;
 
-            let plugin = Box::from_raw(constructor());
-            let name = plugin.name().to_string();
+            let mut plugin = Box::from_raw(constructor());
+            let name = match plugin.handle_request(PluginRequest::GetName) {
+                PluginResponse::Name(name) => name,
+                _ => return Err(LlaError::Plugin("Failed to get plugin name".to_string())),
+            };
 
             if self.plugins.contains_key(&name) {
                 return Err(LlaError::Plugin(format!(
@@ -108,7 +145,7 @@ impl PluginManager {
                 )));
             }
 
-            self.plugins.insert(name.clone(), plugin);
+            self.plugins.insert(name, plugin);
             self.libraries.push(library);
             self.loaded_paths.insert(path);
 
@@ -163,57 +200,48 @@ impl PluginManager {
         }
     }
 
-    pub fn decorate_entry(&self, entry: &mut DecoratedEntry, format: &str) {
+    pub fn decorate_entry(&mut self, entry: &mut DecoratedEntry, format: &str) {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return;
         }
-
-        #[cfg(unix)]
-        let file_id = entry.metadata.ino();
-        #[cfg(windows)]
-        let file_id = entry.metadata.file_index().unwrap_or(0);
-
-        let cache_key = (file_id, format.to_string());
-
+        let path_str = entry.path.to_string_lossy().to_string();
+        let cache_key = (path_str, format.to_string());
         if let Some(fields) = DECORATION_CACHE.get(&cache_key) {
             entry
                 .custom_fields
                 .extend(fields.value().iter().map(|(k, v)| (k.clone(), v.clone())));
             return;
         }
-
-        let enabled_plugins: Vec<_> = self
-            .plugins
-            .iter()
-            .filter(|(name, plugin)| {
-                self.enabled_plugins.contains(*name) && plugin.supported_formats().contains(&format)
-            })
-            .collect();
-
-        if enabled_plugins.is_empty() {
+        let supported_names: Vec<_> = {
+            let mut names = Vec::new();
+            for name in self.enabled_plugins.iter() {
+                if let Some(plugin) = self.plugins.get_mut(name) {
+                    match plugin.handle_request(PluginRequest::GetSupportedFormats) {
+                        PluginResponse::SupportedFormats(formats)
+                            if formats.contains(&format.to_string()) =>
+                        {
+                            names.push(name.clone());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            names
+        };
+        if supported_names.is_empty() {
             return;
         }
 
-        let mut new_decorations = HashMap::with_capacity(enabled_plugins.len() * 2);
-
-        let plugin_results: Vec<_> = enabled_plugins
-            .into_par_iter()
-            .map(|(_name, plugin)| {
-                let temp_fields = HashMap::with_capacity(2);
-                let mut temp_entry = DecoratedEntry {
-                    path: entry.path.clone(),
-                    metadata: entry.metadata.clone(),
-                    custom_fields: temp_fields,
-                };
-                plugin.decorate(&mut temp_entry);
-                temp_entry.custom_fields
-            })
-            .collect();
-
-        for fields in plugin_results {
-            new_decorations.extend(fields);
+        let mut new_decorations = HashMap::with_capacity(supported_names.len() * 2);
+        for name in supported_names {
+            if let Some(plugin) = self.plugins.get_mut(&name) {
+                if let PluginResponse::Decorated(decorated) =
+                    plugin.handle_request(PluginRequest::Decorate(entry.clone()))
+                {
+                    new_decorations.extend(decorated.custom_fields);
+                }
+            }
         }
-
         if !new_decorations.is_empty() {
             entry
                 .custom_fields
@@ -222,17 +250,29 @@ impl PluginManager {
         }
     }
 
-    #[inline]
-    pub fn format_fields(&self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
+    pub fn format_fields(&mut self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return Vec::new();
         }
 
         let mut result = Vec::with_capacity(self.enabled_plugins.len());
-        for (name, plugin) in &self.plugins {
-            if self.enabled_plugins.contains(name) && plugin.supported_formats().contains(&format) {
-                if let Some(field) = plugin.format_field(entry, format) {
-                    result.push(field);
+        for (name, plugin) in self.plugins.iter_mut() {
+            if !self.enabled_plugins.contains(name) {
+                continue;
+            }
+
+            let supports_format = match plugin.handle_request(PluginRequest::GetSupportedFormats) {
+                PluginResponse::SupportedFormats(formats) => formats.contains(&format.to_string()),
+                _ => false,
+            };
+
+            if supports_format {
+                match plugin.handle_request(PluginRequest::FormatField(
+                    entry.clone(),
+                    format.to_string(),
+                )) {
+                    PluginResponse::FormattedField(Some(field)) => result.push(field),
+                    _ => {}
                 }
             }
         }

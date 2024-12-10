@@ -12,7 +12,7 @@ impl FileFormatter for GridFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -22,21 +22,24 @@ impl FileFormatter for GridFormatter {
         let term_width = terminal_size()
             .map(|(Width(w), _)| w as usize)
             .unwrap_or(80);
-        let max_width = files
-            .iter()
-            .map(|file| {
-                let name = file.path.file_name().unwrap_or_default().to_string_lossy();
-                let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
-                let total_str = if plugin_fields.is_empty() {
-                    name.to_string()
-                } else {
-                    format!("{} {}", name, plugin_fields)
-                };
+
+        let mut formatted_entries = Vec::with_capacity(files.len());
+        let mut max_width = 0;
+
+        for file in files {
+            let name = file.path.file_name().unwrap_or_default().to_string_lossy();
+            let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
+            let total_str = if plugin_fields.is_empty() {
+                name.to_string()
+            } else {
+                format!("{} {}", name, plugin_fields)
+            };
+            let width =
                 String::from_utf8_lossy(&strip_ansi_escapes::strip(&total_str).unwrap_or_default())
-                    .width()
-            })
-            .max()
-            .unwrap_or(0);
+                    .width();
+            max_width = max_width.max(width);
+            formatted_entries.push((colorize_file_name(&file.path).to_string(), plugin_fields));
+        }
 
         let column_width = max_width + 2;
         let num_columns = std::cmp::max(1, term_width / column_width);
@@ -44,9 +47,7 @@ impl FileFormatter for GridFormatter {
         let mut output = String::new();
         let mut current_col = 0;
 
-        for file in files {
-            let colored_name = colorize_file_name(&file.path).to_string();
-            let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
+        for (colored_name, plugin_fields) in formatted_entries {
             let entry = if plugin_fields.is_empty() {
                 colored_name
             } else {

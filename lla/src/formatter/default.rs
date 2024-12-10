@@ -10,7 +10,7 @@ impl FileFormatter for DefaultFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         Ok(files
