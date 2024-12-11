@@ -16,6 +16,7 @@ prost.workspace = true
 
 [build-dependencies]
 prost-build.workspace = true
+which = "4.4"
 
 [features]
 regenerate-protobuf = []
