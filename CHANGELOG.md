@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Plugin system redesign:
+  - Protocol Buffers message passing architecture
+  - C API compatibility
+  - ABI version verification
+  - Improved documentation
+  - Enhanced plugin management interface
+  - Plugin cleanup command (`lla clean`)
 - Command shortcuts system:
   - Store and manage plugin commands as shortcuts
   - CLI commands for shortcut management (`lla shortcut add/remove/list`)
@@ -26,13 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Logical operations (AND, OR, NOT, XOR)
   - Glob pattern matching
   - Case sensitivity options
-- Plugin system enhancements:
-  - Protocol Buffers message passing architecture
-  - C API compatibility
-  - ABI version verification
-  - Improved documentation
-  - Enhanced plugin management interface
-  - Plugin cleanup command (`lla clean`)
 - Additional features:
   - Icon support across formats
   - Updated `sizemap`, `timeline` and `git` views
