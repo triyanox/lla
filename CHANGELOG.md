@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2024-12-11
+
+### Added
+
+- New plugin architecture using message passing with Protocol Buffers serialization
+- Full C API compatibility for plugins
+- Version checks for ABI compatibility
+- Comprehensive documentation for each plugin's usage
+- Enhanced plugin manager with support for new plugin interface
+
+### Changed
+
+- Improved plugin system stability and performance
+- Better visual representation in sizemap view
+- Upgraded all existing plugins to use the new interface
+- Enhanced plugin aesthetics and functionality
+- Overall stability and performance optimizations
+
+### Fixed
+
+- ABI compatibility issues with plugins across different rust versions
+
 ## [0.2.10] - 2024-11-30
 
 ### Added
@@ -20,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extended configuration options for customization
 - Plugin support for default and long format customization
 
-### Enhanced
+### Changed
 
 - Significant performance improvements:
   - Optimized tree view rendering
