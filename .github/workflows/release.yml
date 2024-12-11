@@ -78,17 +78,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install -y protobuf-compiler
-            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install protobuf
-            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
-          fi
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: "3.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -115,6 +109,8 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build release
+        env:
+          PROTOC_FLAGS: "--experimental_allow_proto3_optional"
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Prepare binary
@@ -136,15 +132,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install protobuf compiler
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get update
-            sudo apt-get install -y protobuf-compiler
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            brew install protobuf
-          fi
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: "3.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -161,6 +153,9 @@ jobs:
           sed -i 's/version = "[0-9]*\.[0-9]*\.[0-9]*"/version = "'$VERSION'"/' lla/Cargo.toml
 
       - name: Check and publish to crates.io
+        env:
+          PROTOC_FLAGS: "--experimental_allow_proto3_optional"
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           cargo login ${{ secrets.CRATES_IO_TOKEN }}
 
@@ -181,8 +176,6 @@ jobs:
 
           echo "Publishing lla v$VERSION"
           cargo publish -p lla
-        env:
-          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
   create_release:
     needs: [check_release, build, publish]
