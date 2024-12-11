@@ -6,6 +6,10 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/lla_plugin.rs"));
 }
 
+pub trait Plugin: Default {
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8>;
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DecoratedEntry {
     pub path: PathBuf,
@@ -106,24 +110,77 @@ impl TryFrom<proto::DecoratedEntry> for DecoratedEntry {
     }
 }
 
-pub trait Plugin: Send + Sync {
-    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8>;
+#[repr(C)]
+pub struct RawBuffer {
+    pub ptr: *mut u8,
+    pub len: usize,
+    pub capacity: usize,
 }
+
+impl RawBuffer {
+    pub fn from_vec(mut vec: Vec<u8>) -> Self {
+        let ptr = vec.as_mut_ptr();
+        let len = vec.len();
+        let capacity = vec.capacity();
+        std::mem::forget(vec);
+        RawBuffer { ptr, len, capacity }
+    }
+
+    pub unsafe fn into_vec(self) -> Vec<u8> {
+        Vec::from_raw_parts(self.ptr, self.len, self.capacity)
+    }
+}
+
+#[repr(C)]
+pub struct PluginApi {
+    pub version: u32,
+    pub handle_request: extern "C" fn(*mut std::ffi::c_void, *const u8, usize) -> RawBuffer,
+    pub free_response: extern "C" fn(*mut RawBuffer),
+}
+
+pub const CURRENT_PLUGIN_API_VERSION: u32 = 1;
+
+#[repr(C)]
+pub struct PluginContext(*mut std::ffi::c_void);
 
 #[macro_export]
 macro_rules! declare_plugin {
     ($plugin_type:ty) => {
-        #[no_mangle]
-        pub extern "C" fn _plugin_create() -> *mut dyn $crate::Plugin {
-            Box::into_raw(Box::new(<$plugin_type>::new()))
-        }
+        static mut PLUGIN_INSTANCE: Option<$plugin_type> = None;
 
         #[no_mangle]
-        pub extern "C" fn _plugin_handle_request(request: &[u8]) -> Vec<u8> {
-            let mut plugin = unsafe { Box::from_raw(_plugin_create() as *mut $plugin_type) };
-            let response = plugin.handle_raw_request(request);
-            Box::into_raw(plugin);
-            response
+        pub extern "C" fn _plugin_create() -> *mut $crate::PluginApi {
+            let api = Box::new($crate::PluginApi {
+                version: $crate::CURRENT_PLUGIN_API_VERSION,
+                handle_request: {
+                    extern "C" fn handle_request(
+                        _ctx: *mut std::ffi::c_void,
+                        request: *const u8,
+                        len: usize,
+                    ) -> $crate::RawBuffer {
+                        unsafe {
+                            if PLUGIN_INSTANCE.is_none() {
+                                PLUGIN_INSTANCE = Some(<$plugin_type>::default());
+                            }
+                            let plugin = PLUGIN_INSTANCE.as_mut().unwrap();
+                            let request_slice = std::slice::from_raw_parts(request, len);
+                            let response = plugin.handle_raw_request(request_slice);
+                            $crate::RawBuffer::from_vec(response)
+                        }
+                    }
+                    handle_request
+                },
+                free_response: {
+                    extern "C" fn free_response(response: *mut $crate::RawBuffer) {
+                        unsafe {
+                            let buffer = Box::from_raw(response);
+                            drop(Vec::from_raw_parts(buffer.ptr, buffer.len, buffer.capacity));
+                        }
+                    }
+                    free_response
+                },
+            });
+            Box::into_raw(api)
         }
     };
 }
