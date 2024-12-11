@@ -3,6 +3,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub mod proto {
+    #[cfg(not(feature = "regenerate-protobuf"))]
+    include!("generated/mod.rs");
+
+    #[cfg(feature = "regenerate-protobuf")]
     include!(concat!(env!("OUT_DIR"), "/lla_plugin.rs"));
 }
 

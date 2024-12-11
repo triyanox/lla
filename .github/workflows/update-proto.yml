@@ -1,0 +1,60 @@
+name: Update Proto Bindings
+
+on:
+  push:
+    paths:
+      - "lla_plugin_interface/src/plugin.proto"
+  workflow_dispatch:
+
+jobs:
+  update-proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.71.0
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Generate Proto Bindings
+        run: |
+          cd lla_plugin_interface
+          cargo build --features regenerate-protobuf
+          cd ..
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --quiet || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.git-check.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: update generated protobuf bindings"
+          title: "Update Generated Protobuf Bindings"
+          body: |
+            Auto-generated PR to update protobuf bindings.
+
+            This PR was automatically created because changes were detected in the protobuf definitions.
+            The bindings have been regenerated to match the latest proto file.
+          branch: "update-proto-bindings"
+          base: "main"
+          delete-branch: true

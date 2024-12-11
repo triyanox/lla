@@ -21,11 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -43,7 +38,7 @@ jobs:
         run: cargo clippy --all-targets --all-features
 
       - name: Run tests
-        run: cargo test --all-features --workspace
+        run: cargo test --workspace
 
   build:
     name: Build
@@ -75,11 +70,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -105,8 +95,6 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build release
-        env:
-          PROTOC_FLAGS: "--experimental_allow_proto3_optional"
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Prepare binary (Unix)

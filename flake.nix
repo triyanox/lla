@@ -14,11 +14,30 @@
       {
         defaultPackage = naersk-lib.buildPackage {
           src = ./.;
-          buildInputs = with pkgs; [ protobuf ];
         };
+
         devShell = with pkgs; mkShell {
-          buildInputs = [ cargo rustc rustfmt pre-commit rustPackages.clippy protobuf ];
+          buildInputs = [
+            cargo
+            rustc
+            rustfmt
+            pre-commit
+            rustPackages.clippy
+            protobuf
+          ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
+          
+          shellHook = ''
+            echo "Development shell activated"
+            echo "Note: protobuf is available for regenerating bindings"
+            echo "To regenerate protobuf files, run: cargo build --features regenerate-protobuf"
+          '';
+        };
+
+        packages.withProtobuf = naersk-lib.buildPackage {
+          src = ./.;
+          buildInputs = with pkgs; [ protobuf ];
+          cargoBuildFeatures = [ "regenerate-protobuf" ];
         };
       }
     );
