@@ -13,6 +13,10 @@ pub struct Args {
     pub timeline_format: bool,
     pub git_format: bool,
     pub sort_by: String,
+    pub sort_reverse: bool,
+    pub sort_dirs_first: bool,
+    pub sort_case_sensitive: bool,
+    pub sort_natural: bool,
     pub filter: Option<String>,
     pub case_sensitive: bool,
     pub enable_plugin: Vec<String>,
@@ -109,6 +113,27 @@ impl Args {
                     .takes_value(true)
                     .possible_values(["name", "size", "date"])
                     .default_value(&config.default_sort),
+            )
+            .arg(
+                Arg::with_name("sort-reverse")
+                    .short('r')
+                    .long("sort-reverse")
+                    .help("Reverse the sort order"),
+            )
+            .arg(
+                Arg::with_name("sort-dirs-first")
+                    .long("sort-dirs-first")
+                    .help("List directories before files"),
+            )
+            .arg(
+                Arg::with_name("sort-case-sensitive")
+                    .long("sort-case-sensitive")
+                    .help("Enable case-sensitive sorting"),
+            )
+            .arg(
+                Arg::with_name("sort-natural")
+                    .long("sort-natural")
+                    .help("Use natural sorting for numbers (e.g., 2.txt before 10.txt)"),
             )
             .arg(
                 Arg::with_name("filter")
@@ -278,7 +303,7 @@ impl Args {
 
         Args {
             directory: matches.value_of("directory").unwrap_or(".").to_string(),
-            depth: matches.value_of("depth").and_then(|d| d.parse().ok()),
+            depth: matches.value_of("depth").and_then(|s| s.parse().ok()),
             long_format: matches.is_present("long"),
             tree_format: matches.is_present("tree"),
             table_format: matches.is_present("table"),
@@ -287,6 +312,10 @@ impl Args {
             timeline_format: matches.is_present("timeline"),
             git_format: matches.is_present("git"),
             sort_by: matches.value_of("sort").unwrap_or("name").to_string(),
+            sort_reverse: matches.is_present("sort-reverse"),
+            sort_dirs_first: matches.is_present("sort-dirs-first"),
+            sort_case_sensitive: matches.is_present("sort-case-sensitive"),
+            sort_natural: matches.is_present("sort-natural"),
             filter: matches.value_of("filter").map(String::from),
             case_sensitive: matches.is_present("case-sensitive"),
             enable_plugin: matches

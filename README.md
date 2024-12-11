@@ -106,6 +106,10 @@ lla --timeline
 - **Intelligent Organization**
 
   - Sort by name, size, or date (`-s`)
+  - Reverse sort order (`-r` or `--sort-reverse`)
+  - List directories first (`--sort-dirs-first`)
+  - Case-sensitive sorting (`--sort-case-sensitive`)
+  - Natural number sorting (`--sort-natural`)
   - Filter by name or extension (`-f`)
   - Recursive listing with depth control (`-d`)
   - Performance-optimized for large directories
@@ -254,6 +258,16 @@ lla -G                  # Git-aware view
 
 # Advanced usage
 lla -ls size           # Sort by size in long format
+lla -ls size -r        # Sort by size in reverse order
+lla -ls name --sort-dirs-first     # List directories before files
+lla -ls name --sort-case-sensitive # Case-sensitive name sorting
+lla -ls name --sort-natural        # Natural sorting (e.g., 2.txt before 10.txt)
+
+# Combined sorting options
+lla -ls size -r --sort-dirs-first  # Reverse size sort with directories first
+lla -ls name --sort-natural -r     # Reverse natural sort
+lla -ls date --sort-dirs-first -r  # Newest last with directories first
+
 lla -f .rs            # Show only Rust files
 # Case-insensitive search for files containing "test"
 lla -f test

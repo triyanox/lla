@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Enhanced sorting functionality:
+  - Reverse sort order with `-r` or `--sort-reverse`
+  - Directory-first sorting with `--sort-dirs-first`
+  - Case-sensitive sorting with `--sort-case-sensitive`
+  - Natural number sorting with `--sort-natural` (e.g., 2.txt before 10.txt)
+- Improved filtering system:
+  - Multiple pattern matching with comma-separated values
+  - AND operation with `+` prefix (e.g., "+test,api")
+  - Composite filters with AND, OR, NOT, XOR operations
+  - Full path matching for better filtering accuracy
+  - Enhanced case-sensitive and case-insensitive filtering
 - New plugin architecture using message passing with Protocol Buffers serialization
 - Full C API compatibility for plugins
 - Version checks for ABI compatibility
@@ -18,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved sorting performance with parallel processing
+- Enhanced filter matching logic and efficiency
 - Improved plugin system stability and performance
 - Better visual representation in sizemap view
 - Upgraded all existing plugins to use the new interface
@@ -26,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Case-sensitive search accuracy in file filtering
+- Directory sorting consistency across different views
+- Natural sorting for numeric filenames
 - ABI compatibility issues with plugins across different rust versions
 
 ## [0.2.10] - 2024-11-30

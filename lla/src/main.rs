@@ -27,7 +27,7 @@ use lister::{BasicLister, FileLister, RecursiveLister};
 use lla_plugin_interface::proto::{DecoratedEntry, EntryMetadata};
 use plugin::PluginManager;
 use rayon::prelude::*;
-use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter};
+use sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter, SortOptions};
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
@@ -103,7 +103,7 @@ fn list_directory(
     let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
 
     let decorated_files = if !args.tree_format {
-        sort_files(decorated_files, &sorter)?
+        sort_files(decorated_files, &sorter, &args)?
     } else {
         decorated_files
     };
@@ -191,12 +191,21 @@ fn list_and_decorate_files(
 fn sort_files(
     mut files: Vec<DecoratedEntry>,
     sorter: &Arc<dyn FileSorter + Send + Sync>,
+    args: &Args,
 ) -> Result<Vec<DecoratedEntry>> {
     let mut paths: Vec<PathBuf> = files
         .iter()
         .map(|entry| PathBuf::from(&entry.path))
         .collect();
-    sorter.sort_files(&mut paths)?;
+
+    let options = SortOptions {
+        reverse: args.sort_reverse,
+        dirs_first: args.sort_dirs_first,
+        case_sensitive: args.sort_case_sensitive,
+        natural: args.sort_natural,
+    };
+
+    sorter.sort_files(&mut paths, options)?;
 
     files.sort_by_key(|entry| {
         paths
@@ -317,12 +326,14 @@ fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
 }
 
 fn create_sorter(args: &Args) -> Arc<dyn FileSorter + Send + Sync> {
-    match args.sort_by.as_str() {
+    let sorter: Arc<dyn FileSorter + Send + Sync> = match args.sort_by.as_str() {
         "name" => Arc::new(AlphabeticalSorter),
         "size" => Arc::new(SizeSorter),
         "date" => Arc::new(DateSorter),
         _ => Arc::new(AlphabeticalSorter),
-    }
+    };
+
+    sorter
 }
 
 fn create_filter(args: &Args) -> Arc<dyn FileFilter + Send + Sync> {
