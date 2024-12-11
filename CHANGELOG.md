@@ -10,46 +10,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Command shortcuts system:
-  - Save frequently used plugin commands as shortcuts
-  - Manage shortcuts through CLI (`lla shortcut add/remove/list`)
-  - Store shortcuts in config file with descriptions
-  - Pass custom arguments to shortcut commands
-  - Convert long plugin commands into memorable shortcuts
-- Enhanced sorting functionality:
-  - Reverse sort order with `-r` or `--sort-reverse`
-  - Directory-first sorting with `--sort-dirs-first`
-  - Case-sensitive sorting with `--sort-case-sensitive`
-  - Natural number sorting with `--sort-natural` (e.g., 2.txt before 10.txt)
-- Improved filtering system:
-  - Multiple pattern matching with comma-separated values
-  - AND operation with `+` prefix (e.g., "+test,api")
-  - Composite filters with AND, OR, NOT, XOR operations
-  - Full path matching for better filtering accuracy
-  - Enhanced case-sensitive and case-insensitive filtering
-- New plugin architecture using message passing with Protocol Buffers serialization
-- Full C API compatibility for plugins
-- Version checks for ABI compatibility
-- Comprehensive documentation for each plugin's usage
-- Enhanced plugin manager with support for new plugin interface
-- Plugin cleaning command to remove invalid plugins by running `lla clean`
+  - Store and manage plugin commands as shortcuts
+  - CLI commands for shortcut management (`lla shortcut add/remove/list`)
+  - Configuration file storage with descriptions
+  - Support for custom arguments
+  - Simplified command syntax
+- Sorting improvements:
+  - Reverse sorting (`-r`, `--sort-reverse`)
+  - Directory-first option (`--sort-dirs-first`)
+  - Case-sensitive sorting (`--sort-case-sensitive`)
+  - Natural number sorting (`--sort-natural`)
+- Filter system updates:
+  - Multiple pattern support with comma separation
+  - AND operations using `+` prefix
+  - Logical operations (AND, OR, NOT, XOR)
+  - Glob pattern matching
+  - Case sensitivity options
+- Plugin system enhancements:
+  - Protocol Buffers message passing architecture
+  - C API compatibility
+  - ABI version verification
+  - Improved documentation
+  - Enhanced plugin management interface
+  - Plugin cleanup command (`lla clean`)
+- Additional features:
+  - Icon support across formats
+  - Updated `sizemap`, `timeline` and `git` views
+  - Selective plugin installation
+  - Command shortcut system
 
 ### Changed
 
-- Improved sorting performance with parallel processing
-- Enhanced filter matching logic and efficiency
-- Improved plugin system stability and performance
-- Better visual representation in sizemap view
-- Upgraded all existing plugins to use the new interface
-- Enhanced plugin aesthetics and functionality
-- Overall stability and performance optimizations
-- Simplified complex plugin commands through shortcuts system
+- Performance optimizations for sorting
+- Improved filter matching
+- Plugin system reliability updates
+- Refined sizemap visualization
+- Updated plugin interfaces
+- Interface improvements
+- General stability enhancements
 
 ### Fixed
 
-- Case-sensitive search accuracy in file filtering
-- Directory sorting consistency across different views
-- Natural sorting for numeric filenames
-- ABI compatibility issues with plugins across different rust versions
+- Plugin ABI compatibility
+- Case-sensitive search behavior
+- Directory sorting issues
+- Numeric filename sorting
 
 ## [0.2.10] - 2024-11-30
 
