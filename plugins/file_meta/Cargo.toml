@@ -8,5 +8,7 @@ edition = "2021"
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
 chrono = '0.4.38'
 colored = "2.0"
+prost = "0.12"
+bytes = "1.5"
 [lib]
 crate-type = ["cdylib"]

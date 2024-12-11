@@ -1,5 +1,9 @@
 use colored::*;
-use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message},
+    Plugin,
+};
+use prost::Message as _;
 use std::time::SystemTime;
 
 pub struct FileMetadataPlugin;
@@ -13,22 +17,61 @@ impl FileMetadataPlugin {
         let datetime: chrono::DateTime<chrono::Local> = timestamp.into();
         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
     }
+
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
 }
 
 impl Plugin for FileMetadataPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg = match proto_msg.message {
+            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
+            Some(Message::GetVersion(_)) => {
+                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            Some(Message::GetDescription(_)) => {
+                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
             }
-            PluginRequest::Decorate(mut entry) => {
+            Some(Message::GetSupportedFormats(_)) => {
+                Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(Message::Decorate(entry)) => {
+                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
+                {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
+
                 entry.custom_fields.insert(
                     "accessed".to_string(),
                     Self::format_timestamp(
@@ -64,10 +107,20 @@ impl Plugin for FileMetadataPlugin {
                     format!("{:o}", entry.metadata.permissions),
                 );
 
-                PluginResponse::Decorated(entry)
+                Message::DecoratedResponse(entry.into())
             }
-            PluginRequest::FormatField(entry, format) => {
-                let formatted = match format.as_str() {
+            Some(Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
+
+                let formatted = match req.format.as_str() {
                     "long" | "default" => {
                         match (
                             entry.custom_fields.get("accessed"),
@@ -100,10 +153,21 @@ impl Plugin for FileMetadataPlugin {
                     }
                     _ => None,
                 };
-                PluginResponse::FormattedField(formatted)
+                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
             }
-            PluginRequest::PerformAction(_, _) => PluginResponse::ActionResult(Ok(())),
-        }
+            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
+                success: true,
+                error: None,
+            }),
+            _ => Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
