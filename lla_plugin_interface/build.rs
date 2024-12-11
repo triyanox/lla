@@ -7,8 +7,12 @@ fn main() -> Result<()> {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
         println!("cargo:rerun-if-changed=src/plugin.proto");
 
-        // Only try to compile protos if PROTOC is set or protoc is available
-        if std::env::var("PROTOC").is_ok() || which::which("protoc").is_ok() {
+        if std::env::var("PROTOC").is_ok()
+            || which::which("protoc").is_ok()
+            || which::which("protoc-gen-rust").is_ok()
+            || which::which("protoc-gen-rust-macos").is_ok()
+            || which::which("protoc-gen-rust-linux").is_ok()
+        {
             if let Err(e) = prost_build::Config::new()
                 .out_dir(&out_dir)
                 .compile_protos(&["src/plugin.proto"], &["src/"])
