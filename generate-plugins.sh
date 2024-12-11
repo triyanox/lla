@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Output file
 output_file="plugins.md"
 
-# Write header
 cat > "$output_file" << EOL
 # LLA Plugins
 
@@ -23,20 +21,16 @@ Or you can install individual plugins as described below.
 
 EOL
 
-# Iterate through plugin directories
 for plugin_dir in plugins/*/; do
     if [ -f "${plugin_dir}Cargo.toml" ]; then
-        # Extract information from Cargo.toml using grep and sed
         name=$(grep '^name' "${plugin_dir}Cargo.toml" | sed 's/name = "\(.*\)"/\1/')
         version=$(grep '^version' "${plugin_dir}Cargo.toml" | sed 's/version = "\(.*\)"/\1/')
         description=$(grep '^description' "${plugin_dir}Cargo.toml" | sed 's/description = "\(.*\)"/\1/')
         
-        # If description is empty, provide default
         if [ -z "$description" ]; then
             description="No description provided."
         fi
         
-        # Write plugin information
         cat >> "$output_file" << EOL
 ### ${name}
 

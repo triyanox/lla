@@ -195,7 +195,7 @@ impl PluginManager {
                             let api = create_fn();
                             if (*api).version != CURRENT_PLUGIN_API_VERSION {
                                 eprintln!(
-                                    "⚠️ Plugin version mismatch for {:?}: expected {}, got {}",
+                                    "⚠️ Plugin version mismatch for {:?}: expected {}, got {} run `lla clean` to remove invalid plugins",
                                     path,
                                     CURRENT_PLUGIN_API_VERSION,
                                     (*api).version
