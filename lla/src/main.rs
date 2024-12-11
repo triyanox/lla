@@ -34,6 +34,13 @@ use std::time::UNIX_EPOCH;
 fn main() -> Result<()> {
     let (config, config_error) = load_config()?;
     let args = Args::parse(&config);
+
+    if let Some(Command::Clean) = args.command {
+        println!("🔄 Starting plugin cleaning...");
+        let mut plugin_manager = PluginManager::new(config.clone());
+        return plugin_manager.clean_plugins();
+    }
+
     let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
 
     match args.command {
@@ -59,6 +66,7 @@ fn main() -> Result<()> {
         Some(Command::PluginAction(plugin_name, action, action_args)) => {
             plugin_manager.perform_plugin_action(&plugin_name, &action, &action_args)
         }
+        Some(Command::Clean) => unreachable!(),
         None => list_directory(&args, &mut plugin_manager, config_error),
     }
 }

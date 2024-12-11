@@ -28,6 +28,7 @@ pub enum Command {
     Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
     Update(Option<String>),
+    Clean,
 }
 
 pub enum InstallSource {
@@ -212,39 +213,29 @@ impl Args {
                             .index(1),
                     ),
             )
+            .subcommand(
+                SubCommand::with_name("clean")
+                    .about("This command will clean up invalid plugins")
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
     }
 
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let format = if matches.is_present("long") {
-            "long"
-        } else if matches.is_present("tree") {
-            "tree"
-        } else if matches.is_present("table") {
-            "table"
-        } else if matches.is_present("grid") {
-            "grid"
-        } else if matches.is_present("sizemap") {
-            "sizemap"
-        } else if matches.is_present("timeline") {
-            "timeline"
-        } else if matches.is_present("git") {
-            "git"
-        } else {
-            &config.default_format
-        };
-
-        let command = if let Some(install_matches) = matches.subcommand_matches("install") {
+        let command = if matches.subcommand_matches("clean").is_some() {
+            Some(Command::Clean)
+        } else if let Some(install_matches) = matches.subcommand_matches("install") {
             if let Some(github_url) = install_matches.value_of("git") {
                 Some(Command::Install(InstallSource::GitHub(
                     github_url.to_string(),
                 )))
+            } else if let Some(local_dir) = install_matches.value_of("dir") {
+                Some(Command::Install(InstallSource::LocalDir(
+                    local_dir.to_string(),
+                )))
             } else {
-                install_matches.value_of("dir").map(|local_dir| {
-                    Command::Install(InstallSource::LocalDir(local_dir.to_string()))
-                })
+                None
             }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)
@@ -270,10 +261,12 @@ impl Args {
                 .map(|v| v.map(String::from).collect())
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
+        } else if let Some(update_matches) = matches.subcommand_matches("update") {
+            Some(Command::Update(
+                update_matches.value_of("name").map(String::from),
+            ))
         } else {
-            matches.subcommand_matches("update").map(|update_matches| {
-                Command::Update(update_matches.value_of("name").map(String::from))
-            })
+            None
         };
 
         Args {
@@ -282,13 +275,13 @@ impl Args {
                 .value_of("depth")
                 .map(|d| d.parse().unwrap())
                 .or(config.default_depth),
-            long_format: format == "long",
-            tree_format: format == "tree",
-            table_format: format == "table",
-            grid_format: format == "grid",
-            sizemap_format: format == "sizemap",
-            timeline_format: format == "timeline",
-            git_format: format == "git",
+            long_format: matches.is_present("long"),
+            tree_format: matches.is_present("tree"),
+            table_format: matches.is_present("table"),
+            grid_format: matches.is_present("grid"),
+            sizemap_format: matches.is_present("sizemap"),
+            timeline_format: matches.is_present("timeline"),
+            git_format: matches.is_present("git"),
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)

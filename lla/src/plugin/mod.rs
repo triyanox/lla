@@ -188,55 +188,68 @@ impl PluginManager {
         }
 
         unsafe {
-            let library = Library::new(&path)
-                .map_err(|e| LlaError::Plugin(format!("Failed to load plugin library: {}", e)))?;
+            match Library::new(&path) {
+                Ok(library) => {
+                    match library.get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create") {
+                        Ok(create_fn) => {
+                            let api = create_fn();
+                            if (*api).version != CURRENT_PLUGIN_API_VERSION {
+                                eprintln!(
+                                    "⚠️ Plugin version mismatch for {:?}: expected {}, got {}",
+                                    path,
+                                    CURRENT_PLUGIN_API_VERSION,
+                                    (*api).version
+                                );
+                                return Ok(());
+                            }
 
-            let create_fn = library
-                .get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create")
-                .map_err(|e| {
-                    LlaError::Plugin(format!("Plugin doesn't have a create function: {}", e))
-                })?;
+                            let request = PluginMessage {
+                                message: Some(Message::GetName(true)),
+                            };
+                            let mut buf = Vec::with_capacity(request.encoded_len());
+                            request.encode(&mut buf).unwrap();
 
-            let api = create_fn();
-
-            if (*api).version != CURRENT_PLUGIN_API_VERSION {
-                return Err(LlaError::Plugin(format!(
-                    "Plugin API version mismatch: expected {}, got {}",
-                    CURRENT_PLUGIN_API_VERSION,
-                    (*api).version
-                )));
+                            match ((*api).handle_request)(
+                                std::ptr::null_mut(),
+                                buf.as_ptr(),
+                                buf.len(),
+                            ) {
+                                raw_response => {
+                                    let response_vec = Vec::from_raw_parts(
+                                        raw_response.ptr,
+                                        raw_response.len,
+                                        raw_response.capacity,
+                                    );
+                                    match proto::PluginMessage::decode(&response_vec[..]) {
+                                        Ok(response_msg) => match response_msg.message {
+                                            Some(Message::NameResponse(name)) => {
+                                                if !self.plugins.contains_key(&name) {
+                                                    self.plugins.insert(name, (library, api));
+                                                    self.loaded_paths.insert(path);
+                                                }
+                                            }
+                                            _ => eprintln!(
+                                                "⚠️ Failed to get plugin name for {:?}",
+                                                path
+                                            ),
+                                        },
+                                        Err(e) => eprintln!(
+                                            "⚠️ Failed to decode response for {:?}: {}",
+                                            path, e
+                                        ),
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ Plugin doesn't have a create function {:?}: {}", path, e)
+                        }
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Failed to load plugin library {:?}: {}", path, e),
             }
-
-            let request = PluginMessage {
-                message: Some(Message::GetName(true)),
-            };
-            let mut buf = Vec::with_capacity(request.encoded_len());
-            request.encode(&mut buf).unwrap();
-
-            let raw_response =
-                ((*api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len());
-            let response_vec =
-                Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity);
-            let response_msg = proto::PluginMessage::decode(&response_vec[..])
-                .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))?;
-
-            let name = match response_msg.message {
-                Some(Message::NameResponse(name)) => name,
-                _ => return Err(LlaError::Plugin("Failed to get plugin name".to_string())),
-            };
-
-            if self.plugins.contains_key(&name) {
-                return Err(LlaError::Plugin(format!(
-                    "Plugin '{}' already loaded",
-                    name
-                )));
-            }
-
-            self.plugins.insert(name, (library, api));
-            self.loaded_paths.insert(path);
-
-            Ok(())
         }
+        Ok(())
     }
 
     pub fn discover_plugins<P: AsRef<Path>>(&mut self, plugin_dir: P) -> Result<()> {
@@ -384,5 +397,112 @@ impl PluginManager {
             }
         }
         result
+    }
+
+    pub fn clean_plugins(&mut self) -> Result<()> {
+        println!("🔄 Starting plugin cleaning...");
+
+        let plugins_dir = self.config.plugins_dir.clone();
+        let mut failed_plugins = Vec::new();
+
+        for entry in fs::read_dir(&plugins_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if let Some(extension) = path.extension() {
+                if extension == "so" || extension == "dll" || extension == "dylib" {
+                    println!("📦 Checking plugin: {:?}", path);
+
+                    match std::panic::catch_unwind(|| self.validate_plugin(&path)) {
+                        Ok(Ok(true)) => println!("✅ Plugin is valid: {:?}", path),
+                        Ok(Ok(false)) => {
+                            println!("❌ Plugin is invalid: {:?}", path);
+                            failed_plugins.push(path);
+                        }
+                        Ok(Err(e)) => {
+                            println!("❌ Error validating plugin {:?}: {}", path, e);
+                            failed_plugins.push(path);
+                        }
+                        Err(_) => {
+                            println!("❌ Plugin validation panicked: {:?}", path);
+                            failed_plugins.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        for path in failed_plugins {
+            if let Err(e) = fs::remove_file(&path) {
+                eprintln!("⚠️ Failed to remove invalid plugin {:?}: {}", path, e);
+            } else {
+                println!("🗑️ Removed invalid plugin: {:?}", path);
+            }
+        }
+
+        println!("✨ Plugin cleaning complete");
+        Ok(())
+    }
+
+    fn validate_plugin<P: AsRef<Path>>(&self, path: P) -> Result<bool> {
+        unsafe {
+            let library = match Library::new(path.as_ref()) {
+                Ok(lib) => lib,
+                Err(_) => return Ok(false),
+            };
+
+            let create_fn = match library.get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create") {
+                Ok(f) => f,
+                Err(_) => return Ok(false),
+            };
+
+            let api = match create_fn() {
+                api if api.is_null() => return Ok(false),
+                api => api,
+            };
+
+            if (api as usize) % std::mem::align_of::<PluginApi>() != 0 {
+                return Ok(false);
+            }
+
+            if (*api).version != CURRENT_PLUGIN_API_VERSION {
+                return Ok(false);
+            }
+
+            let request = PluginMessage {
+                message: Some(Message::GetName(true)),
+            };
+            let mut buf = Vec::with_capacity(request.encoded_len());
+            if let Err(_) = request.encode(&mut buf) {
+                return Ok(false);
+            }
+
+            let raw_response = match std::panic::catch_unwind(|| {
+                ((*api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len())
+            }) {
+                Ok(response) => response,
+                Err(_) => return Ok(false),
+            };
+
+            if raw_response.ptr.is_null() || raw_response.len == 0 || raw_response.len > 1024 * 1024
+            {
+                return Ok(false);
+            }
+
+            let response_vec = match std::panic::catch_unwind(|| {
+                Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity)
+            }) {
+                Ok(vec) => vec,
+                Err(_) => return Ok(false),
+            };
+
+            match proto::PluginMessage::decode(&response_vec[..]) {
+                Ok(response_msg) => match response_msg.message {
+                    Some(Message::NameResponse(_)) => Ok(true),
+                    _ => Ok(false),
+                },
+                Err(_) => Ok(false),
+            }
+        }
     }
 }
