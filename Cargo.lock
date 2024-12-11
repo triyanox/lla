@@ -323,10 +323,12 @@ dependencies = [
 name = "dirs"
 version = "0.2.1"
 dependencies = [
+ "bytes",
  "colored",
  "lazy_static",
  "lla_plugin_interface",
  "parking_lot",
+ "prost",
  "rayon",
  "walkdir",
 ]
@@ -356,10 +358,12 @@ dependencies = [
 name = "duplicate_file_detector"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "lazy_static",
  "lla_plugin_interface",
  "parking_lot",
+ "prost",
  "sha2",
 ]
 
@@ -401,8 +405,10 @@ checksum = "486f806e73c5707928240ddc295403b1b93c96a02038563881c4a2fd84b81ac4"
 name = "file_hash"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "lla_plugin_interface",
+ "prost",
  "sha1",
  "sha2",
 ]
@@ -411,18 +417,22 @@ dependencies = [
 name = "file_meta"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "chrono",
  "colored",
  "lla_plugin_interface",
+ "prost",
 ]
 
 [[package]]
 name = "file_tagger"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
+ "prost",
 ]
 
 [[package]]
@@ -466,8 +476,10 @@ dependencies = [
 name = "git_status"
 version = "0.2.1"
 dependencies = [
+ "bytes",
  "colored",
  "lla_plugin_interface",
+ "prost",
 ]
 
 [[package]]
@@ -587,9 +599,11 @@ dependencies = [
 name = "keyword_search"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "dirs 5.0.1",
  "lla_plugin_interface",
+ "prost",
  "regex",
  "serde",
  "toml",
@@ -599,9 +613,11 @@ dependencies = [
 name = "last_git_commit"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "flate2",
  "lla_plugin_interface",
+ "prost",
 ]
 
 [[package]]
@@ -1109,8 +1125,10 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 name = "sizeviz"
 version = "0.2.0"
 dependencies = [
+ "bytes",
  "colored",
  "lla_plugin_interface",
+ "prost",
 ]
 
 [[package]]
