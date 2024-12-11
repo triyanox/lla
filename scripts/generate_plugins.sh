@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.."
+
 output_file="plugins.md"
 
 cat > "$output_file" << EOL

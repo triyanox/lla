@@ -108,8 +108,6 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build release
-        env:
-          PROTOC_FLAGS: "--experimental_allow_proto3_optional"
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Prepare binary
@@ -152,7 +150,6 @@ jobs:
 
       - name: Check and publish to crates.io
         env:
-          PROTOC_FLAGS: "--experimental_allow_proto3_optional"
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           cargo login ${{ secrets.CRATES_IO_TOKEN }}
