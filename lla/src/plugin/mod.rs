@@ -2,7 +2,10 @@ use crate::config::Config;
 use crate::error::{LlaError, Result};
 use dashmap::DashMap;
 use libloading::Library;
-use lla_plugin_interface::proto::{self, plugin_message::Message, PluginMessage};
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message, PluginMessage},
+    PluginApi, CURRENT_PLUGIN_API_VERSION,
+};
 use once_cell::sync::Lazy;
 use prost::Message as _;
 use std::collections::{HashMap, HashSet};
@@ -14,7 +17,7 @@ type DecorationCache = DashMap<(String, String), HashMap<String, String>>;
 static DECORATION_CACHE: Lazy<DecorationCache> = Lazy::new(DashMap::new);
 
 pub struct PluginManager {
-    plugins: HashMap<String, (Library, unsafe fn(&[u8]) -> Vec<u8>)>,
+    plugins: HashMap<String, (Library, *mut PluginApi)>,
     loaded_paths: HashSet<PathBuf>,
     pub enabled_plugins: HashSet<String>,
     config: Config,
@@ -68,14 +71,19 @@ impl PluginManager {
     }
 
     fn send_request(&self, plugin_name: &str, request: PluginMessage) -> Result<PluginMessage> {
-        if let Some((_, plugin_fn)) = self.plugins.get(plugin_name) {
+        if let Some((_, api)) = self.plugins.get(plugin_name) {
             let mut buf = Vec::with_capacity(request.encoded_len());
             request.encode(&mut buf).unwrap();
 
-            let response_buf = unsafe { plugin_fn(&buf) };
-
-            proto::PluginMessage::decode(&response_buf[..])
-                .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))
+            unsafe {
+                let raw_response =
+                    ((**api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len());
+                let response_vec =
+                    Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity);
+                let response_msg = proto::PluginMessage::decode(&response_vec[..])
+                    .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))?;
+                Ok(response_msg)
+            }
         } else {
             Err(LlaError::Plugin(format!(
                 "Plugin '{}' not found",
@@ -183,12 +191,21 @@ impl PluginManager {
             let library = Library::new(&path)
                 .map_err(|e| LlaError::Plugin(format!("Failed to load plugin library: {}", e)))?;
 
-            let plugin_fn = *library
-                .get::<unsafe fn(&[u8]) -> Vec<u8>>(b"_plugin_handle_request")
+            let create_fn = library
+                .get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create")
                 .map_err(|e| {
-                    LlaError::Plugin(format!("Plugin doesn't have a request handler: {}", e))
-                })?
-                .into_raw();
+                    LlaError::Plugin(format!("Plugin doesn't have a create function: {}", e))
+                })?;
+
+            let api = create_fn();
+
+            if (*api).version != CURRENT_PLUGIN_API_VERSION {
+                return Err(LlaError::Plugin(format!(
+                    "Plugin API version mismatch: expected {}, got {}",
+                    CURRENT_PLUGIN_API_VERSION,
+                    (*api).version
+                )));
+            }
 
             let request = PluginMessage {
                 message: Some(Message::GetName(true)),
@@ -196,11 +213,14 @@ impl PluginManager {
             let mut buf = Vec::with_capacity(request.encoded_len());
             request.encode(&mut buf).unwrap();
 
-            let response_buf = plugin_fn(&buf);
-            let response = proto::PluginMessage::decode(&response_buf[..])
+            let raw_response =
+                ((*api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len());
+            let response_vec =
+                Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity);
+            let response_msg = proto::PluginMessage::decode(&response_vec[..])
                 .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))?;
 
-            let name = match response.message {
+            let name = match response_msg.message {
                 Some(Message::NameResponse(name)) => name,
                 _ => return Err(LlaError::Plugin("Failed to get plugin name".to_string())),
             };
@@ -212,7 +232,7 @@ impl PluginManager {
                 )));
             }
 
-            self.plugins.insert(name, (library, plugin_fn));
+            self.plugins.insert(name, (library, api));
             self.loaded_paths.insert(path);
 
             Ok(())
