@@ -27,8 +27,10 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
             sudo apt-get install -y protobuf-compiler
+            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install protobuf
+            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
           fi
 
       - name: Install Rust toolchain
@@ -86,8 +88,10 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update
             sudo apt-get install -y protobuf-compiler
+            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install protobuf
+            echo "PROTOC_FLAGS=--experimental_allow_proto3_optional" >> $GITHUB_ENV
           fi
 
       - name: Install Rust toolchain
