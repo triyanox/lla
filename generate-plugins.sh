@@ -31,12 +31,20 @@ for plugin_dir in plugins/*/; do
             description="No description provided."
         fi
         
+        readme_path="${plugin_dir}README.md"
+        doc_link=""
+        if [ -f "$readme_path" ]; then
+            doc_link="[Documentation](${plugin_dir}README.md)"
+        fi
+        
         cat >> "$output_file" << EOL
 ### ${name}
 
 **Description:** ${description}
 
 **Version:** ${version}
+
+**Documentation:** ${doc_link}
 
 **Installation Options:**
 

@@ -20,16 +20,16 @@ Or you can install individual plugins as described below.
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/categorizer/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/categorizer/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/categorizer/
@@ -44,16 +44,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/code_complexity/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/code_complexity/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/code_complexity/
@@ -68,16 +68,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/code_snippet_extractor/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/code_snippet_extractor/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/code_snippet_extractor/
@@ -92,16 +92,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/dirs/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/dirs/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/dirs/
@@ -116,16 +116,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/duplicate_file_detector/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/duplicate_file_detector/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/duplicate_file_detector/
@@ -140,16 +140,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/file_hash/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/file_hash/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_hash/
@@ -164,16 +164,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/file_meta/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/file_meta/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_meta/
@@ -188,16 +188,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/file_tagger/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/file_tagger/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_tagger/
@@ -212,16 +212,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/git_status/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/git_status/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/git_status/
@@ -236,16 +236,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/keyword_search/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/keyword_search/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/keyword_search/
@@ -260,16 +260,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/last_git_commit/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/last_git_commit/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/last_git_commit/
@@ -284,16 +284,16 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Version:** 0.3.0
 
+**Documentation:** [Documentation](plugins/sizeviz/README.md)
+
 **Installation Options:**
 
 1. Using LLA install command:
-
 ```bash
 lla install --dir path/to/lla/plugins/sizeviz/
 ```
 
 2. Manual installation:
-
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/sizeviz/
@@ -301,3 +301,4 @@ cargo build --release
 ```
 
 Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
+
