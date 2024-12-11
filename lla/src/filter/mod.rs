@@ -8,13 +8,13 @@ pub trait FileFilter: Send + Sync {
 mod case_insensitive;
 mod composite;
 mod extension;
-mod glob;
+mod glob_filter;
 mod pattern;
-mod regex;
+mod regex_filter;
 
 pub use case_insensitive::CaseInsensitiveFilter;
 pub use composite::{CompositeFilter, FilterOperation};
 pub use extension::ExtensionFilter;
-pub use glob::GlobFilter;
+pub use glob_filter::GlobFilter;
 pub use pattern::PatternFilter;
-pub use regex::RegexFilter;
+pub use regex_filter::RegexFilter;
