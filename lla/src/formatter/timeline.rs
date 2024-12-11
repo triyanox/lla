@@ -18,6 +18,27 @@ impl TimelineFormatter {
     pub fn new(show_icons: bool) -> Self {
         Self { show_icons }
     }
+
+    fn format_relative_time(dt: DateTime<Local>) -> String {
+        let now = Local::now();
+        let duration = now.signed_duration_since(dt);
+
+        if duration.num_seconds() < 60 {
+            "just now".to_string()
+        } else if duration.num_minutes() < 60 {
+            format!("{} mins ago", duration.num_minutes())
+        } else if duration.num_hours() < 24 {
+            format!("{} hours ago", duration.num_hours())
+        } else if duration.num_days() < 7 {
+            format!("{} days ago", duration.num_days())
+        } else if duration.num_days() < 30 {
+            format!("{} weeks ago", duration.num_weeks())
+        } else if duration.num_days() < 365 {
+            dt.format("%b %d").to_string()
+        } else {
+            dt.format("%b %d, %Y").to_string()
+        }
+    }
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -85,8 +106,12 @@ impl FileFormatter for TimelineFormatter {
         }
 
         let mut output = String::new();
-        let time_format = "%H:%M:%S";
-        let date_format = "%Y-%m-%d";
+
+        output.push_str(&format!(
+            "\n{}\n{}\n\n",
+            "Timeline".bright_blue().bold(),
+            "─".repeat(80).bright_black()
+        ));
 
         for (group, entries) in groups {
             output.push_str(&format!(
@@ -100,12 +125,7 @@ impl FileFormatter for TimelineFormatter {
                 let modified = UNIX_EPOCH + std::time::Duration::from_secs(modified);
                 let dt = DateTime::<Local>::from(modified);
 
-                let time_str = dt.format(time_format).to_string().bright_black();
-                let date_str = if group == TimeGroup::Older {
-                    dt.format(date_format).to_string().bright_black()
-                } else {
-                    "".bright_black()
-                };
+                let time_str = Self::format_relative_time(dt).bright_black();
 
                 let path = Path::new(&entry.path);
                 let colored_name = colorize_file_name(path).to_string();
@@ -125,7 +145,7 @@ impl FileFormatter for TimelineFormatter {
                     String::new()
                 };
 
-                output.push_str(&format!("{} {} {}{}\n", time_str, date_str, name, git_info));
+                output.push_str(&format!("{} • {}{}\n", name, time_str, git_info));
             }
             output.push('\n');
         }
