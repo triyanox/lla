@@ -1,7 +1,8 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
+use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::utils::icons::format_with_icon;
 use chrono::{DateTime, Duration, Local};
 use colored::*;
 use lla_plugin_interface::proto::DecoratedEntry;
@@ -9,7 +10,15 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-pub struct TimelineFormatter;
+pub struct TimelineFormatter {
+    pub show_icons: bool,
+}
+
+impl TimelineFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 enum TimeGroup {
@@ -99,7 +108,12 @@ impl FileFormatter for TimelineFormatter {
                 };
 
                 let path = Path::new(&entry.path);
-                let name = colorize_file_name(path);
+                let colored_name = colorize_file_name(path).to_string();
+                let name = colorize_file_name_with_icon(
+                    path,
+                    format_with_icon(path, colored_name, self.show_icons),
+                )
+                .to_string();
 
                 let plugin_fields = plugin_manager.format_fields(entry, "timeline").join(" ");
                 let git_info = if let Some(git_field) = plugin_fields

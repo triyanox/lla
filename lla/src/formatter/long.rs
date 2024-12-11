@@ -2,6 +2,7 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::*;
+use crate::utils::icons::format_with_icon;
 use lla_plugin_interface::proto::DecoratedEntry;
 use once_cell::sync::Lazy;
 
@@ -16,8 +17,15 @@ use users::{get_group_by_gid, get_user_by_uid};
 static USER_CACHE: Lazy<Mutex<HashMap<u32, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static GROUP_CACHE: Lazy<Mutex<HashMap<u32, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub struct LongFormatter;
+pub struct LongFormatter {
+    pub show_icons: bool,
+}
 
+impl LongFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 impl FileFormatter for LongFormatter {
     fn format_files(
         &self,
@@ -59,7 +67,13 @@ impl FileFormatter for LongFormatter {
             let permissions = colorize_permissions(&perms);
             let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(metadata.modified);
             let modified_str = colorize_date(&modified);
-            let name = colorize_file_name(Path::new(&entry.path));
+            let path = Path::new(&entry.path);
+            let colored_name = colorize_file_name(path).to_string();
+            let name = colorize_file_name_with_icon(
+                path,
+                format_with_icon(path, colored_name, self.show_icons),
+            )
+            .to_string();
 
             let uid = metadata.uid;
             let gid = metadata.gid;

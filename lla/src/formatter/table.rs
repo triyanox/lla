@@ -2,6 +2,7 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::*;
+use crate::utils::icons::format_with_icon;
 use colored::*;
 use lla_plugin_interface::proto::DecoratedEntry;
 use std::cmp;
@@ -11,8 +12,15 @@ use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 use unicode_width::UnicodeWidthStr;
 
-pub struct TableFormatter;
+pub struct TableFormatter {
+    pub show_icons: bool,
+}
 
+impl TableFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 impl TableFormatter {
     const PADDING: usize = 1;
 
@@ -45,8 +53,11 @@ impl TableFormatter {
             let date = colorize_date(&modified);
             widths[2] = cmp::max(widths[2], Self::visible_width(&date));
 
-            let name = colorize_file_name(Path::new(&entry.path));
-            widths[3] = cmp::max(widths[3], Self::visible_width(&name));
+            let path = Path::new(&entry.path);
+            let colored_name = colorize_file_name(path).to_string();
+            let name_with_icon =
+                colorize_file_name_with_icon(path, format_with_icon(path, colored_name, true));
+            widths[3] = cmp::max(widths[3], Self::visible_width(&name_with_icon));
         }
 
         widths
@@ -149,7 +160,9 @@ impl FileFormatter for TableFormatter {
             let size = colorize_size(metadata.size);
             let modified = UNIX_EPOCH + Duration::from_secs(metadata.modified);
             let date = colorize_date(&modified);
-            let name = colorize_file_name(Path::new(&entry.path));
+            let path = Path::new(&entry.path);
+            let colored_name = colorize_file_name(path).to_string();
+            let name = format_with_icon(path, colored_name, self.show_icons);
 
             let plugin_fields = plugin_manager.format_fields(&entry, "table").join(" ");
             let plugin_suffix = if plugin_fields.is_empty() {

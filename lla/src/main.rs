@@ -440,23 +440,23 @@ fn create_base_filter(pattern: &str, case_insensitive: bool) -> Box<dyn FileFilt
     }
 }
 
-fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
+fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
     if args.long_format {
-        Arc::new(LongFormatter)
+        Box::new(LongFormatter::new(args.show_icons))
     } else if args.tree_format {
-        Arc::new(TreeFormatter)
+        Box::new(TreeFormatter::new(args.show_icons))
     } else if args.table_format {
-        Arc::new(TableFormatter)
+        Box::new(TableFormatter::new(args.show_icons))
     } else if args.grid_format {
-        Arc::new(GridFormatter)
+        Box::new(GridFormatter::new(args.show_icons))
     } else if args.sizemap_format {
-        Arc::new(SizeMapFormatter)
+        Box::new(SizeMapFormatter::new(args.show_icons))
     } else if args.timeline_format {
-        Arc::new(TimelineFormatter)
+        Box::new(TimelineFormatter::new(args.show_icons))
     } else if args.git_format {
-        Arc::new(GitFormatter)
+        Box::new(GitFormatter::new(args.show_icons))
     } else {
-        Arc::new(DefaultFormatter)
+        Box::new(DefaultFormatter::new(args.show_icons))
     }
 }
 

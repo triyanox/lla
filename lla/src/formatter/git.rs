@@ -1,15 +1,29 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
+use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::utils::icons::format_with_icon;
 use colored::*;
+use console::strip_ansi_codes;
 use lla_plugin_interface::proto::DecoratedEntry;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use unicode_width::UnicodeWidthStr;
 
-pub struct GitFormatter;
+pub struct GitFormatter {
+    pub show_icons: bool,
+}
 
+impl GitFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+
+    fn strip_ansi(s: &str) -> String {
+        String::from_utf8(strip_ansi_escapes::strip(s).unwrap_or_default()).unwrap_or_default()
+    }
+}
 #[derive(Debug, Default)]
 struct GitInfo {
     branch: String,
@@ -187,8 +201,30 @@ impl FileFormatter for GitFormatter {
             None => return Ok("Not a git repository".red().to_string()),
         };
 
+        let status_map = GitFormatter::get_git_status_map(workspace_root);
+        let mut max_name_width: usize = 0;
+        let mut max_hash_width: usize = 0;
+        let mut max_time_width: usize = 0;
+        let mut max_author_width: usize = 0;
+
+        for file in files {
+            let path = Path::new(&file.path);
+            let name = colorize_file_name(path);
+            let name_with_icon = colorize_file_name_with_icon(
+                path,
+                format_with_icon(path, name.to_string(), self.show_icons),
+            );
+            let commit_info = GitFormatter::get_last_commit_info(workspace_root, path)
+                .unwrap_or_else(|| ("-".to_string(), "never".to_string(), "-".to_string()));
+
+            max_name_width = max_name_width.max(Self::strip_ansi(&name_with_icon).width());
+            max_hash_width = max_hash_width.max(commit_info.0.len());
+            max_time_width = max_time_width.max(commit_info.1.len());
+            max_author_width = max_author_width.max(commit_info.2.len());
+        }
+
         let mut output = format!(
-            "{} {}{}{}\n{}\n\n",
+            "{} {}{}{}\n{}\n",
             "⎇".bright_blue(),
             git_info.branch.green().bold(),
             if git_info.ahead > 0 {
@@ -204,15 +240,29 @@ impl FileFormatter for GitFormatter {
             "─".repeat(40).bright_black()
         );
 
-        let status_map = GitFormatter::get_git_status_map(workspace_root);
-        let mut max_name_width = 0;
+        output.push_str(&format!(
+            "{}  {}  {}  {}  {}\n",
+            "Name".bold(),
+            "Commit".bold(),
+            "Time".bold(),
+            "Author".bold(),
+            "Status".bold()
+        ));
+        output.push_str(
+            &"─"
+                .repeat(max_name_width + max_hash_width + max_time_width + max_author_width + 40)
+                .bright_black(),
+        );
+        output.push_str("\n");
 
-        let mut formatted_entries = Vec::with_capacity(files.len());
+        let mut entries = Vec::new();
         for file in files {
             let path = Path::new(&file.path);
             let name = colorize_file_name(path);
-            let name_width = name.chars().count();
-            max_name_width = max_name_width.max(name_width);
+            let name_with_icon = colorize_file_name_with_icon(
+                path,
+                format_with_icon(path, name.to_string(), self.show_icons),
+            );
 
             let relative_path = path.strip_prefix(workspace_root).unwrap_or(path);
             let relative_path_str = relative_path.to_string_lossy();
@@ -226,32 +276,40 @@ impl FileFormatter for GitFormatter {
                 .unwrap_or_else(|| ("-".to_string(), "never".to_string(), "-".to_string()));
 
             let plugin_fields = plugin_manager.format_fields(file, "git").join(" ");
-            formatted_entries.push((name, status_str, commit_info, plugin_fields));
+
+            entries.push((name_with_icon, commit_info, status_str, plugin_fields));
         }
 
-        for (name, status_str, commit_info, plugin_fields) in formatted_entries {
-            let plugin_suffix = if plugin_fields.is_empty() {
-                String::new()
+        for (name, commit_info, status, plugin_fields) in entries {
+            let name_width = strip_ansi_codes(&name).width();
+            let name_padding = " ".repeat(max_name_width.saturating_sub(name_width) as usize);
+
+            let hash_padding =
+                " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()) as usize);
+            let time_padding =
+                " ".repeat(max_time_width.saturating_sub(commit_info.1.len()) as usize);
+
+            let author_part = if commit_info.2 != "-" {
+                format!("by {} ", commit_info.2.bright_blue())
             } else {
-                format!(" {}", plugin_fields)
+                "".into()
             };
 
-            let name_width = name.chars().count();
-            let padding = " ".repeat(max_name_width - name_width);
-
             output.push_str(&format!(
-                "{}{} @{} ({}) {}{}{}",
+                "{}{}  @{}{}  {}{}  {}{}{}",
                 name,
-                padding,
+                name_padding,
                 commit_info.0.bright_yellow(),
+                hash_padding,
                 commit_info.1.bright_black(),
-                if commit_info.2 != "-" {
-                    format!("by {} ", commit_info.2.bright_blue())
+                time_padding,
+                author_part,
+                status,
+                if plugin_fields.is_empty() {
+                    String::new()
                 } else {
-                    "".into()
-                },
-                status_str,
-                plugin_suffix
+                    format!(" {}", plugin_fields)
+                }
             ));
             output.push('\n');
         }

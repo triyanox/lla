@@ -12,6 +12,7 @@ pub struct Args {
     pub sizemap_format: bool,
     pub timeline_format: bool,
     pub git_format: bool,
+    pub show_icons: bool,
     pub sort_by: String,
     pub sort_reverse: bool,
     pub sort_dirs_first: bool,
@@ -70,6 +71,7 @@ impl Args {
                     sizemap_format: false,
                     timeline_format: false,
                     git_format: false,
+                    show_icons: false,
                     sort_by: "name".to_string(),
                     sort_reverse: false,
                     sort_dirs_first: false,
@@ -145,6 +147,11 @@ impl Args {
                     .short('G')
                     .long("git")
                     .help("Show git status and information"),
+            )
+            .arg(
+                Arg::with_name("icons")
+                    .long("icons")
+                    .help("Show icons for files and directories"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -414,6 +421,7 @@ impl Args {
             sizemap_format: matches.is_present("sizemap"),
             timeline_format: matches.is_present("timeline"),
             git_format: matches.is_present("git"),
+            show_icons: matches.is_present("icons"),
             sort_by: matches.value_of("sort").unwrap_or("name").to_string(),
             sort_reverse: matches.is_present("sort-reverse"),
             sort_dirs_first: matches.is_present("sort-dirs-first"),

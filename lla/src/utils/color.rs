@@ -48,7 +48,10 @@ fn get_extension_color(path: &Path) -> Option<Color> {
 }
 
 pub fn colorize_file_name(path: &Path) -> ColoredString {
-    let name = path.file_name().unwrap().to_str().unwrap();
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_else(|| path.to_str().unwrap_or(""));
 
     if path.is_dir() {
         format!("{}/", name).color(DIRECTORY_COLOR).bold()
@@ -60,6 +63,31 @@ pub fn colorize_file_name(path: &Path) -> ColoredString {
         name.color(color)
     } else {
         name.color(FILE_COLOR)
+    }
+}
+
+pub fn colorize_file_name_with_icon(path: &Path, content: String) -> ColoredString {
+    let parts: Vec<&str> = content.split(' ').collect();
+    if parts.len() != 2 {
+        return content.color(FILE_COLOR);
+    }
+
+    let icon = parts[0];
+    let name = parts[1];
+
+    if path.is_dir() {
+        format!("{} {}", icon, name.normal()).color(DIRECTORY_COLOR)
+    } else if path.is_symlink() {
+        format!("{} {}", icon, name.normal())
+            .color(SYMLINK_COLOR)
+            .italic()
+            .underline()
+    } else if is_executable(path) {
+        format!("{} {}", icon, name.normal()).color(EXECUTABLE_COLOR)
+    } else if let Some(color) = get_extension_color(path) {
+        format!("{} {}", icon, name.normal()).color(color)
+    } else {
+        format!("{} {}", icon, name.normal()).color(FILE_COLOR)
     }
 }
 

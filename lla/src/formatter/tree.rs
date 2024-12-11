@@ -1,7 +1,8 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
+use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::utils::icons::format_with_icon;
 use colored::*;
 use lla_plugin_interface::proto::DecoratedEntry;
 use std::path::Path;
@@ -28,7 +29,15 @@ impl TreePart {
     }
 }
 
-pub struct TreeFormatter;
+pub struct TreeFormatter {
+    pub show_icons: bool,
+}
+
+impl TreeFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 
 impl TreeFormatter {
     fn format_entry(
@@ -36,12 +45,17 @@ impl TreeFormatter {
         prefix: &str,
         plugin_manager: &mut PluginManager,
         buf: &mut String,
+        show_icons: bool,
     ) {
         buf.clear();
         let path = Path::new(&entry.path);
         buf.reserve(prefix.len() + path.as_os_str().len() + 1);
         buf.push_str(prefix);
-        buf.push_str(&colorize_file_name(path).to_string());
+        let colored_name = colorize_file_name(path).to_string();
+        buf.push_str(&colorize_file_name_with_icon(
+            path,
+            format_with_icon(path, colored_name, show_icons),
+        ));
 
         let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
         if !plugin_fields.is_empty() {
@@ -155,7 +169,13 @@ impl FileFormatter for TreeFormatter {
                 };
 
                 trunk.get_prefix(*depth, is_last, &mut prefix_buf);
-                Self::format_entry(entry, &prefix_buf, plugin_manager, &mut entry_buf);
+                Self::format_entry(
+                    entry,
+                    &prefix_buf,
+                    plugin_manager,
+                    &mut entry_buf,
+                    self.show_icons,
+                );
                 result.push_str(&entry_buf);
             }
         }

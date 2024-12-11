@@ -1,14 +1,22 @@
 use super::FileFormatter;
-use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::colorize_file_name;
+use crate::utils::icons::format_with_icon;
+use crate::{error::Result, utils::color::colorize_file_name_with_icon};
 use lla_plugin_interface::proto::DecoratedEntry;
 use std::path::Path;
 use terminal_size::{terminal_size, Width};
 use unicode_width::UnicodeWidthStr;
 
-pub struct GridFormatter;
+pub struct GridFormatter {
+    pub show_icons: bool,
+}
 
+impl GridFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 impl FileFormatter for GridFormatter {
     fn format_files(
         &self,
@@ -29,18 +37,23 @@ impl FileFormatter for GridFormatter {
 
         for file in files {
             let path = Path::new(&file.path);
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let colored_name = colorize_file_name(path).to_string();
+            let name_with_icon = colorize_file_name_with_icon(
+                path,
+                format_with_icon(path, colored_name, self.show_icons),
+            )
+            .to_string();
             let plugin_fields = plugin_manager.format_fields(file, "grid").join(" ");
             let total_str = if plugin_fields.is_empty() {
-                name.to_string()
+                name_with_icon.clone()
             } else {
-                format!("{} {}", name, plugin_fields)
+                format!("{} {}", name_with_icon.clone(), plugin_fields)
             };
             let width =
                 String::from_utf8_lossy(&strip_ansi_escapes::strip(&total_str).unwrap_or_default())
                     .width();
             max_width = max_width.max(width);
-            formatted_entries.push((colorize_file_name(path).to_string(), plugin_fields));
+            formatted_entries.push((name_with_icon, plugin_fields));
         }
 
         let column_width = max_width + 2;
