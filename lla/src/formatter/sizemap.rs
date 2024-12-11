@@ -180,11 +180,7 @@ impl FileFormatter for SizeMapFormatter {
             .sum();
 
         let mut output = String::new();
-        output.push_str(&format!(
-            "\n{}\n{}\n\n",
-            "Size Map".bright_blue().bold(),
-            "─".repeat(term_width.min(80)).bright_black()
-        ));
+        output.push('\n');
 
         let mut files = files.to_vec();
         files.sort_by_key(|f| std::cmp::Reverse(f.metadata.as_ref().map_or(0, |m| m.size)));

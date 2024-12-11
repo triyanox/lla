@@ -224,7 +224,7 @@ impl FileFormatter for GitFormatter {
         }
 
         let mut output = format!(
-            "{} {}{}{}\n{}\n",
+            "\n{} {}{}{}\n{}\n",
             "⎇".bright_blue(),
             git_info.branch.green().bold(),
             if git_info.ahead > 0 {

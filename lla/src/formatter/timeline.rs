@@ -107,15 +107,9 @@ impl FileFormatter for TimelineFormatter {
 
         let mut output = String::new();
 
-        output.push_str(&format!(
-            "\n{}\n{}\n\n",
-            "Timeline".bright_blue().bold(),
-            "─".repeat(80).bright_black()
-        ));
-
         for (group, entries) in groups {
             output.push_str(&format!(
-                "{}\n{}\n\n",
+                "\n{}\n{}\n",
                 group.display_name().bright_blue().bold(),
                 "─".repeat(40).bright_black()
             ));
