@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved documentation
   - Enhanced plugin management interface
   - Plugin cleanup command (`lla clean`)
+  - Improved plugin discovery and loading
+  - Plugin update functionality improved
+  - Improved the functionality and look of all plugins
 - Command shortcuts system:
   - Store and manage plugin commands as shortcuts
   - CLI commands for shortcut management (`lla shortcut add/remove/list`)
