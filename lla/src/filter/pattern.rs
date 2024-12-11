@@ -3,12 +3,64 @@ use crate::error::Result;
 use std::path::PathBuf;
 
 pub struct PatternFilter {
-    pattern: String,
+    patterns: Vec<String>,
+    match_all: bool,
 }
 
 impl PatternFilter {
     pub fn new(pattern: String) -> Self {
-        PatternFilter { pattern }
+        let patterns: Vec<String> = if pattern.contains(',') {
+            pattern
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        } else {
+            vec![pattern]
+        };
+
+        let match_all = patterns.iter().any(|p| p.starts_with('+'));
+        let patterns = patterns
+            .into_iter()
+            .map(|p| {
+                if p.starts_with('+') {
+                    p[1..].to_string()
+                } else {
+                    p
+                }
+            })
+            .collect();
+
+        PatternFilter {
+            patterns,
+            match_all,
+        }
+    }
+
+    fn matches_pattern(&self, path: &PathBuf) -> bool {
+        if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+            if self.match_all {
+                return self.patterns.iter().all(|pattern| name.contains(pattern));
+            } else {
+                if self.patterns.iter().any(|pattern| name.contains(pattern)) {
+                    return true;
+                }
+            }
+        }
+
+        if let Some(path_str) = path.to_str() {
+            if self.match_all {
+                self.patterns
+                    .iter()
+                    .all(|pattern| path_str.contains(pattern))
+            } else {
+                self.patterns
+                    .iter()
+                    .any(|pattern| path_str.contains(pattern))
+            }
+        } else {
+            false
+        }
     }
 }
 
@@ -16,12 +68,7 @@ impl FileFilter for PatternFilter {
     fn filter_files(&self, files: &[PathBuf]) -> Result<Vec<PathBuf>> {
         Ok(files
             .iter()
-            .filter(|file| {
-                file.file_name()
-                    .and_then(|name| name.to_str())
-                    .map(|name| name.contains(&self.pattern))
-                    .unwrap_or(false)
-            })
+            .filter(|file| self.matches_pattern(file))
             .cloned()
             .collect())
     }

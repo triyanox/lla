@@ -7,6 +7,7 @@ pub enum LlaError {
     Parse(String),
     Config(String),
     Plugin(String),
+    Filter(String),
 }
 
 impl fmt::Display for LlaError {
@@ -16,6 +17,7 @@ impl fmt::Display for LlaError {
             LlaError::Parse(msg) => write!(f, "Parse error: {}", msg),
             LlaError::Config(msg) => write!(f, "Configuration error: {}", msg),
             LlaError::Plugin(msg) => write!(f, "Plugin error: {}", msg),
+            LlaError::Filter(msg) => write!(f, "Filter error: {}", msg),
         }
     }
 }

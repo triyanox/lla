@@ -14,7 +14,10 @@ use colored::*;
 use config::{initialize_config, Config};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};
 use error::{LlaError, Result};
-use filter::{ExtensionFilter, FileFilter, PatternFilter};
+use filter::{
+    CaseInsensitiveFilter, CompositeFilter, ExtensionFilter, FileFilter, FilterOperation,
+    GlobFilter, PatternFilter, RegexFilter,
+};
 use formatter::{
     DefaultFormatter, FileFormatter, GitFormatter, GridFormatter, LongFormatter, SizeMapFormatter,
     TableFormatter, TimelineFormatter, TreeFormatter,
@@ -324,11 +327,50 @@ fn create_sorter(args: &Args) -> Arc<dyn FileSorter + Send + Sync> {
 
 fn create_filter(args: &Args) -> Arc<dyn FileFilter + Send + Sync> {
     match &args.filter {
-        Some(filter_str) if filter_str.starts_with('.') => {
-            Arc::new(ExtensionFilter::new(filter_str[1..].to_string()))
+        Some(filter_str) => {
+            if filter_str.contains(" AND ") {
+                let mut composite = CompositeFilter::new(FilterOperation::And);
+                for part in filter_str.split(" AND ") {
+                    composite.add_filter(create_base_filter(part.trim(), !args.case_sensitive));
+                }
+                Arc::new(composite)
+            } else if filter_str.contains(" OR ") {
+                let mut composite = CompositeFilter::new(FilterOperation::Or);
+                for part in filter_str.split(" OR ") {
+                    composite.add_filter(create_base_filter(part.trim(), !args.case_sensitive));
+                }
+                Arc::new(composite)
+            } else if filter_str.starts_with("NOT ") {
+                let mut composite = CompositeFilter::new(FilterOperation::Not);
+                composite.add_filter(create_base_filter(&filter_str[4..], !args.case_sensitive));
+                Arc::new(composite)
+            } else if filter_str.starts_with("XOR ") {
+                let mut composite = CompositeFilter::new(FilterOperation::Xor);
+                composite.add_filter(create_base_filter(&filter_str[4..], !args.case_sensitive));
+                Arc::new(composite)
+            } else {
+                Arc::from(create_base_filter(filter_str, !args.case_sensitive))
+            }
         }
-        Some(filter_str) => Arc::new(PatternFilter::new(filter_str.clone())),
         None => Arc::new(PatternFilter::new("".to_string())),
+    }
+}
+
+fn create_base_filter(pattern: &str, case_insensitive: bool) -> Box<dyn FileFilter + Send + Sync> {
+    let base_filter: Box<dyn FileFilter + Send + Sync> = if pattern.starts_with("regex:") {
+        Box::new(RegexFilter::new(pattern[6..].to_string()))
+    } else if pattern.starts_with("glob:") {
+        Box::new(GlobFilter::new(pattern[5..].to_string()))
+    } else if pattern.starts_with('.') {
+        Box::new(ExtensionFilter::new(pattern[1..].to_string()))
+    } else {
+        Box::new(PatternFilter::new(pattern.to_string()))
+    };
+
+    if case_insensitive {
+        Box::new(CaseInsensitiveFilter::new(base_filter))
+    } else {
+        base_filter
     }
 }
 

@@ -14,6 +14,7 @@ pub struct Args {
     pub git_format: bool,
     pub sort_by: String,
     pub filter: Option<String>,
+    pub case_sensitive: bool,
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
@@ -115,6 +116,12 @@ impl Args {
                     .long("filter")
                     .takes_value(true)
                     .help("Filter files by name or extension"),
+            )
+            .arg(
+                Arg::with_name("case-sensitive")
+                    .short('c')
+                    .long("case-sensitive")
+                    .help("Enable case-sensitive filtering"),
             )
             .arg(
                 Arg::with_name("enable-plugin")
@@ -270,11 +277,8 @@ impl Args {
         };
 
         Args {
-            directory: matches.value_of("directory").unwrap().to_string(),
-            depth: matches
-                .value_of("depth")
-                .map(|d| d.parse().unwrap())
-                .or(config.default_depth),
+            directory: matches.value_of("directory").unwrap_or(".").to_string(),
+            depth: matches.value_of("depth").and_then(|d| d.parse().ok()),
             long_format: matches.is_present("long"),
             tree_format: matches.is_present("tree"),
             table_format: matches.is_present("table"),
@@ -282,15 +286,13 @@ impl Args {
             sizemap_format: matches.is_present("sizemap"),
             timeline_format: matches.is_present("timeline"),
             git_format: matches.is_present("git"),
-            sort_by: matches
-                .value_of("sort")
-                .unwrap_or(&config.default_sort)
-                .to_string(),
+            sort_by: matches.value_of("sort").unwrap_or("name").to_string(),
             filter: matches.value_of("filter").map(String::from),
+            case_sensitive: matches.is_present("case-sensitive"),
             enable_plugin: matches
                 .values_of("enable-plugin")
                 .map(|v| v.map(String::from).collect())
-                .unwrap_or_else(|| config.enabled_plugins.clone()),
+                .unwrap_or_default(),
             disable_plugin: matches
                 .values_of("disable-plugin")
                 .map(|v| v.map(String::from).collect())

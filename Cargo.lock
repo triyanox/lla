@@ -483,6 +483,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,6 +677,7 @@ dependencies = [
  "dashmap",
  "dialoguer",
  "dirs 5.0.1",
+ "glob",
  "indicatif",
  "libloading",
  "lla_plugin_interface",
@@ -678,6 +685,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "rayon",
+ "regex",
  "serde",
  "serde_json",
  "strip-ansi-escapes",

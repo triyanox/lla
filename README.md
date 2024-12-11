@@ -110,6 +110,95 @@ lla --timeline
   - Recursive listing with depth control (`-d`)
   - Performance-optimized for large directories
 
+## Filter System
+
+`lla` provides a powerful and flexible filtering system to help you find files efficiently:
+
+### Basic Filtering
+
+```bash
+# Simple pattern matching
+lla -f "test"              # Find files containing "test"
+lla -f "test" -c          # Case-sensitive search for "test"
+lla -f ".rs"              # Find files with .rs extension
+```
+
+### Advanced Filter Types
+
+1. **Pattern Filter**
+
+```bash
+# Multiple patterns (OR operation)
+lla -f "test,spec"         # Match files containing either "test" or "spec"
+
+# AND operation with + prefix
+lla -f "+test,api"         # Match files containing both "test" AND "api"
+```
+
+2. **Regular Expression Filter**
+
+```bash
+# Use regex: prefix for regular expressions
+lla -f "regex:^test.*\.rs$"   # Match Rust files starting with "test"
+lla -f "regex:\d{4}"          # Match files containing 4 digits
+```
+
+3. **Glob Pattern Filter**
+
+```bash
+# Use glob: prefix for glob patterns
+lla -f "glob:*.{rs,toml}"     # Match .rs or .toml files
+lla -f "glob:test_*"          # Match files starting with test_
+```
+
+### Composite Filters
+
+Combine multiple filters using logical operators:
+
+```bash
+# AND operation
+lla -f "test AND .rs"         # Files containing "test" AND having .rs extension
+lla -f "regex:^test AND glob:*.rs"
+
+# OR operation
+lla -f "test OR spec"         # Files containing either "test" OR "spec"
+lla -f ".rs OR .toml"         # Files with either extension
+
+# NOT operation
+lla -f "NOT test"             # Files NOT containing "test"
+lla -f "glob:*.rs AND NOT test"
+
+# XOR operation (exclusive OR)
+lla -f "test XOR spec"        # Files containing either "test" or "spec", but not both
+```
+
+### Filter with Other Features
+
+Combine filters with other `lla` features:
+
+```bash
+# Filter with tree view
+lla -f "test" -t            # Show tree view of files containing "test"
+
+# Filter with depth control
+lla -f ".rs" -t -d 3        # Show Rust files in tree view, max depth 3
+
+# Filter and sort
+lla -f "test" -ls size      # Show matching files sorted by size
+
+# Filter in long format
+lla -f "test" -l            # Detailed view of matching files
+```
+
+### Tips for Filtering
+
+- Use quotes around filter patterns to prevent shell interpretation
+- Case-sensitive filtering is available with the `-c` flag
+- Filters work on both filenames and paths
+- Multiple patterns in comma-separated lists are treated as OR conditions
+- Use `+` prefix for AND conditions in comma-separated lists
+- Combine with `--tree` to see the full path context of matches
+
 - **Plugin Ecosystem**
   - Git integration for repository insights
   - File categorization and tagging
@@ -166,7 +255,21 @@ lla -G                  # Git-aware view
 # Advanced usage
 lla -ls size           # Sort by size in long format
 lla -f .rs            # Show only Rust files
-lla -t -d 3           # Tree view, max depth 3
+# Case-insensitive search for files containing "test"
+lla -f test
+# Case-sensitive search for files containing "Test"
+lla -f test -c
+# Regular expression search
+lla -f "regex:.*\.rs$"
+# Glob pattern search
+lla -f "glob:*.{rs,toml}"
+# Composite filters
+lla -f "regex:.*\.rs$ AND NOT test"
+lla -f ".rs OR .toml"
+lla -f "test AND glob:*.rs"
+
+# Tree view with max depth 3
+lla -t -d 3
 ```
 
 ## Plugin System
