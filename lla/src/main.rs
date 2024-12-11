@@ -9,7 +9,7 @@ mod plugin;
 mod sorter;
 mod utils;
 
-use args::{Args, Command, ConfigAction, InstallSource};
+use args::{Args, Command, ConfigAction, InstallSource, ShortcutAction};
 use colored::*;
 use config::{initialize_config, Config};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};
@@ -35,7 +35,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 fn main() -> Result<()> {
-    let (config, config_error) = load_config()?;
+    let (mut config, config_error) = load_config()?;
     let args = Args::parse(&config);
 
     if let Some(Command::Clean) = args.command {
@@ -47,6 +47,61 @@ fn main() -> Result<()> {
     let mut plugin_manager = initialize_plugin_manager(&args, &config)?;
 
     match args.command {
+        Some(Command::Shortcut(action)) => match action {
+            ShortcutAction::Add(name, command) => {
+                config.add_shortcut(name.clone(), command.clone())?;
+                println!(
+                    "✓ Added shortcut '{}' -> {} {}",
+                    name.green(),
+                    command.plugin_name.cyan(),
+                    command.action.cyan()
+                );
+                if let Some(desc) = command.description {
+                    println!("  Description: {}", desc);
+                }
+                Ok(())
+            }
+            ShortcutAction::Remove(name) => {
+                if config.get_shortcut(&name).is_some() {
+                    config.remove_shortcut(&name)?;
+                    println!("✓ Removed shortcut '{}'", name.green());
+                } else {
+                    println!("✗ Shortcut '{}' not found", name.red());
+                }
+                Ok(())
+            }
+            ShortcutAction::List => {
+                if config.shortcuts.is_empty() {
+                    println!("No shortcuts configured");
+                    return Ok(());
+                }
+                println!("\n{}", "Configured Shortcuts:".cyan().bold());
+                for (name, cmd) in &config.shortcuts {
+                    println!(
+                        "\n{} → {} {}",
+                        name.green(),
+                        cmd.plugin_name.cyan(),
+                        cmd.action.cyan()
+                    );
+                    if let Some(desc) = &cmd.description {
+                        println!("  Description: {}", desc);
+                    }
+                }
+                println!();
+                Ok(())
+            }
+            ShortcutAction::Run(name, args) => match config.get_shortcut(&name) {
+                Some(shortcut) => {
+                    let plugin_name = shortcut.plugin_name.clone();
+                    let action = shortcut.action.clone();
+                    handle_plugin_action(&mut config, &plugin_name, &action, &args)
+                }
+                None => {
+                    println!("✗ Shortcut '{}' not found", name.red());
+                    Ok(())
+                }
+            },
+        },
         Some(Command::Install(source)) => {
             let installer = PluginInstaller::new(&args.plugins_dir);
             match source {
@@ -403,4 +458,15 @@ fn create_formatter(args: &Args) -> Arc<dyn FileFormatter + Send + Sync> {
     } else {
         Arc::new(DefaultFormatter)
     }
+}
+
+fn handle_plugin_action(
+    config: &mut Config,
+    plugin_name: &str,
+    action: &str,
+    args: &[String],
+) -> Result<()> {
+    let mut plugin_manager = PluginManager::new(config.clone());
+    plugin_manager.discover_plugins(&config.plugins_dir)?;
+    plugin_manager.perform_plugin_action(plugin_name, action, args)
 }

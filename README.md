@@ -114,6 +114,12 @@ lla --timeline
   - Recursive listing with depth control (`-d`)
   - Performance-optimized for large directories
 
+- **Command Shortcuts**
+  - Save long plugin commands as shortcuts
+  - Quick access to frequently used plugin actions
+  - Configurable through CLI or config file
+  - Supports passing custom arguments
+
 ## Filter System
 
 `lla` provides a powerful and flexible filtering system to help you find files efficiently:
@@ -285,6 +291,63 @@ lla -f "test AND glob:*.rs"
 # Tree view with max depth 3
 lla -t -d 3
 ```
+
+## Command Shortcuts
+
+Save and reuse frequently used plugin commands with shortcuts:
+
+```bash
+# Add a shortcut
+lla shortcut add extract code_snippet_extractor extract -d "Extract code snippets"
+
+# List all shortcuts
+lla shortcut list
+
+# Use a shortcut (remaining arguments are passed to the plugin)
+lla extract file.rs function_name 10 20
+
+# Remove a shortcut
+lla shortcut remove extract
+```
+
+Your shortcuts are stored in the config file:
+
+```toml
+[shortcuts]
+extract = { plugin_name = "code_snippet_extractor", action = "extract", description = "Extract code snippets" }
+```
+
+### Example Shortcut Usage
+
+Convert long plugin commands into short, memorable ones:
+
+```bash
+# Instead of typing:
+lla plugin --name code_snippet_extractor --action extract --args "file.rs" "function_name" 10 20
+
+# You can use:
+lla extract file.rs function_name 10 20
+```
+
+### Managing Shortcuts
+
+```bash
+# Add a shortcut with description
+lla shortcut add NAME PLUGIN_NAME ACTION -d "Description"
+
+# List all configured shortcuts
+lla shortcut list
+
+# Remove a shortcut
+lla shortcut remove NAME
+```
+
+### Tips for Shortcuts
+
+- Choose short, memorable names for frequently used commands
+- Add descriptions to help remember shortcut purposes
+- Use shortcuts for complex plugin actions
+- All arguments after the shortcut name are passed to the plugin action
 
 ## Plugin System
 

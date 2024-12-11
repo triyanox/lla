@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, ShortcutCommand};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::path::PathBuf;
 
@@ -34,11 +34,19 @@ pub enum Command {
     PluginAction(String, String, Vec<String>),
     Update(Option<String>),
     Clean,
+    Shortcut(ShortcutAction),
 }
 
 pub enum InstallSource {
     GitHub(String),
     LocalDir(String),
+}
+
+pub enum ShortcutAction {
+    Add(String, ShortcutCommand),
+    Remove(String),
+    List,
+    Run(String, Vec<String>),
 }
 
 pub enum ConfigAction {
@@ -48,6 +56,38 @@ pub enum ConfigAction {
 
 impl Args {
     pub fn parse(config: &Config) -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        if args.len() > 1 {
+            let potential_shortcut = &args[1];
+            if config.get_shortcut(potential_shortcut).is_some() {
+                return Self {
+                    directory: ".".to_string(),
+                    depth: None,
+                    long_format: false,
+                    tree_format: false,
+                    table_format: false,
+                    grid_format: false,
+                    sizemap_format: false,
+                    timeline_format: false,
+                    git_format: false,
+                    sort_by: "name".to_string(),
+                    sort_reverse: false,
+                    sort_dirs_first: false,
+                    sort_case_sensitive: false,
+                    sort_natural: false,
+                    filter: None,
+                    case_sensitive: false,
+                    enable_plugin: Vec::new(),
+                    disable_plugin: Vec::new(),
+                    plugins_dir: config.plugins_dir.clone(),
+                    command: Some(Command::Shortcut(ShortcutAction::Run(
+                        potential_shortcut.clone(),
+                        args[2..].to_vec(),
+                    ))),
+                };
+            }
+        }
+
         let matches = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -249,13 +289,76 @@ impl Args {
                 SubCommand::with_name("clean")
                     .about("This command will clean up invalid plugins")
             )
+            .subcommand(
+                SubCommand::with_name("shortcut")
+                    .about("Manage command shortcuts")
+                    .subcommand(
+                        SubCommand::with_name("add")
+                            .about("Add a new shortcut")
+                            .arg(
+                                Arg::with_name("name")
+                                    .help("Name of the shortcut")
+                                    .required(true)
+                                    .index(1),
+                            )
+                            .arg(
+                                Arg::with_name("plugin")
+                                    .help("Plugin name")
+                                    .required(true)
+                                    .index(2),
+                            )
+                            .arg(
+                                Arg::with_name("action")
+                                    .help("Plugin action")
+                                    .required(true)
+                                    .index(3),
+                            )
+                            .arg(
+                                Arg::with_name("description")
+                                    .help("Optional description of the shortcut")
+                                    .long("description")
+                                    .short('d')
+                                    .takes_value(true),
+                            ),
+                    )
+                    .subcommand(
+                        SubCommand::with_name("remove")
+                            .about("Remove a shortcut")
+                            .arg(
+                                Arg::with_name("name")
+                                    .help("Name of the shortcut to remove")
+                                    .required(true)
+                                    .index(1),
+                            ),
+                    )
+                    .subcommand(SubCommand::with_name("list").about("List all shortcuts")),
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
     }
 
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let command = if matches.subcommand_matches("clean").is_some() {
+        let command = if let Some(matches) = matches.subcommand_matches("shortcut") {
+            if let Some(add_matches) = matches.subcommand_matches("add") {
+                Some(Command::Shortcut(ShortcutAction::Add(
+                    add_matches.value_of("name").unwrap().to_string(),
+                    ShortcutCommand {
+                        plugin_name: add_matches.value_of("plugin").unwrap().to_string(),
+                        action: add_matches.value_of("action").unwrap().to_string(),
+                        description: add_matches.value_of("description").map(String::from),
+                    },
+                )))
+            } else if let Some(remove_matches) = matches.subcommand_matches("remove") {
+                Some(Command::Shortcut(ShortcutAction::Remove(
+                    remove_matches.value_of("name").unwrap().to_string(),
+                )))
+            } else if matches.subcommand_matches("list").is_some() {
+                Some(Command::Shortcut(ShortcutAction::List))
+            } else {
+                None
+            }
+        } else if matches.subcommand_matches("clean").is_some() {
             Some(Command::Clean)
         } else if let Some(install_matches) = matches.subcommand_matches("install") {
             if let Some(github_url) = install_matches.value_of("git") {

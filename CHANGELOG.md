@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Command shortcuts system:
+  - Save frequently used plugin commands as shortcuts
+  - Manage shortcuts through CLI (`lla shortcut add/remove/list`)
+  - Store shortcuts in config file with descriptions
+  - Pass custom arguments to shortcut commands
+  - Convert long plugin commands into memorable shortcuts
 - Enhanced sorting functionality:
   - Reverse sort order with `-r` or `--sort-reverse`
   - Directory-first sorting with `--sort-dirs-first`
@@ -36,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded all existing plugins to use the new interface
 - Enhanced plugin aesthetics and functionality
 - Overall stability and performance optimizations
+- Simplified complex plugin commands through shortcuts system
 
 ### Fixed
 
