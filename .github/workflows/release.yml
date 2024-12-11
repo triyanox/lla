@@ -80,9 +80,6 @@ jobs:
 
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3
-        with:
-          version: "3.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
