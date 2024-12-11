@@ -14,6 +14,19 @@ Or you can install individual plugins as described below.
 
 ## Available Plugins
 
+- [categorizer](#categorizer): Categorizes files based on their extensions and metadata
+- [code_complexity](#code_complexity): Analyzes code complexity using various metrics
+- [code_snippet_extractor](#code_snippet_extractor): A plugin for extracting and managing code snippets
+- [dirs](#dirs): Shows directories metadata
+- [duplicate_file_detector](#duplicate_file_detector): A plugin for the LLA that detects duplicate files.
+- [file_hash](#file_hash): Displays the hash of each file
+- [file_meta](#file_meta): Displays the file metadata of each file
+- [file_tagger](#file_tagger): A plugin for tagging files and filtering by tags
+- [git_status](#git_status): Shows the git status of each file
+- [keyword_search](#keyword_search): Searches file contents for user-specified keywords
+- [last_git_commit](#last_git_commit): A plugin for the LLA that provides the last git commit hash
+- [sizeviz](#sizeviz): File size visualizer plugin for LLA
+
 ### categorizer
 
 **Description:** Categorizes files based on their extensions and metadata
@@ -301,4 +314,3 @@ cargo build --release
 ```
 
 Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/release` directory to your LLA plugins directory.
-

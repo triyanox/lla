@@ -50,6 +50,12 @@ paru -S lla
 
 # On NetBSD
 pkgin install lla
+
+# Manual - Example is for amd64 GNU, replaces the file names if downloading for a different arch.
+wget -c https://github.com/triyanox/lla/releases/download/v0.3.0/lla-linux-amd64 -O lla
+sudo chmod +x lla
+sudo chown root:root lla
+sudo mv lla /usr/local/bin/lla
 ```
 
 After installation, initialize your setup:
