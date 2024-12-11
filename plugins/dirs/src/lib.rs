@@ -28,6 +28,20 @@ impl DirsPlugin {
         DirsPlugin
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn analyze_directory(path: &Path) -> Option<(usize, usize, u64)> {
         let path_str = path.to_string_lossy().to_string();
         if let Ok(metadata) = path.metadata() {
@@ -234,22 +248,6 @@ impl Plugin for DirsPlugin {
         };
         let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
         response.encode(&mut buf).unwrap();
-        buf.to_vec()
-    }
-}
-
-impl DirsPlugin {
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
         buf.to_vec()
     }
 }

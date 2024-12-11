@@ -13,6 +13,20 @@ impl FileSizeVisualizerPlugin {
         FileSizeVisualizerPlugin
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn format_size(size: u64) -> String {
         const KB: u64 = 1024;
         const MB: u64 = KB * 1024;
@@ -80,20 +94,6 @@ impl FileSizeVisualizerPlugin {
         } else {
             (size as f64 / total_size as f64) * 100.0
         }
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
     }
 }
 

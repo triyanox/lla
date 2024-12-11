@@ -13,11 +13,6 @@ impl FileMetadataPlugin {
         FileMetadataPlugin
     }
 
-    fn format_timestamp(timestamp: SystemTime) -> String {
-        let datetime: chrono::DateTime<chrono::Local> = timestamp.into();
-        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
-    }
-
     fn encode_error(&self, error: &str) -> Vec<u8> {
         use prost::Message;
         let error_msg = lla_plugin_interface::proto::PluginMessage {
@@ -30,6 +25,11 @@ impl FileMetadataPlugin {
         let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
         error_msg.encode(&mut buf).unwrap();
         buf.to_vec()
+    }
+
+    fn format_timestamp(timestamp: SystemTime) -> String {
+        let datetime: chrono::DateTime<chrono::Local> = timestamp.into();
+        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
 

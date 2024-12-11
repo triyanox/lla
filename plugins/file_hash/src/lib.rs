@@ -16,18 +16,6 @@ impl FileHashPlugin {
         FileHashPlugin
     }
 
-    fn calculate_hashes(path: &std::path::Path) -> Option<(String, String)> {
-        let file = File::open(path).ok()?;
-        let mut reader = BufReader::new(file);
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer).ok()?;
-
-        let sha1 = format!("{:x}", Sha1::digest(&buffer));
-        let sha256 = format!("{:x}", Sha256::digest(&buffer));
-
-        Some((sha1, sha256))
-    }
-
     fn encode_error(&self, error: &str) -> Vec<u8> {
         use prost::Message;
         let error_msg = lla_plugin_interface::proto::PluginMessage {
@@ -40,6 +28,18 @@ impl FileHashPlugin {
         let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
         error_msg.encode(&mut buf).unwrap();
         buf.to_vec()
+    }
+
+    fn calculate_hashes(path: &std::path::Path) -> Option<(String, String)> {
+        let file = File::open(path).ok()?;
+        let mut reader = BufReader::new(file);
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer).ok()?;
+
+        let sha1 = format!("{:x}", Sha1::digest(&buffer));
+        let sha256 = format!("{:x}", Sha256::digest(&buffer));
+
+        Some((sha1, sha256))
     }
 }
 

@@ -36,6 +36,20 @@ impl DuplicateFileDetectorPlugin {
         DuplicateFileDetectorPlugin
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn get_file_hash(path: &Path) -> Option<String> {
         let mut file = File::open(path).ok()?;
         let mut hasher = Sha256::new();
@@ -105,20 +119,6 @@ impl DuplicateFileDetectorPlugin {
         }
 
         entry
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
     }
 }
 

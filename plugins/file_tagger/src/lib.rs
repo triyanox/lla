@@ -30,6 +30,20 @@ impl FileTaggerPlugin {
         FileTaggerPlugin { tag_file, tags }
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn load_tags(path: &PathBuf) -> HashMap<String, Vec<String>> {
         let mut tags: HashMap<String, Vec<String>> = HashMap::new();
         if let Ok(file) = File::open(path) {
@@ -79,20 +93,6 @@ impl FileTaggerPlugin {
 
     fn get_tags(&self, file_path: &str) -> Vec<String> {
         self.tags.get(file_path).cloned().unwrap_or_default()
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
     }
 }
 

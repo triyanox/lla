@@ -163,6 +163,20 @@ impl FileCategoryPlugin {
         }
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn load_rules(path: &PathBuf) -> Option<Vec<CategoryRule>> {
         fs::read_to_string(path)
             .ok()
@@ -458,22 +472,6 @@ impl Plugin for FileCategoryPlugin {
         };
         let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
         response.encode(&mut buf).unwrap();
-        buf.to_vec()
-    }
-}
-
-impl FileCategoryPlugin {
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
         buf.to_vec()
     }
 }

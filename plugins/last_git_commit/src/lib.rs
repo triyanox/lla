@@ -14,6 +14,20 @@ impl LastGitCommitPlugin {
         LastGitCommitPlugin
     }
 
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+
     fn get_last_commit_info(path: &Path) -> Option<(String, String, String)> {
         let output = Command::new("git")
             .args(["log", "-1", "--format=%h|%an|%ar", "--", path.to_str()?])
@@ -32,20 +46,6 @@ impl LastGitCommitPlugin {
         } else {
             None
         }
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
     }
 }
 
