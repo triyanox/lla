@@ -1,5 +1,9 @@
 use colored::Colorize;
-use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message},
+    Plugin,
+};
+use prost::Message as _;
 use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
@@ -295,19 +299,44 @@ impl KeywordSearchPlugin {
 }
 
 impl Plugin for KeywordSearchPlugin {
-    fn handle_request(&mut self, request: PluginRequest) -> PluginResponse {
-        match request {
-            PluginRequest::GetName => PluginResponse::Name(env!("CARGO_PKG_NAME").to_string()),
-            PluginRequest::GetVersion => {
-                PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-            PluginRequest::GetDescription => {
-                PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+        };
+
+        let response_msg = match proto_msg.message {
+            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
+            Some(Message::GetVersion(_)) => {
+                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
             }
-            PluginRequest::GetSupportedFormats => {
-                PluginResponse::SupportedFormats(vec!["default".to_string(), "long".to_string()])
+            Some(Message::GetDescription(_)) => {
+                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
             }
-            PluginRequest::Decorate(mut entry) => {
+            Some(Message::GetSupportedFormats(_)) => {
+                Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(Message::Decorate(entry)) => {
+                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
+                {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
+
                 if let Some(matches) = entry
                     .path
                     .is_file()
@@ -319,37 +348,49 @@ impl Plugin for KeywordSearchPlugin {
                         toml::to_string(&matches).unwrap_or_default(),
                     );
                 }
-                PluginResponse::Decorated(entry)
+                Message::DecoratedResponse(entry.into())
             }
-            PluginRequest::FormatField(entry, format) => {
+            Some(Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        }
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
+
                 let formatted = entry
                     .custom_fields
                     .get("keyword_matches")
                     .and_then(|toml_str| toml::from_str::<Vec<KeywordMatch>>(toml_str).ok())
-                    .map(|matches| self.format_matches(&matches[..], format == "long"));
-                PluginResponse::FormattedField(formatted)
+                    .map(|matches| self.format_matches(&matches[..], req.format == "long"));
+                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
             }
-            PluginRequest::PerformAction(action, args) => match action.as_str() {
+            Some(Message::Action(req)) => match req.action.as_str() {
                 "set-keywords" => {
-                    if args.is_empty() {
-                        return PluginResponse::Error(
-                            "Usage: set-keywords <keyword1> [keyword2 ...]".to_string(),
-                        );
+                    if req.args.is_empty() {
+                        return self.encode_error("Usage: set-keywords <keyword1> [keyword2 ...]");
                     }
                     let mut config = self.config.lock().unwrap();
-                    config.keywords = args.to_vec();
+                    config.keywords = req.args.to_vec();
                     drop(config);
                     if let Err(e) = self.save_config() {
-                        return PluginResponse::ActionResult(Err(e));
+                        return self.encode_error(&e);
                     }
                     println!(
                         "Set keywords to: {}",
-                        args.iter()
+                        req.args
+                            .iter()
                             .map(|k| k.yellow().to_string())
                             .collect::<Vec<_>>()
                             .join(", ")
                     );
-                    PluginResponse::ActionResult(Ok(()))
+                    Message::ActionResponse(proto::ActionResponse {
+                        success: true,
+                        error: None,
+                    })
                 }
                 "show-config" => {
                     let config = self.config.lock().unwrap();
@@ -385,45 +426,57 @@ impl Plugin for KeywordSearchPlugin {
                             .collect::<Vec<_>>()
                             .join(", ")
                     );
-                    PluginResponse::ActionResult(Ok(()))
+                    Message::ActionResponse(proto::ActionResponse {
+                        success: true,
+                        error: None,
+                    })
                 }
                 "set-case-sensitive" => {
-                    let value = args.first().map(|s| s == "true").unwrap_or(false);
+                    let value = req.args.first().map(|s| s == "true").unwrap_or(false);
                     let mut config = self.config.lock().unwrap();
                     config.case_sensitive = value;
                     drop(config);
                     if let Err(e) = self.save_config() {
-                        return PluginResponse::ActionResult(Err(e));
+                        return self.encode_error(&e);
                     }
                     println!("Case sensitive search: {}", value.to_string().cyan());
-                    PluginResponse::ActionResult(Ok(()))
+                    Message::ActionResponse(proto::ActionResponse {
+                        success: true,
+                        error: None,
+                    })
                 }
                 "set-context-lines" => {
-                    if let Some(lines) = args.first().and_then(|s| s.parse().ok()) {
+                    if let Some(lines) = req.args.first().and_then(|s| s.parse().ok()) {
                         let mut config = self.config.lock().unwrap();
                         config.context_lines = lines;
                         drop(config);
                         if let Err(e) = self.save_config() {
-                            return PluginResponse::ActionResult(Err(e));
+                            return self.encode_error(&e);
                         }
                         println!("Context lines set to: {}", lines.to_string().cyan());
-                        PluginResponse::ActionResult(Ok(()))
+                        Message::ActionResponse(proto::ActionResponse {
+                            success: true,
+                            error: None,
+                        })
                     } else {
-                        PluginResponse::Error("Invalid number of context lines".to_string())
+                        return self.encode_error("Invalid number of context lines");
                     }
                 }
                 "set-max-matches" => {
-                    if let Some(max) = args.first().and_then(|s| s.parse().ok()) {
+                    if let Some(max) = req.args.first().and_then(|s| s.parse().ok()) {
                         let mut config = self.config.lock().unwrap();
                         config.max_matches = max;
                         drop(config);
                         if let Err(e) = self.save_config() {
-                            return PluginResponse::ActionResult(Err(e));
+                            return self.encode_error(&e);
                         }
                         println!("Max matches per file set to: {}", max.to_string().cyan());
-                        PluginResponse::ActionResult(Ok(()))
+                        Message::ActionResponse(proto::ActionResponse {
+                            success: true,
+                            error: None,
+                        })
                     } else {
-                        PluginResponse::Error("Invalid max matches value".to_string())
+                        return self.encode_error("Invalid max matches value");
                     }
                 }
                 "help" => {
@@ -460,13 +513,16 @@ impl Plugin for KeywordSearchPlugin {
                         "    {} --name keyword_search --action set-case-sensitive --args true",
                         "lla plugin".bright_blue()
                     );
-                    PluginResponse::ActionResult(Ok(()))
+                    Message::ActionResponse(proto::ActionResponse {
+                        success: true,
+                        error: None,
+                    })
                 }
                 "search" => {
-                    if args.is_empty() {
-                        return PluginResponse::Error("Usage: search <file_path>".to_string());
+                    if req.args.is_empty() {
+                        return self.encode_error("Usage: search <file_path>");
                     }
-                    let path = std::path::Path::new(&args[0]);
+                    let path = std::path::Path::new(&req.args[0]);
                     if let Some(matches) = self.search_file(path) {
                         println!(
                             "\n{} in {}:",
@@ -474,19 +530,51 @@ impl Plugin for KeywordSearchPlugin {
                             path.display().to_string().bright_blue()
                         );
                         println!("{}", self.format_matches(&matches[..], true));
-                        PluginResponse::ActionResult(Ok(()))
+                        Message::ActionResponse(proto::ActionResponse {
+                            success: true,
+                            error: None,
+                        })
                     } else {
                         println!(
                             "{} No matches found in {}",
                             "Info:".bright_blue(),
                             path.display().to_string().bright_yellow()
                         );
-                        PluginResponse::ActionResult(Ok(()))
+                        Message::ActionResponse(proto::ActionResponse {
+                            success: true,
+                            error: None,
+                        })
                     }
                 }
-                _ => PluginResponse::Error(format!("Unknown action: {}", action)),
+                _ => {
+                    return self.encode_error(&format!("Unknown action: {}", req.action));
+                }
             },
-        }
+            _ => Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
+    }
+}
+
+impl KeywordSearchPlugin {
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
