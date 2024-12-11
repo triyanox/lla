@@ -108,7 +108,7 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 
 [[package]]
 name = "categorizer"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "code_complexity"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "code_snippet_extractor"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64",
  "bytes",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "duplicate_file_detector"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -403,7 +403,7 @@ checksum = "486f806e73c5707928240ddc295403b1b93c96a02038563881c4a2fd84b81ac4"
 
 [[package]]
 name = "file_hash"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "file_meta"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "file_tagger"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "git_status"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "keyword_search"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "last_git_commit"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
@@ -1123,7 +1123,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sizeviz"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",

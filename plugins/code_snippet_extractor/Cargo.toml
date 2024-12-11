@@ -1,7 +1,7 @@
 [package]
 name = "code_snippet_extractor"
 description = "A plugin for extracting and managing code snippets"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
