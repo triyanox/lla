@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, ShortcutCommand};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::path::PathBuf;
 
@@ -12,13 +12,18 @@ pub struct Args {
     pub sizemap_format: bool,
     pub timeline_format: bool,
     pub git_format: bool,
+    pub show_icons: bool,
     pub sort_by: String,
+    pub sort_reverse: bool,
+    pub sort_dirs_first: bool,
+    pub sort_case_sensitive: bool,
+    pub sort_natural: bool,
     pub filter: Option<String>,
+    pub case_sensitive: bool,
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
     pub command: Option<Command>,
-    pub plugin_args: Vec<String>,
 }
 
 pub enum Command {
@@ -29,11 +34,20 @@ pub enum Command {
     Config(Option<ConfigAction>),
     PluginAction(String, String, Vec<String>),
     Update(Option<String>),
+    Clean,
+    Shortcut(ShortcutAction),
 }
 
 pub enum InstallSource {
     GitHub(String),
     LocalDir(String),
+}
+
+pub enum ShortcutAction {
+    Add(String, ShortcutCommand),
+    Remove(String),
+    List,
+    Run(String, Vec<String>),
 }
 
 pub enum ConfigAction {
@@ -43,6 +57,39 @@ pub enum ConfigAction {
 
 impl Args {
     pub fn parse(config: &Config) -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        if args.len() > 1 {
+            let potential_shortcut = &args[1];
+            if config.get_shortcut(potential_shortcut).is_some() {
+                return Self {
+                    directory: ".".to_string(),
+                    depth: None,
+                    long_format: false,
+                    tree_format: false,
+                    table_format: false,
+                    grid_format: false,
+                    sizemap_format: false,
+                    timeline_format: false,
+                    git_format: false,
+                    show_icons: false,
+                    sort_by: "name".to_string(),
+                    sort_reverse: false,
+                    sort_dirs_first: false,
+                    sort_case_sensitive: false,
+                    sort_natural: false,
+                    filter: None,
+                    case_sensitive: false,
+                    enable_plugin: Vec::new(),
+                    disable_plugin: Vec::new(),
+                    plugins_dir: config.plugins_dir.clone(),
+                    command: Some(Command::Shortcut(ShortcutAction::Run(
+                        potential_shortcut.clone(),
+                        args[2..].to_vec(),
+                    ))),
+                };
+            }
+        }
+
         let matches = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -102,6 +149,11 @@ impl Args {
                     .help("Show git status and information"),
             )
             .arg(
+                Arg::with_name("icons")
+                    .long("icons")
+                    .help("Show icons for files and directories"),
+            )
+            .arg(
                 Arg::with_name("sort")
                     .short('s')
                     .long("sort")
@@ -110,11 +162,38 @@ impl Args {
                     .default_value(&config.default_sort),
             )
             .arg(
+                Arg::with_name("sort-reverse")
+                    .short('r')
+                    .long("sort-reverse")
+                    .help("Reverse the sort order"),
+            )
+            .arg(
+                Arg::with_name("sort-dirs-first")
+                    .long("sort-dirs-first")
+                    .help("List directories before files"),
+            )
+            .arg(
+                Arg::with_name("sort-case-sensitive")
+                    .long("sort-case-sensitive")
+                    .help("Enable case-sensitive sorting"),
+            )
+            .arg(
+                Arg::with_name("sort-natural")
+                    .long("sort-natural")
+                    .help("Use natural sorting for numbers (e.g., 2.txt before 10.txt)"),
+            )
+            .arg(
                 Arg::with_name("filter")
                     .short('f')
                     .long("filter")
                     .takes_value(true)
                     .help("Filter files by name or extension"),
+            )
+            .arg(
+                Arg::with_name("case-sensitive")
+                    .short('c')
+                    .long("case-sensitive")
+                    .help("Enable case-sensitive filtering"),
             )
             .arg(
                 Arg::with_name("enable-plugin")
@@ -151,13 +230,6 @@ impl Args {
                             .takes_value(true)
                             .help("Install a plugin from a local directory"),
                     ),
-            )
-            .arg(
-                Arg::with_name("plugin-arg")
-                    .long("plugin-arg")
-                    .takes_value(true)
-                    .multiple(true)
-                    .help("Arguments to pass to enabled plugins"),
             )
             .subcommand(
                 SubCommand::with_name("plugin")
@@ -211,39 +283,91 @@ impl Args {
                             .index(1),
                     ),
             )
+            .subcommand(
+                SubCommand::with_name("clean").about("This command will clean up invalid plugins"),
+            )
+            .subcommand(
+                SubCommand::with_name("shortcut")
+                    .about("Manage command shortcuts")
+                    .subcommand(
+                        SubCommand::with_name("add")
+                            .about("Add a new shortcut")
+                            .arg(
+                                Arg::with_name("name")
+                                    .help("Name of the shortcut")
+                                    .required(true)
+                                    .index(1),
+                            )
+                            .arg(
+                                Arg::with_name("plugin")
+                                    .help("Plugin name")
+                                    .required(true)
+                                    .index(2),
+                            )
+                            .arg(
+                                Arg::with_name("action")
+                                    .help("Plugin action")
+                                    .required(true)
+                                    .index(3),
+                            )
+                            .arg(
+                                Arg::with_name("description")
+                                    .help("Optional description of the shortcut")
+                                    .long("description")
+                                    .short('d')
+                                    .takes_value(true),
+                            ),
+                    )
+                    .subcommand(
+                        SubCommand::with_name("remove")
+                            .about("Remove a shortcut")
+                            .arg(
+                                Arg::with_name("name")
+                                    .help("Name of the shortcut to remove")
+                                    .required(true)
+                                    .index(1),
+                            ),
+                    )
+                    .subcommand(SubCommand::with_name("list").about("List all shortcuts")),
+            )
             .get_matches();
 
         Self::from_matches(&matches, config)
     }
 
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let format = if matches.is_present("long") {
-            "long"
-        } else if matches.is_present("tree") {
-            "tree"
-        } else if matches.is_present("table") {
-            "table"
-        } else if matches.is_present("grid") {
-            "grid"
-        } else if matches.is_present("sizemap") {
-            "sizemap"
-        } else if matches.is_present("timeline") {
-            "timeline"
-        } else if matches.is_present("git") {
-            "git"
-        } else {
-            &config.default_format
-        };
-
-        let command = if let Some(install_matches) = matches.subcommand_matches("install") {
+        let command = if let Some(matches) = matches.subcommand_matches("shortcut") {
+            if let Some(add_matches) = matches.subcommand_matches("add") {
+                Some(Command::Shortcut(ShortcutAction::Add(
+                    add_matches.value_of("name").unwrap().to_string(),
+                    ShortcutCommand {
+                        plugin_name: add_matches.value_of("plugin").unwrap().to_string(),
+                        action: add_matches.value_of("action").unwrap().to_string(),
+                        description: add_matches.value_of("description").map(String::from),
+                    },
+                )))
+            } else if let Some(remove_matches) = matches.subcommand_matches("remove") {
+                Some(Command::Shortcut(ShortcutAction::Remove(
+                    remove_matches.value_of("name").unwrap().to_string(),
+                )))
+            } else if matches.subcommand_matches("list").is_some() {
+                Some(Command::Shortcut(ShortcutAction::List))
+            } else {
+                None
+            }
+        } else if matches.subcommand_matches("clean").is_some() {
+            Some(Command::Clean)
+        } else if let Some(install_matches) = matches.subcommand_matches("install") {
             if let Some(github_url) = install_matches.value_of("git") {
                 Some(Command::Install(InstallSource::GitHub(
                     github_url.to_string(),
                 )))
+            } else if let Some(local_dir) = install_matches.value_of("dir") {
+                Some(Command::Install(InstallSource::LocalDir(
+                    local_dir.to_string(),
+                )))
             } else {
-                install_matches.value_of("dir").map(|local_dir| {
-                    Command::Install(InstallSource::LocalDir(local_dir.to_string()))
-                })
+                None
             }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)
@@ -269,34 +393,36 @@ impl Args {
                 .map(|v| v.map(String::from).collect())
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
+        } else if let Some(update_matches) = matches.subcommand_matches("update") {
+            Some(Command::Update(
+                update_matches.value_of("name").map(String::from),
+            ))
         } else {
-            matches.subcommand_matches("update").map(|update_matches| {
-                Command::Update(update_matches.value_of("name").map(String::from))
-            })
+            None
         };
 
         Args {
-            directory: matches.value_of("directory").unwrap().to_string(),
-            depth: matches
-                .value_of("depth")
-                .map(|d| d.parse().unwrap())
-                .or(config.default_depth),
-            long_format: format == "long",
-            tree_format: format == "tree",
-            table_format: format == "table",
-            grid_format: format == "grid",
-            sizemap_format: format == "sizemap",
-            timeline_format: format == "timeline",
-            git_format: format == "git",
-            sort_by: matches
-                .value_of("sort")
-                .unwrap_or(&config.default_sort)
-                .to_string(),
+            directory: matches.value_of("directory").unwrap_or(".").to_string(),
+            depth: matches.value_of("depth").and_then(|s| s.parse().ok()),
+            long_format: matches.is_present("long"),
+            tree_format: matches.is_present("tree"),
+            table_format: matches.is_present("table"),
+            grid_format: matches.is_present("grid"),
+            sizemap_format: matches.is_present("sizemap"),
+            timeline_format: matches.is_present("timeline"),
+            git_format: matches.is_present("git"),
+            show_icons: matches.is_present("icons"),
+            sort_by: matches.value_of("sort").unwrap_or("name").to_string(),
+            sort_reverse: matches.is_present("sort-reverse"),
+            sort_dirs_first: matches.is_present("sort-dirs-first"),
+            sort_case_sensitive: matches.is_present("sort-case-sensitive"),
+            sort_natural: matches.is_present("sort-natural"),
             filter: matches.value_of("filter").map(String::from),
+            case_sensitive: matches.is_present("case-sensitive"),
             enable_plugin: matches
                 .values_of("enable-plugin")
                 .map(|v| v.map(String::from).collect())
-                .unwrap_or_else(|| config.enabled_plugins.clone()),
+                .unwrap_or_default(),
             disable_plugin: matches
                 .values_of("disable-plugin")
                 .map(|v| v.map(String::from).collect())
@@ -306,10 +432,6 @@ impl Args {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
             command,
-            plugin_args: matches
-                .values_of("plugin-arg")
-                .map(|v| v.map(String::from).collect())
-                .unwrap_or_default(),
         }
     }
 }

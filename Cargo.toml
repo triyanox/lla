@@ -2,12 +2,12 @@
 members = ["lla", "lla_plugin_interface", "plugins/*"]
 
 [workspace.package]
-version = "0.2.10"
+version = "0.3.0"
 edition = "2021"
 authors = ["Achaq <hi@achaq.dev>"]
 license = "MIT"
 repository = "https://github.com/triyanox/lla"
-resolver = "1"
+resolver = "2"
 
 [workspace.dependencies]
 clap = "3.2.25"
@@ -33,3 +33,13 @@ dialoguer = "0.11.0"
 atty = "0.2.14"
 indicatif = "0.17.9"
 console = "0.15.8"
+regex = "1.5"
+glob = "0.3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev.build-override]
+opt-level = 3

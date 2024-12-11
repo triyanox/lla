@@ -1,27 +1,41 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
-use lla_plugin_interface::DecoratedEntry;
+use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::utils::icons::format_with_icon;
+use lla_plugin_interface::proto::DecoratedEntry;
+use std::path::Path;
+pub struct DefaultFormatter {
+    pub show_icons: bool,
+}
 
-pub struct DefaultFormatter;
-
+impl DefaultFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 impl FileFormatter for DefaultFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         Ok(files
             .iter()
             .map(|file| {
-                let colored_name = colorize_file_name(&file.path).to_string();
+                let path = Path::new(&file.path);
+                let colored_name = colorize_file_name(path).to_string();
+                let name_with_icon = colorize_file_name_with_icon(
+                    path,
+                    format_with_icon(path, colored_name, self.show_icons),
+                )
+                .to_string();
                 let plugin_fields = plugin_manager.format_fields(file, "default").join(" ");
                 if plugin_fields.is_empty() {
-                    colored_name
+                    name_with_icon
                 } else {
-                    format!("{} {}", colored_name, plugin_fields)
+                    format!("{} {}", name_with_icon, plugin_fields)
                 }
             })
             .collect::<Vec<_>>()

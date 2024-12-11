@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -56,6 +57,15 @@ pub struct Config {
     pub formatters: FormatterConfig,
     #[serde(default)]
     pub listers: ListerConfig,
+    #[serde(default)]
+    pub shortcuts: HashMap<String, ShortcutCommand>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortcutCommand {
+    pub plugin_name: String,
+    pub action: String,
+    pub description: Option<String>,
 }
 
 impl Config {
@@ -93,7 +103,7 @@ impl Config {
     }
 
     fn generate_config_content(&self) -> String {
-        format!(
+        let mut content = format!(
             r#"# LLA Configuration File
 
 # Default sorting method for file listings
@@ -140,7 +150,23 @@ max_entries = {}"#,
             self.default_depth.unwrap_or(3),
             self.formatters.tree.max_lines.unwrap_or(20000),
             self.listers.recursive.max_entries.unwrap_or(100000),
-        )
+        );
+
+        if !self.shortcuts.is_empty() {
+            content.push_str("\n\n# Command shortcuts\n[shortcuts]\n");
+            for (name, cmd) in &self.shortcuts {
+                content.push_str(&format!(
+                    r#"{}={{ plugin_name = "{}", action = "{}""#,
+                    name, cmd.plugin_name, cmd.action
+                ));
+                if let Some(desc) = &cmd.description {
+                    content.push_str(&format!(r#", description = "{}""#, desc));
+                }
+                content.push_str("}\n");
+            }
+        }
+
+        content
     }
 
     pub fn save(&self, path: &Path) -> io::Result<()> {
@@ -174,6 +200,26 @@ max_entries = {}"#,
         self.save(&Self::get_config_path())?;
         Ok(())
     }
+
+    pub fn add_shortcut(
+        &mut self,
+        name: String,
+        command: ShortcutCommand,
+    ) -> crate::error::Result<()> {
+        self.shortcuts.insert(name, command);
+        self.save(&Self::get_config_path())?;
+        Ok(())
+    }
+
+    pub fn remove_shortcut(&mut self, name: &str) -> crate::error::Result<()> {
+        self.shortcuts.remove(name);
+        self.save(&Self::get_config_path())?;
+        Ok(())
+    }
+
+    pub fn get_shortcut(&self, name: &str) -> Option<&ShortcutCommand> {
+        self.shortcuts.get(name)
+    }
 }
 
 impl Default for Config {
@@ -189,6 +235,7 @@ impl Default for Config {
             default_depth: Some(3),
             formatters: FormatterConfig::default(),
             listers: ListerConfig::default(),
+            shortcuts: HashMap::new(),
         }
     }
 }

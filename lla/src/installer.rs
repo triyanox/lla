@@ -1,5 +1,8 @@
 use crate::error::{LlaError, Result};
-use console::style;
+use atty;
+use colored::Colorize;
+use console::{style, Term};
+use dialoguer::{theme::ColorfulTheme, MultiSelect};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -71,16 +74,16 @@ impl InstallSummary {
 
     fn display(&self) {
         if !self.successful.is_empty() {
-            println!("\n{} Successfully installed:", style("✨").green());
+            println!("\n{} Successfully installed:", "✨".green());
             for (name, version) in &self.successful {
-                println!("   {} {} ({})", style("✓").green(), name, version);
+                println!("   {} {} ({})", "◉".green(), name, version);
             }
         }
 
         if !self.failed.is_empty() {
-            println!("\n{} Failed to install:", style("❌").red());
+            println!("\n{} Failed to install:", "×".red());
             for (name, error) in &self.failed {
-                println!("   {} {} ({})", style("✗").red(), name, error);
+                println!("   {} {} ({})", "○".red(), name, error);
             }
         }
     }
@@ -146,19 +149,81 @@ impl PluginInstaller {
 
     fn create_progress_style() -> ProgressStyle {
         ProgressStyle::default_bar()
-            .template("{prefix:.green} {spinner:.green} [{bar:30.cyan/blue}] {msg} {bytes:>8} ({elapsed})")
+            .template("{prefix:.cyan} {spinner:.cyan} [{bar:30.cyan/blue}] {msg} {percent}%")
             .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
             .progress_chars("━━╾─")
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
     }
 
-    fn update_progress(pb: &ProgressBar, percent: u64, msg: impl Into<String>, bytes: Option<u64>) {
+    fn update_progress(
+        pb: &ProgressBar,
+        percent: u64,
+        msg: impl Into<String>,
+        _bytes: Option<u64>,
+    ) {
         pb.set_position(percent);
         pb.set_message(msg.into());
-        if let Some(bytes) = bytes {
-            pb.set_length(bytes);
-        }
         std::thread::sleep(Duration::from_millis(25));
+    }
+
+    fn select_plugins(&self, plugin_dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+        if !atty::is(atty::Stream::Stdout) {
+            return Ok(plugin_dirs.to_vec());
+        }
+
+        let plugin_names: Vec<String> = plugin_dirs
+            .iter()
+            .map(|p| {
+                let name = Self::get_display_name(p);
+                let version = self
+                    .get_plugin_version(p)
+                    .unwrap_or_else(|_| "unknown".to_string());
+                format!("{} {}", name.cyan(), format!("v{}", version).yellow(),)
+            })
+            .collect();
+
+        if plugin_names.is_empty() {
+            return Err(LlaError::Plugin("No plugins found".to_string()));
+        }
+
+        println!("\n{}", "Plugin Installation".cyan().bold());
+        println!("{}\n", "Space to toggle, Enter to confirm".bright_black());
+
+        let theme = ColorfulTheme {
+            active_item_style: dialoguer::console::Style::new().cyan().bold(),
+            active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string())
+                .for_stderr()
+                .cyan(),
+            checked_item_prefix: dialoguer::console::style("  ◉ ".to_string())
+                .for_stderr()
+                .green(),
+            unchecked_item_prefix: dialoguer::console::style("  ○ ".to_string())
+                .for_stderr()
+                .red(),
+            prompt_prefix: dialoguer::console::style("│ ".to_string())
+                .for_stderr()
+                .cyan(),
+            prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
+            success_prefix: dialoguer::console::style("│ ".to_string())
+                .for_stderr()
+                .cyan(),
+            ..ColorfulTheme::default()
+        };
+
+        let selections = MultiSelect::with_theme(&theme)
+            .with_prompt("Select plugins to install")
+            .items(&plugin_names)
+            .defaults(&vec![false; plugin_names.len()])
+            .interact_on(&Term::stderr())?;
+
+        if selections.is_empty() {
+            return Err(LlaError::Plugin("No plugins selected".to_string()));
+        }
+
+        Ok(selections
+            .into_iter()
+            .map(|i| plugin_dirs[i].clone())
+            .collect())
     }
 
     fn install_plugins(
@@ -175,16 +240,17 @@ impl PluginInstaller {
             )));
         }
 
+        let selected_plugins = self.select_plugins(&plugin_dirs)?;
         let mut summary = InstallSummary::default();
-        let total_plugins = plugin_dirs.len();
+        let total_plugins = selected_plugins.len();
 
         if let Some(pb) = pb {
-            Self::update_progress(pb, 5, format!("found {} plugin(s)", total_plugins), None);
+            Self::update_progress(pb, 5, format!("Found {} plugin(s)", total_plugins), None);
         }
 
         let progress_per_plugin = 95.0 / total_plugins as f64;
 
-        for (idx, plugin_dir) in plugin_dirs.iter().enumerate() {
+        for (idx, plugin_dir) in selected_plugins.iter().enumerate() {
             let plugin_name = plugin_dir
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -198,7 +264,7 @@ impl PluginInstaller {
                 Self::update_progress(
                     pb,
                     start_progress,
-                    format!("installing {}", plugin_name),
+                    format!("Installing {}", plugin_name),
                     None,
                 );
             }
@@ -238,7 +304,7 @@ impl PluginInstaller {
                         Self::update_progress(
                             pb,
                             end_progress,
-                            format!("❌ {} failed", plugin_name),
+                            format!("× {} failed", plugin_name),
                             None,
                         );
                     }
@@ -249,7 +315,7 @@ impl PluginInstaller {
                 Self::update_progress(
                     pb,
                     end_progress,
-                    format!("processed {}/{}", idx + 1, total_plugins),
+                    format!("Processed {}/{}", idx + 1, total_plugins),
                     None,
                 );
             }
@@ -258,12 +324,12 @@ impl PluginInstaller {
         if let Some(pb) = pb {
             if summary.failed.is_empty() {
                 pb.finish_with_message(format!(
-                    "✨ installed {} plugin(s)",
+                    "✨ Installed {} plugin(s)",
                     summary.successful.len()
                 ));
             } else {
                 pb.finish_with_message(format!(
-                    "⚠️ installed {}/{} plugin(s)",
+                    "⚠ Installed {}/{} plugin(s)",
                     summary.successful.len(),
                     total_plugins
                 ));
@@ -284,14 +350,14 @@ impl PluginInstaller {
     }
 
     pub fn install_from_git(&self, url: &str) -> Result<()> {
-        println!("{} Installing from Git", style("📦").green());
+        println!("{}", "Installing from Git Repository".cyan().bold());
         let m = MultiProgress::new();
         let pb = m.add(ProgressBar::new(100));
         pb.set_style(Self::create_progress_style());
-        pb.set_prefix("🔄");
+        pb.set_prefix("│");
         pb.enable_steady_tick(Duration::from_millis(80));
 
-        Self::update_progress(&pb, 0, "cloning repository", None);
+        Self::update_progress(&pb, 0, "Cloning repository", None);
         let temp_dir = tempfile::tempdir()?;
         let repo_name = url
             .split('/')
@@ -306,7 +372,7 @@ impl PluginInstaller {
             .map(|s| s.len() as u64 * 100)
             .unwrap_or(0);
 
-        Self::update_progress(&pb, 10, "downloading", Some(repo_size));
+        Self::update_progress(&pb, 10, "Downloading", Some(repo_size));
 
         let output = Command::new("git")
             .args(["clone", "--quiet", "--progress", url])
@@ -314,14 +380,14 @@ impl PluginInstaller {
             .output()?;
 
         if !output.status.success() {
-            pb.finish_with_message("❌ clone failed");
+            pb.finish_with_message("× Clone failed");
             return Err(LlaError::Plugin(format!(
                 "Failed to clone repository: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
         }
 
-        Self::update_progress(&pb, 30, "finding plugins", None);
+        Self::update_progress(&pb, 30, "Finding plugins", None);
         self.install_plugins(
             &temp_dir.path().join(repo_name),
             Some((repo_name, url)),
@@ -330,25 +396,25 @@ impl PluginInstaller {
     }
 
     pub fn install_from_directory(&self, dir: &str) -> Result<()> {
-        println!("{} Installing from directory", style("📦").green());
+        println!("{}", "Installing from Directory".cyan().bold());
         let m = MultiProgress::new();
         let pb = m.add(ProgressBar::new(100));
         pb.set_style(Self::create_progress_style());
-        pb.set_prefix("🔄");
+        pb.set_prefix("│");
         pb.enable_steady_tick(Duration::from_millis(80));
 
-        pb.set_message("checking source");
+        pb.set_message("Checking source");
         let source_dir = PathBuf::from(dir.trim_end_matches('/'))
             .canonicalize()
             .map_err(|_| LlaError::Plugin(format!("Directory not found: {}", dir)))?;
 
         if !source_dir.exists() || !source_dir.is_dir() {
-            pb.finish_with_message("❌ invalid directory");
+            pb.finish_with_message("× Invalid directory");
             return Err(LlaError::Plugin(format!("Not a valid directory: {}", dir)));
         }
 
         pb.inc(30);
-        pb.set_message("finding plugins");
+        pb.set_message("Finding plugins");
         self.install_plugins(&source_dir, None, Some(&pb))
     }
 

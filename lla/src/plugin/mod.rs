@@ -1,22 +1,23 @@
 use crate::config::Config;
 use crate::error::{LlaError, Result};
 use dashmap::DashMap;
-use libloading::{Library, Symbol};
-use lla_plugin_interface::{CliArg, DecoratedEntry, Plugin};
+use libloading::Library;
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message, PluginMessage},
+    PluginApi, CURRENT_PLUGIN_API_VERSION,
+};
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
+use prost::Message as _;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-type DecorationCache = DashMap<(u64, String), HashMap<String, String>>;
+type DecorationCache = DashMap<(String, String), HashMap<String, String>>;
 static DECORATION_CACHE: Lazy<DecorationCache> = Lazy::new(DashMap::new);
 
 pub struct PluginManager {
-    plugins: HashMap<String, Box<dyn Plugin>>,
-    libraries: Vec<Library>,
+    plugins: HashMap<String, (Library, *mut PluginApi)>,
     loaded_paths: HashSet<PathBuf>,
     pub enabled_plugins: HashSet<String>,
     config: Config,
@@ -27,37 +28,61 @@ impl PluginManager {
         let enabled_plugins = HashSet::from_iter(config.enabled_plugins.clone());
         PluginManager {
             plugins: HashMap::new(),
-            libraries: Vec::new(),
             loaded_paths: HashSet::new(),
             enabled_plugins,
             config,
         }
     }
 
-    pub fn handle_plugin_args(&self, args: &[String]) {
-        for (name, plugin) in &self.plugins {
-            if self.enabled_plugins.contains(name) {
-                plugin.handle_cli_args(args);
-            }
+    fn _convert_metadata(metadata: &std::fs::Metadata) -> proto::EntryMetadata {
+        proto::EntryMetadata {
+            size: metadata.len(),
+            modified: metadata
+                .modified()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            accessed: metadata
+                .accessed()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            created: metadata
+                .created()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
+                .unwrap_or(0),
+            is_dir: metadata.is_dir(),
+            is_file: metadata.is_file(),
+            is_symlink: metadata.is_symlink(),
+            permissions: metadata.mode(),
+            uid: metadata.uid(),
+            gid: metadata.gid(),
         }
     }
 
-    pub fn perform_plugin_action(
-        &self,
-        plugin_name: &str,
-        action: &str,
-        args: &[String],
-    ) -> Result<()> {
-        if let Some(plugin) = self.plugins.get(plugin_name) {
-            if self.enabled_plugins.contains(plugin_name) {
-                plugin
-                    .perform_action(action, args)
-                    .map_err(LlaError::Plugin)
-            } else {
-                Err(LlaError::Plugin(format!(
-                    "Plugin '{}' is not enabled",
-                    plugin_name
-                )))
+    fn send_request(&self, plugin_name: &str, request: PluginMessage) -> Result<PluginMessage> {
+        if let Some((_, api)) = self.plugins.get(plugin_name) {
+            let mut buf = Vec::with_capacity(request.encoded_len());
+            request.encode(&mut buf).unwrap();
+
+            unsafe {
+                let raw_response =
+                    ((**api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len());
+                let response_vec =
+                    Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity);
+                let response_msg = proto::PluginMessage::decode(&response_vec[..])
+                    .map_err(|e| LlaError::Plugin(format!("Failed to decode response: {}", e)))?;
+                Ok(response_msg)
             }
         } else {
             Err(LlaError::Plugin(format!(
@@ -67,20 +92,93 @@ impl PluginManager {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn get_cli_args(&self) -> Vec<CliArg> {
-        self.plugins
-            .iter()
-            .filter(|(name, _)| self.enabled_plugins.contains(*name))
-            .flat_map(|(_, plugin)| plugin.cli_args())
-            .collect()
+    pub fn perform_plugin_action(
+        &mut self,
+        plugin_name: &str,
+        action: &str,
+        args: &[String],
+    ) -> Result<()> {
+        if !self.enabled_plugins.contains(plugin_name) {
+            return Err(LlaError::Plugin(format!(
+                "Plugin '{}' is not enabled",
+                plugin_name
+            )));
+        }
+
+        let request = PluginMessage {
+            message: Some(Message::Action(proto::ActionRequest {
+                action: action.to_string(),
+                args: args.to_vec(),
+            })),
+        };
+
+        match self.send_request(plugin_name, request)?.message {
+            Some(Message::ActionResponse(response)) => {
+                if response.success {
+                    Ok(())
+                } else {
+                    Err(LlaError::Plugin(
+                        response
+                            .error
+                            .unwrap_or_else(|| "Unknown error".to_string()),
+                    ))
+                }
+            }
+            _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+        }
     }
 
-    pub fn list_plugins(&self) -> Vec<(&str, &str, &str)> {
-        self.plugins
-            .values()
-            .map(|p| (p.name(), p.version(), p.description()))
-            .collect()
+    pub fn list_plugins(&mut self) -> Vec<(String, String, String)> {
+        let mut result = Vec::new();
+        for plugin_name in self.plugins.keys() {
+            let name = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetName(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::NameResponse(name)) => Ok(name),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(name) => name,
+                Err(_) => continue,
+            };
+
+            let version = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetVersion(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::VersionResponse(version)) => Ok(version),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(version) => version,
+                Err(_) => continue,
+            };
+
+            let description = match self
+                .send_request(
+                    plugin_name,
+                    PluginMessage {
+                        message: Some(Message::GetDescription(true)),
+                    },
+                )
+                .and_then(|msg| match msg.message {
+                    Some(Message::DescriptionResponse(description)) => Ok(description),
+                    _ => Err(LlaError::Plugin("Invalid response type".to_string())),
+                }) {
+                Ok(description) => description,
+                Err(_) => continue,
+            };
+
+            result.push((name, version, description));
+        }
+        result
     }
 
     pub fn load_plugin<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
@@ -90,30 +188,68 @@ impl PluginManager {
         }
 
         unsafe {
-            let library = Library::new(&path)
-                .map_err(|e| LlaError::Plugin(format!("Failed to load plugin library: {}", e)))?;
+            match Library::new(&path) {
+                Ok(library) => {
+                    match library.get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create") {
+                        Ok(create_fn) => {
+                            let api = create_fn();
+                            if (*api).version != CURRENT_PLUGIN_API_VERSION {
+                                eprintln!(
+                                    "⚠️ Plugin version mismatch for {:?}: expected {}, got {} run `lla clean` to remove invalid plugins",
+                                    path,
+                                    CURRENT_PLUGIN_API_VERSION,
+                                    (*api).version
+                                );
+                                return Ok(());
+                            }
 
-            let constructor: Symbol<unsafe fn() -> *mut dyn Plugin> =
-                library.get(b"_plugin_create").map_err(|e| {
-                    LlaError::Plugin(format!("Plugin doesn't have a constructor: {}", e))
-                })?;
+                            let request = PluginMessage {
+                                message: Some(Message::GetName(true)),
+                            };
+                            let mut buf = Vec::with_capacity(request.encoded_len());
+                            request.encode(&mut buf).unwrap();
 
-            let plugin = Box::from_raw(constructor());
-            let name = plugin.name().to_string();
-
-            if self.plugins.contains_key(&name) {
-                return Err(LlaError::Plugin(format!(
-                    "Plugin '{}' already loaded",
-                    name
-                )));
+                            match ((*api).handle_request)(
+                                std::ptr::null_mut(),
+                                buf.as_ptr(),
+                                buf.len(),
+                            ) {
+                                raw_response => {
+                                    let response_vec = Vec::from_raw_parts(
+                                        raw_response.ptr,
+                                        raw_response.len,
+                                        raw_response.capacity,
+                                    );
+                                    match proto::PluginMessage::decode(&response_vec[..]) {
+                                        Ok(response_msg) => match response_msg.message {
+                                            Some(Message::NameResponse(name)) => {
+                                                if !self.plugins.contains_key(&name) {
+                                                    self.plugins.insert(name, (library, api));
+                                                    self.loaded_paths.insert(path);
+                                                }
+                                            }
+                                            _ => eprintln!(
+                                                "⚠️ Failed to get plugin name for {:?}",
+                                                path
+                                            ),
+                                        },
+                                        Err(e) => eprintln!(
+                                            "⚠️ Failed to decode response for {:?}: {}",
+                                            path, e
+                                        ),
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ Plugin doesn't have a create function {:?}: {}", path, e)
+                        }
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Failed to load plugin library {:?}: {}", path, e),
             }
-
-            self.plugins.insert(name.clone(), plugin);
-            self.libraries.push(library);
-            self.loaded_paths.insert(path);
-
-            Ok(())
         }
+        Ok(())
     }
 
     pub fn discover_plugins<P: AsRef<Path>>(&mut self, plugin_dir: P) -> Result<()> {
@@ -163,18 +299,13 @@ impl PluginManager {
         }
     }
 
-    pub fn decorate_entry(&self, entry: &mut DecoratedEntry, format: &str) {
+    pub fn decorate_entry(&mut self, entry: &mut proto::DecoratedEntry, format: &str) {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return;
         }
 
-        #[cfg(unix)]
-        let file_id = entry.metadata.ino();
-        #[cfg(windows)]
-        let file_id = entry.metadata.file_index().unwrap_or(0);
-
-        let cache_key = (file_id, format.to_string());
-
+        let path_str = entry.path.clone();
+        let cache_key = (path_str.clone(), format.to_string());
         if let Some(fields) = DECORATION_CACHE.get(&cache_key) {
             entry
                 .custom_fields
@@ -182,36 +313,39 @@ impl PluginManager {
             return;
         }
 
-        let enabled_plugins: Vec<_> = self
-            .plugins
-            .iter()
-            .filter(|(name, plugin)| {
-                self.enabled_plugins.contains(*name) && plugin.supported_formats().contains(&format)
-            })
-            .collect();
+        let supported_names: Vec<_> = {
+            let mut names = Vec::new();
+            for name in self.enabled_plugins.iter() {
+                let request = PluginMessage {
+                    message: Some(Message::GetSupportedFormats(true)),
+                };
 
-        if enabled_plugins.is_empty() {
+                if let Ok(response) = self.send_request(name, request) {
+                    if let Some(Message::FormatsResponse(formats_response)) = response.message {
+                        if formats_response.formats.contains(&format.to_string()) {
+                            names.push(name.clone());
+                        }
+                    }
+                }
+            }
+            names
+        };
+
+        if supported_names.is_empty() {
             return;
         }
 
-        let mut new_decorations = HashMap::with_capacity(enabled_plugins.len() * 2);
+        let mut new_decorations = HashMap::with_capacity(supported_names.len() * 2);
+        for name in supported_names {
+            let request = PluginMessage {
+                message: Some(Message::Decorate(entry.clone())),
+            };
 
-        let plugin_results: Vec<_> = enabled_plugins
-            .into_par_iter()
-            .map(|(_name, plugin)| {
-                let temp_fields = HashMap::with_capacity(2);
-                let mut temp_entry = DecoratedEntry {
-                    path: entry.path.clone(),
-                    metadata: entry.metadata.clone(),
-                    custom_fields: temp_fields,
-                };
-                plugin.decorate(&mut temp_entry);
-                temp_entry.custom_fields
-            })
-            .collect();
-
-        for fields in plugin_results {
-            new_decorations.extend(fields);
+            if let Ok(response) = self.send_request(&name, request) {
+                if let Some(Message::DecoratedResponse(decorated)) = response.message {
+                    new_decorations.extend(decorated.custom_fields);
+                }
+            }
         }
 
         if !new_decorations.is_empty() {
@@ -222,20 +356,153 @@ impl PluginManager {
         }
     }
 
-    #[inline]
-    pub fn format_fields(&self, entry: &DecoratedEntry, format: &str) -> Vec<String> {
+    pub fn format_fields(&mut self, entry: &proto::DecoratedEntry, format: &str) -> Vec<String> {
         if self.enabled_plugins.is_empty() || (format != "default" && format != "long") {
             return Vec::new();
         }
 
         let mut result = Vec::with_capacity(self.enabled_plugins.len());
-        for (name, plugin) in &self.plugins {
-            if self.enabled_plugins.contains(name) && plugin.supported_formats().contains(&format) {
-                if let Some(field) = plugin.format_field(entry, format) {
-                    result.push(field);
+        for name in self.enabled_plugins.iter() {
+            let supports_format = match self.send_request(
+                name,
+                PluginMessage {
+                    message: Some(Message::GetSupportedFormats(true)),
+                },
+            ) {
+                Ok(response) => {
+                    if let Some(Message::FormatsResponse(formats)) = response.message {
+                        formats.formats.contains(&format.to_string())
+                    } else {
+                        false
+                    }
+                }
+                Err(_) => false,
+            };
+
+            if supports_format {
+                let request = PluginMessage {
+                    message: Some(Message::FormatField(proto::FormatFieldRequest {
+                        entry: Some(entry.clone()),
+                        format: format.to_string(),
+                    })),
+                };
+
+                if let Ok(response) = self.send_request(name, request) {
+                    if let Some(Message::FieldResponse(field_response)) = response.message {
+                        if let Some(field) = field_response.field {
+                            result.push(field);
+                        }
+                    }
                 }
             }
         }
         result
+    }
+
+    pub fn clean_plugins(&mut self) -> Result<()> {
+        println!("🔄 Starting plugin cleaning...");
+
+        let plugins_dir = self.config.plugins_dir.clone();
+        let mut failed_plugins = Vec::new();
+
+        for entry in fs::read_dir(&plugins_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if let Some(extension) = path.extension() {
+                if extension == "so" || extension == "dll" || extension == "dylib" {
+                    println!("📦 Checking plugin: {:?}", path);
+
+                    match std::panic::catch_unwind(|| self.validate_plugin(&path)) {
+                        Ok(Ok(true)) => println!("✅ Plugin is valid: {:?}", path),
+                        Ok(Ok(false)) => {
+                            println!("❌ Plugin is invalid: {:?}", path);
+                            failed_plugins.push(path);
+                        }
+                        Ok(Err(e)) => {
+                            println!("❌ Error validating plugin {:?}: {}", path, e);
+                            failed_plugins.push(path);
+                        }
+                        Err(_) => {
+                            println!("❌ Plugin validation panicked: {:?}", path);
+                            failed_plugins.push(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        for path in failed_plugins {
+            if let Err(e) = fs::remove_file(&path) {
+                eprintln!("⚠️ Failed to remove invalid plugin {:?}: {}", path, e);
+            } else {
+                println!("🗑️ Removed invalid plugin: {:?}", path);
+            }
+        }
+
+        println!("✨ Plugin cleaning complete");
+        Ok(())
+    }
+
+    fn validate_plugin<P: AsRef<Path>>(&self, path: P) -> Result<bool> {
+        unsafe {
+            let library = match Library::new(path.as_ref()) {
+                Ok(lib) => lib,
+                Err(_) => return Ok(false),
+            };
+
+            let create_fn = match library.get::<unsafe fn() -> *mut PluginApi>(b"_plugin_create") {
+                Ok(f) => f,
+                Err(_) => return Ok(false),
+            };
+
+            let api = match create_fn() {
+                api if api.is_null() => return Ok(false),
+                api => api,
+            };
+
+            if (api as usize) % std::mem::align_of::<PluginApi>() != 0 {
+                return Ok(false);
+            }
+
+            if (*api).version != CURRENT_PLUGIN_API_VERSION {
+                return Ok(false);
+            }
+
+            let request = PluginMessage {
+                message: Some(Message::GetName(true)),
+            };
+            let mut buf = Vec::with_capacity(request.encoded_len());
+            if let Err(_) = request.encode(&mut buf) {
+                return Ok(false);
+            }
+
+            let raw_response = match std::panic::catch_unwind(|| {
+                ((*api).handle_request)(std::ptr::null_mut(), buf.as_ptr(), buf.len())
+            }) {
+                Ok(response) => response,
+                Err(_) => return Ok(false),
+            };
+
+            if raw_response.ptr.is_null() || raw_response.len == 0 || raw_response.len > 1024 * 1024
+            {
+                return Ok(false);
+            }
+
+            let response_vec = match std::panic::catch_unwind(|| {
+                Vec::from_raw_parts(raw_response.ptr, raw_response.len, raw_response.capacity)
+            }) {
+                Ok(vec) => vec,
+                Err(_) => return Ok(false),
+            };
+
+            match proto::PluginMessage::decode(&response_vec[..]) {
+                Ok(response_msg) => match response_msg.message {
+                    Some(Message::NameResponse(_)) => Ok(true),
+                    _ => Ok(false),
+                },
+                Err(_) => Ok(false),
+            }
+        }
     }
 }

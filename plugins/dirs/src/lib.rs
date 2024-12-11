@@ -1,10 +1,13 @@
 use colored::Colorize;
 use lazy_static::lazy_static;
-use lla_plugin_interface::{DecoratedEntry, EntryDecorator, Plugin};
+use lla_plugin_interface::{
+    proto::{self, plugin_message::Message},
+    Plugin,
+};
 use parking_lot::RwLock;
+use prost::Message as _;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::env;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::SystemTime;
@@ -18,12 +21,25 @@ lazy_static! {
     static ref CACHE: RwLock<DirCache> = RwLock::new(HashMap::new());
 }
 
-pub struct DirectorySummaryPlugin;
+pub struct DirsPlugin;
 
-impl DirectorySummaryPlugin {
-    #[allow(clippy::new_without_default)]
+impl DirsPlugin {
     pub fn new() -> Self {
-        DirectorySummaryPlugin
+        DirsPlugin
+    }
+
+    fn encode_error(&self, error: &str) -> Vec<u8> {
+        use prost::Message;
+        let error_msg = lla_plugin_interface::proto::PluginMessage {
+            message: Some(
+                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
+                    error.to_string(),
+                ),
+            ),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+        error_msg.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 
     fn analyze_directory(path: &Path) -> Option<(usize, usize, u64)> {
@@ -63,6 +79,7 @@ impl DirectorySummaryPlugin {
             dir_count.load(Ordering::Relaxed),
             total_size.load(Ordering::Relaxed),
         );
+
         if let Ok(metadata) = path.metadata() {
             if let Ok(modified_time) = metadata.modified() {
                 let mut cache = CACHE.write();
@@ -90,95 +107,149 @@ impl DirectorySummaryPlugin {
     }
 }
 
-impl Default for DirectorySummaryPlugin {
+impl Default for DirsPlugin {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Plugin for DirectorySummaryPlugin {
-    fn version(&self) -> &'static str {
-        env!("CARGO_PKG_VERSION")
-    }
-
-    fn description(&self) -> &'static str {
-        env!("CARGO_PKG_DESCRIPTION")
-    }
-}
-
-impl EntryDecorator for DirectorySummaryPlugin {
-    fn name(&self) -> &'static str {
-        env!("CARGO_PKG_NAME")
-    }
-
-    fn decorate(&self, entry: &mut DecoratedEntry) {
-        if entry.path.is_dir() {
-            if let Some((file_count, dir_count, total_size)) = Self::analyze_directory(&entry.path)
-            {
-                entry
-                    .custom_fields
-                    .insert("file_count".to_string(), file_count.to_string());
-                entry
-                    .custom_fields
-                    .insert("dir_count".to_string(), dir_count.to_string());
-                entry
-                    .custom_fields
-                    .insert("total_size".to_string(), Self::format_size(total_size));
+impl Plugin for DirsPlugin {
+    fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
+        let proto_msg = match proto::PluginMessage::decode(request) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_msg = proto::PluginMessage {
+                    message: Some(Message::ErrorResponse(format!(
+                        "Failed to decode request: {}",
+                        e
+                    ))),
+                };
+                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
+                error_msg.encode(&mut buf).unwrap();
+                return buf.to_vec();
             }
-        }
-    }
+        };
 
-    fn format_field(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
-        if !entry.path.is_dir() {
-            return None;
-        }
+        let response_msg = match proto_msg.message {
+            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
+            Some(Message::GetVersion(_)) => {
+                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
+            }
+            Some(Message::GetDescription(_)) => {
+                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
+            }
+            Some(Message::GetSupportedFormats(_)) => {
+                Message::FormatsResponse(proto::SupportedFormatsResponse {
+                    formats: vec!["default".to_string(), "long".to_string()],
+                })
+            }
+            Some(Message::Decorate(entry)) => {
+                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
+                {
+                    Ok(e) => e,
+                    Err(e) => {
+                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    }
+                };
 
-        match format {
-            "long" => {
-                let file_count = entry.custom_fields.get("file_count")?;
-                let dir_count = entry.custom_fields.get("dir_count")?;
-                let total_size = entry.custom_fields.get("total_size")?;
-
-                let modified = entry
-                    .path
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .and_then(|t| t.elapsed().ok())
-                    .map(|e| {
-                        let secs = e.as_secs();
-                        if secs < 60 {
-                            format!("{} secs ago", secs)
-                        } else if secs < 3600 {
-                            format!("{} mins ago", secs / 60)
-                        } else if secs < 86400 {
-                            format!("{} hours ago", secs / 3600)
-                        } else {
-                            format!("{} days ago", secs / 86400)
+                if entry.metadata.is_dir {
+                    if let Some((file_count, dir_count, total_size)) =
+                        Self::analyze_directory(&entry.path)
+                    {
+                        entry
+                            .custom_fields
+                            .insert("dir_file_count".to_string(), file_count.to_string());
+                        entry
+                            .custom_fields
+                            .insert("dir_subdir_count".to_string(), dir_count.to_string());
+                        entry
+                            .custom_fields
+                            .insert("dir_total_size".to_string(), Self::format_size(total_size));
+                    }
+                }
+                Message::DecoratedResponse(entry.into())
+            }
+            Some(Message::FormatField(req)) => {
+                let entry = match req.entry {
+                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
+                        Ok(entry) => entry,
+                        Err(e) => {
+                            return self.encode_error(&format!("Failed to convert entry: {}", e));
                         }
-                    })
-                    .unwrap_or_else(|| "unknown time".to_string());
+                    },
+                    None => return self.encode_error("Missing entry in format field request"),
+                };
 
-                Some(format!(
-                    "{} files, {} dirs, {} (modified {})",
-                    file_count.bright_cyan(),
-                    dir_count.bright_green(),
-                    total_size.bright_yellow(),
-                    modified.bright_magenta()
-                ))
-            }
-            "default" => {
-                let file_count = entry.custom_fields.get("file_count")?;
-                let total_size = entry.custom_fields.get("total_size")?;
-                Some(format!("{} files, {}", file_count, total_size))
-            }
-            _ => None,
-        }
-    }
+                if !entry.metadata.is_dir {
+                    Message::FieldResponse(proto::FormattedFieldResponse { field: None })
+                } else {
+                    let formatted = match req.format.as_str() {
+                        "long" => {
+                            if let (Some(file_count), Some(dir_count), Some(total_size)) = (
+                                entry.custom_fields.get("dir_file_count"),
+                                entry.custom_fields.get("dir_subdir_count"),
+                                entry.custom_fields.get("dir_total_size"),
+                            ) {
+                                let modified = entry
+                                    .path
+                                    .metadata()
+                                    .ok()
+                                    .and_then(|m| m.modified().ok())
+                                    .and_then(|t| t.elapsed().ok())
+                                    .map(|e| {
+                                        let secs = e.as_secs();
+                                        if secs < 60 {
+                                            format!("{} secs ago", secs)
+                                        } else if secs < 3600 {
+                                            format!("{} mins ago", secs / 60)
+                                        } else if secs < 86400 {
+                                            format!("{} hours ago", secs / 3600)
+                                        } else {
+                                            format!("{} days ago", secs / 86400)
+                                        }
+                                    })
+                                    .unwrap_or_else(|| "unknown time".to_string());
 
-    fn supported_formats(&self) -> Vec<&'static str> {
-        vec!["default", "long"]
+                                Some(format!(
+                                    "{} files, {} dirs, {} (modified {})",
+                                    file_count.bright_cyan(),
+                                    dir_count.bright_green(),
+                                    total_size.bright_yellow(),
+                                    modified.bright_magenta()
+                                ))
+                            } else {
+                                None
+                            }
+                        }
+                        "default" => {
+                            if let (Some(file_count), Some(total_size)) = (
+                                entry.custom_fields.get("dir_file_count"),
+                                entry.custom_fields.get("dir_total_size"),
+                            ) {
+                                Some(format!("{} files, {}", file_count, total_size))
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    };
+                    Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
+                }
+            }
+            Some(Message::Action(_req)) => Message::ActionResponse(proto::ActionResponse {
+                success: true,
+                error: None,
+            }),
+            _ => Message::ErrorResponse("Invalid request type".to_string()),
+        };
+
+        let response = proto::PluginMessage {
+            message: Some(response_msg),
+        };
+        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
+        response.encode(&mut buf).unwrap();
+        buf.to_vec()
     }
 }
 
-lla_plugin_interface::declare_plugin!(DirectorySummaryPlugin);
+lla_plugin_interface::declare_plugin!(DirsPlugin);

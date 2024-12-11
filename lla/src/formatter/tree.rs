@@ -1,10 +1,11 @@
 use super::FileFormatter;
-use crate::config::Config;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
+use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::utils::icons::format_with_icon;
 use colored::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
+use std::path::Path;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 enum TreePart {
@@ -28,14 +29,40 @@ impl TreePart {
     }
 }
 
-pub struct TreeFormatter;
+pub struct TreeFormatter {
+    pub show_icons: bool,
+}
 
 impl TreeFormatter {
-    fn format_entry(entry: &DecoratedEntry, prefix: &str, buf: &mut String) {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
+
+impl TreeFormatter {
+    fn format_entry(
+        entry: &DecoratedEntry,
+        prefix: &str,
+        plugin_manager: &mut PluginManager,
+        buf: &mut String,
+        show_icons: bool,
+    ) {
         buf.clear();
-        buf.reserve(prefix.len() + entry.path.as_os_str().len() + 1);
+        let path = Path::new(&entry.path);
+        buf.reserve(prefix.len() + path.as_os_str().len() + 1);
         buf.push_str(prefix);
-        buf.push_str(&colorize_file_name(&entry.path).to_string());
+        let colored_name = colorize_file_name(path).to_string();
+        buf.push_str(&colorize_file_name_with_icon(
+            path,
+            format_with_icon(path, colored_name, show_icons),
+        ));
+
+        let plugin_fields = plugin_manager.format_fields(entry, "tree").join(" ");
+        if !plugin_fields.is_empty() {
+            buf.push(' ');
+            buf.push_str(&plugin_fields);
+        }
+
         buf.push('\n');
     }
 }
@@ -90,7 +117,7 @@ impl FileFormatter for TreeFormatter {
     fn format_files(
         &self,
         files: &[DecoratedEntry],
-        _plugin_manager: &PluginManager,
+        plugin_manager: &mut PluginManager,
         max_depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -98,49 +125,36 @@ impl FileFormatter for TreeFormatter {
         }
 
         let mut trunk = TreeTrunk::default();
+        let mut prefix_buf = String::with_capacity(128);
+        let mut entry_buf = String::with_capacity(256);
+        let mut result = String::new();
 
         let mut entries: Vec<_> = files
             .iter()
-            .filter_map(|entry| {
-                let depth = entry.path.components().count() - 1;
-                if max_depth.map_or(true, |max| depth <= max) {
-                    Some((entry, depth, entry.path.clone()))
-                } else {
-                    None
-                }
+            .map(|entry| {
+                let path = Path::new(&entry.path);
+                let depth = path.components().count();
+                (entry, depth, path.to_path_buf())
             })
             .collect();
 
-        entries.sort_unstable_by(|a, b| a.2.cmp(&b.2));
+        entries.sort_by(|a, b| a.2.cmp(&b.2));
 
-        let config = Config::load(&Config::get_config_path()).unwrap_or_default();
-        let max_lines = config.formatters.tree.max_lines.unwrap_or(20_000);
-
-        let total_entries = entries.len();
-        let start_index = if max_lines > 0 && total_entries > max_lines {
-            eprintln!(
-                "Note: Showing only the last {} entries out of {}",
-                max_lines, total_entries
-            );
-            total_entries - max_lines
-        } else {
-            0
-        };
-
-        let entries = &entries[start_index..];
+        if let Some(max_depth) = max_depth {
+            entries.retain(|(_, depth, _)| *depth <= max_depth);
+        }
 
         let avg_line_len = entries
             .first()
             .map(|(e, d, _)| {
-                let name_len = e.path.file_name().map_or(0, |n| n.len());
+                let path = Path::new(&e.path);
+                let name_len = path.file_name().map_or(0, |n| n.len());
                 let prefix_len = *d * 4;
                 name_len + prefix_len + 1
             })
             .unwrap_or(64);
 
-        let mut result = String::with_capacity(entries.len() * avg_line_len);
-        let mut prefix_buf = String::with_capacity(128);
-        let mut entry_buf = String::with_capacity(256);
+        result.reserve(entries.len() * avg_line_len);
 
         const CHUNK_SIZE: usize = 8192;
         for chunk in entries.chunks(CHUNK_SIZE) {
@@ -149,13 +163,19 @@ impl FileFormatter for TreeFormatter {
                 let is_last = if i + 1 < chunk_len {
                     let (next_entry, next_depth, _) = &chunk[i + 1];
                     *depth > *next_depth
-                        || !next_entry.path.starts_with(path.parent().unwrap_or(path))
+                        || !Path::new(&next_entry.path).starts_with(path.parent().unwrap_or(path))
                 } else {
                     true
                 };
 
                 trunk.get_prefix(*depth, is_last, &mut prefix_buf);
-                Self::format_entry(entry, &prefix_buf, &mut entry_buf);
+                Self::format_entry(
+                    entry,
+                    &prefix_buf,
+                    plugin_manager,
+                    &mut entry_buf,
+                    self.show_icons,
+                );
                 result.push_str(&entry_buf);
             }
         }

@@ -1,12 +1,14 @@
 [package]
 name = "git_status"
 description = "Shows the git status of each file"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
 colored = "2.1.0"
+prost = "0.12"
+bytes = "1.5"
 
 [lib]
 crate-type = ["cdylib"]

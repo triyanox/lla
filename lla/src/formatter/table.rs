@@ -2,13 +2,25 @@ use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
 use crate::utils::color::*;
+use crate::utils::icons::format_with_icon;
 use colored::*;
-use lla_plugin_interface::DecoratedEntry;
+use lla_plugin_interface::proto::DecoratedEntry;
 use std::cmp;
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::time::{Duration, UNIX_EPOCH};
 use unicode_width::UnicodeWidthStr;
 
-pub struct TableFormatter;
+pub struct TableFormatter {
+    pub show_icons: bool,
+}
 
+impl TableFormatter {
+    pub fn new(show_icons: bool) -> Self {
+        Self { show_icons }
+    }
+}
 impl TableFormatter {
     const PADDING: usize = 1;
 
@@ -29,17 +41,23 @@ impl TableFormatter {
         ];
 
         for entry in files {
-            let perms = colorize_permissions(&entry.metadata.permissions());
+            let metadata = entry.metadata.as_ref().cloned().unwrap_or_default();
+            let perms = Permissions::from_mode(metadata.permissions);
+            let perms = colorize_permissions(&perms);
             widths[0] = cmp::max(widths[0], Self::visible_width(&perms));
 
-            let size: ColoredString = colorize_size(entry.metadata.len());
+            let size: ColoredString = colorize_size(metadata.size);
             widths[1] = cmp::max(widths[1], Self::visible_width(&size));
 
-            let date = colorize_date(&entry.metadata.modified().unwrap());
+            let modified = UNIX_EPOCH + Duration::from_secs(metadata.modified);
+            let date = colorize_date(&modified);
             widths[2] = cmp::max(widths[2], Self::visible_width(&date));
 
-            let name = colorize_file_name(&entry.path);
-            widths[3] = cmp::max(widths[3], Self::visible_width(&name));
+            let path = Path::new(&entry.path);
+            let colored_name = colorize_file_name(path).to_string();
+            let name_with_icon =
+                colorize_file_name_with_icon(path, format_with_icon(path, colored_name, true));
+            widths[3] = cmp::max(widths[3], Self::visible_width(&name_with_icon));
         }
 
         widths
@@ -117,8 +135,8 @@ impl TableFormatter {
 impl FileFormatter for TableFormatter {
     fn format_files(
         &self,
-        files: &[DecoratedEntry],
-        plugin_manager: &PluginManager,
+        files: &[lla_plugin_interface::proto::DecoratedEntry],
+        plugin_manager: &mut PluginManager,
         _depth: Option<usize>,
     ) -> Result<String> {
         if files.is_empty() {
@@ -136,12 +154,17 @@ impl FileFormatter for TableFormatter {
         output.push('\n');
 
         for entry in files {
-            let perms = colorize_permissions(&entry.metadata.permissions());
-            let size = colorize_size(entry.metadata.len());
-            let date = colorize_date(&entry.metadata.modified()?);
-            let name = colorize_file_name(&entry.path);
+            let metadata = entry.metadata.as_ref().cloned().unwrap_or_default();
+            let perms = Permissions::from_mode(metadata.permissions);
+            let perms = colorize_permissions(&perms);
+            let size = colorize_size(metadata.size);
+            let modified = UNIX_EPOCH + Duration::from_secs(metadata.modified);
+            let date = colorize_date(&modified);
+            let path = Path::new(&entry.path);
+            let colored_name = colorize_file_name(path).to_string();
+            let name = format_with_icon(path, colored_name, self.show_icons);
 
-            let plugin_fields = plugin_manager.format_fields(entry, "table").join(" ");
+            let plugin_fields = plugin_manager.format_fields(&entry, "table").join(" ");
             let plugin_suffix = if plugin_fields.is_empty() {
                 String::new()
             } else {
