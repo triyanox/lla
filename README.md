@@ -25,10 +25,9 @@
 - [Installation](#installation)
 - [Features](#features)
   - [Display Formats](#display-formats)
-  - [Intelligent Organization](#intelligent-organization)
-  - [Command Shortcuts](#command-shortcuts)
+  - [Core Features](#core-features)
 - [Usage](#usage)
-  - [Basic Commands](#basic-commands)
+  - [Command Reference](#command-reference)
   - [Filter System](#filter-system)
   - [Plugin System](#plugin-system)
 - [Configuration](#configuration)
@@ -125,7 +124,7 @@ Repository status and insights
 lla -G
 ```
 
-![git](https://github.com/user-attachments/assets/a0d68240-adfe-411b-90e3-8c6749c063b9)
+![git](https://github.com/user-attachments/assets/19ae3be6-4ddc-4415-ac09-9b0e72ece662)
 
 #### Timeline View
 
@@ -135,7 +134,7 @@ Group files by dates
 lla --timeline
 ```
 
-![timeline](https://github.com/user-attachments/assets/11cc4b85-8a53-457f-a0e6-38e3c9f83b83)
+![timeline](https://github.com/user-attachments/assets/2bb9f80c-3059-4362-9f47-378fb0a1db18)
 
 #### Sizemap View
 
@@ -145,7 +144,8 @@ Visualize file sizes relative to each other
 lla -S
 ```
 
-![sizemap](https://github.com/user-attachments/assets/11cc4b85-8a53-457f-a0e6-38e3c9f83b83)
+![sizemap](https://github.com/user-attachments/assets/9efc39a6-f21d-4b78-bad1-eb957beae6e9)
+
 
 #### Icons support
 
@@ -155,7 +155,7 @@ Icons are supported in all formats simply by using the `--icons` flag.
 lla --icons
 ```
 
-![icons](https://github.com/user-attachments/assets/11cc4b85-8a53-457f-a0e6-38e3c9f83b83)
+![icons](https://github.com/user-attachments/assets/be4f95c3-014a-427b-98a9-ef8e2aa53877)
 
 ### Core Features
 
