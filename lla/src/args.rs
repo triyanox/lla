@@ -231,15 +231,6 @@ impl Args {
                             .help("Install a plugin from a local directory"),
                     ),
             )
-            .arg(
-                Arg::with_name("plugin-arg")
-                    .long("plugin-arg")
-                    .takes_value(true)
-                    .multiple(true)
-                    .number_of_values(2)
-                    .value_names(&["PLUGIN", "ARG"])
-                    .help("Arguments to pass to specific plugins (e.g., --plugin-arg keyword_search -k=TODO)"),
-            )
             .subcommand(
                 SubCommand::with_name("plugin")
                     .about("Run a plugin action")
@@ -293,8 +284,7 @@ impl Args {
                     ),
             )
             .subcommand(
-                SubCommand::with_name("clean")
-                    .about("This command will clean up invalid plugins")
+                SubCommand::with_name("clean").about("This command will clean up invalid plugins"),
             )
             .subcommand(
                 SubCommand::with_name("shortcut")
