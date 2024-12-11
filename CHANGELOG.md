@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version checks for ABI compatibility
 - Comprehensive documentation for each plugin's usage
 - Enhanced plugin manager with support for new plugin interface
+- Plugin cleaning command to remove invalid plugins by running `lla clean`
 
 ### Changed
 
