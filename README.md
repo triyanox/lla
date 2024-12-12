@@ -52,7 +52,7 @@ paru -S lla
 pkgin install lla
 
 # Manual - Example is for amd64 GNU, replaces the file names if downloading for a different arch.
-wget -c https://github.com/triyanox/lla/releases/download/v0.3.0/lla-linux-amd64 -O lla
+wget -c https://github.com/triyanox/lla/releases/download/v0.3.1/lla-linux-amd64 -O lla
 sudo chmod +x lla
 sudo chown root:root lla
 sudo mv lla /usr/local/bin/lla
@@ -151,7 +151,6 @@ lla -S
 ```
 
 ![sizemap](https://github.com/user-attachments/assets/9efc39a6-f21d-4b78-bad1-eb957beae6e9)
-
 
 #### Icons support
 

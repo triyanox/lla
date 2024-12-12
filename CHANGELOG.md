@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2024-12-12
+
+### Added
+
+- Plugin system redesign:
+  - Protocol Buffers message passing architecture
+  - C API compatibility
+  - ABI version verification
+  - Improved documentation
+  - Enhanced plugin management interface
+  - Plugin cleanup command (`lla clean`)
+  - Improved plugin discovery and loading
+  - Plugin update functionality improved
+  - Improved the functionality and look of all plugins
+- Command shortcuts system:
+  - Store and manage plugin commands as shortcuts
+  - CLI commands for shortcut management (`lla shortcut add/remove/list`)
+  - Configuration file storage with descriptions
+  - Support for custom arguments
+  - Simplified command syntax
+- Sorting improvements:
+  - Reverse sorting (`-r`, `--sort-reverse`)
+  - Directory-first option (`--sort-dirs-first`)
+  - Case-sensitive sorting (`--sort-case-sensitive`)
+  - Natural number sorting (`--sort-natural`)
+- Filter system updates:
+  - Multiple pattern support with comma separation
+  - AND operations using `+` prefix
+  - Logical operations (AND, OR, NOT, XOR)
+  - Glob pattern matching
+  - Case sensitivity options
+- Additional features:
+  - Icon support across formats
+  - Updated `sizemap`, `timeline` and `git` views
+  - Selective plugin installation
+  - Command shortcut system
+
+### Changed
+
+- Performance optimizations for sorting
+- Improved filter matching
+- Plugin system reliability updates
+- Refined sizemap visualization
+- Updated plugin interfaces
+- Interface improvements
+- General stability enhancements
+
+### Fixed
+
+- Pregenerate protobuf bindings
+- Plugin ABI compatibility
+- Case-sensitive search behavior
+- Directory sorting issues
+- Numeric filename sorting
+
 ## [0.3.0] - 2024-12-11
 
 ### Added
