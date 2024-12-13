@@ -7,6 +7,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -74,16 +75,29 @@ impl InstallSummary {
 
     fn display(&self) {
         if !self.successful.is_empty() {
-            println!("\n{} Successfully installed:", "✨".green());
+            println!("Successfully installed:");
             for (name, version) in &self.successful {
-                println!("   {} {} ({})", "◉".green(), name, version);
+                println!(
+                    "  {} {} v{}",
+                    "✓".green(),
+                    name.bright_blue(),
+                    version.bright_black()
+                );
             }
         }
 
         if !self.failed.is_empty() {
-            println!("\n{} Failed to install:", "×".red());
+            if !self.successful.is_empty() {
+                println!();
+            }
+            println!("Failed to install:");
             for (name, error) in &self.failed {
-                println!("   {} {} ({})", "○".red(), name, error);
+                println!(
+                    "  {} {} - {}",
+                    "✗".red(),
+                    name.bright_blue(),
+                    error.bright_black()
+                );
             }
         }
     }
@@ -148,22 +162,10 @@ impl PluginInstaller {
     }
 
     fn create_progress_style() -> ProgressStyle {
-        ProgressStyle::default_bar()
-            .template("{prefix:.cyan} {spinner:.cyan} [{bar:30.cyan/blue}] {msg} {percent}%")
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
             .unwrap()
-            .progress_chars("━━╾─")
             .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
-    }
-
-    fn update_progress(
-        pb: &ProgressBar,
-        percent: u64,
-        msg: impl Into<String>,
-        _bytes: Option<u64>,
-    ) {
-        pb.set_position(percent);
-        pb.set_message(msg.into());
-        std::thread::sleep(Duration::from_millis(25));
     }
 
     fn select_plugins(&self, plugin_dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
@@ -178,7 +180,7 @@ impl PluginInstaller {
                 let version = self
                     .get_plugin_version(p)
                     .unwrap_or_else(|_| "unknown".to_string());
-                format!("{} {}", name.cyan(), format!("v{}", version).yellow(),)
+                format!("{} v{}", name, version)
             })
             .collect();
 
@@ -226,138 +228,20 @@ impl PluginInstaller {
             .collect())
     }
 
-    fn install_plugins(
-        &self,
-        root_dir: &Path,
-        repo_info: Option<(&str, &str)>,
-        pb: Option<&ProgressBar>,
-    ) -> Result<()> {
-        let plugin_dirs = self.find_plugin_directories(root_dir)?;
-        if plugin_dirs.is_empty() {
-            return Err(LlaError::Plugin(format!(
-                "No plugins found in {:?}",
-                root_dir
-            )));
-        }
-
-        let selected_plugins = self.select_plugins(&plugin_dirs)?;
-        let mut summary = InstallSummary::default();
-        let total_plugins = selected_plugins.len();
-
-        if let Some(pb) = pb {
-            Self::update_progress(pb, 5, format!("Found {} plugin(s)", total_plugins), None);
-        }
-
-        let progress_per_plugin = 95.0 / total_plugins as f64;
-
-        for (idx, plugin_dir) in selected_plugins.iter().enumerate() {
-            let plugin_name = plugin_dir
-                .file_name()
-                .and_then(|n| n.to_str())
-                .ok_or_else(|| LlaError::Plugin("Invalid plugin directory name".to_string()))?
-                .to_string();
-
-            let start_progress = 5 + (progress_per_plugin * idx as f64) as u64;
-            let end_progress = 5 + (progress_per_plugin * (idx + 1) as f64) as u64;
-
-            if let Some(pb) = pb {
-                Self::update_progress(
-                    pb,
-                    start_progress,
-                    format!("Installing {}", plugin_name),
-                    None,
-                );
-            }
-
-            match self.build_and_install_plugin(plugin_dir, pb, Some(start_progress)) {
-                Ok(_) => {
-                    let version = self.get_plugin_version(plugin_dir)?;
-                    let metadata = if let Some((repo_name, url)) = repo_info {
-                        PluginMetadata::new(
-                            plugin_name.clone(),
-                            version.clone(),
-                            PluginSource::Git {
-                                url: url.to_string(),
-                            },
-                            Some(repo_name.to_string()),
-                        )
-                    } else {
-                        PluginMetadata::new(
-                            plugin_name.clone(),
-                            version.clone(),
-                            PluginSource::Local {
-                                directory: root_dir.to_string_lossy().into_owned(),
-                            },
-                            None,
-                        )
-                    };
-
-                    if let Err(e) = self.update_plugin_metadata(&plugin_name, metadata) {
-                        summary.add_failure(plugin_name, format!("metadata error: {}", e));
-                    } else {
-                        summary.add_success(plugin_name, version);
-                    }
-                }
-                Err(e) => {
-                    summary.add_failure(plugin_name.clone(), e.to_string());
-                    if let Some(pb) = pb {
-                        Self::update_progress(
-                            pb,
-                            end_progress,
-                            format!("× {} failed", plugin_name),
-                            None,
-                        );
-                    }
-                }
-            }
-
-            if let Some(pb) = pb {
-                Self::update_progress(
-                    pb,
-                    end_progress,
-                    format!("Processed {}/{}", idx + 1, total_plugins),
-                    None,
-                );
-            }
-        }
-
-        if let Some(pb) = pb {
-            if summary.failed.is_empty() {
-                pb.finish_with_message(format!(
-                    "✨ Installed {} plugin(s)",
-                    summary.successful.len()
-                ));
-            } else {
-                pb.finish_with_message(format!(
-                    "⚠ Installed {}/{} plugin(s)",
-                    summary.successful.len(),
-                    total_plugins
-                ));
-            }
-        }
-
-        summary.display();
-
-        if !summary.failed.is_empty() {
-            Err(LlaError::Plugin(format!(
-                "{}/{} plugins failed to install",
-                summary.failed.len(),
-                total_plugins
-            )))
-        } else {
-            Ok(())
-        }
-    }
-
     pub fn install_from_git(&self, url: &str) -> Result<()> {
-        println!("{}", "Installing from Git Repository".cyan().bold());
+        println!("\n{}\n", "Installing from Git Repository".cyan().bold());
         let m = MultiProgress::new();
-        let pb = m.add(ProgressBar::new(100));
-        pb.set_style(Self::create_progress_style());
-        pb.set_prefix("│");
+
+        let pb = m.add(ProgressBar::new(1));
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        pb.set_message("Cloning repository...");
         pb.enable_steady_tick(Duration::from_millis(80));
 
-        Self::update_progress(&pb, 0, "Cloning repository", None);
         let temp_dir = tempfile::tempdir()?;
         let repo_name = url
             .split('/')
@@ -365,61 +249,55 @@ impl PluginInstaller {
             .ok_or_else(|| LlaError::Plugin(format!("Invalid GitHub URL: {}", url)))?
             .trim_end_matches(".git");
 
-        let size_output = Command::new("git").args(["ls-remote", url]).output().ok();
-
-        let repo_size = size_output
-            .and_then(|output| String::from_utf8(output.stdout).ok())
-            .map(|s| s.len() as u64 * 100)
-            .unwrap_or(0);
-
-        Self::update_progress(&pb, 10, "Downloading", Some(repo_size));
-
-        let output = Command::new("git")
-            .args(["clone", "--quiet", "--progress", url])
+        let mut child = Command::new("git")
+            .args(["clone", "--quiet", url])
             .current_dir(&temp_dir)
-            .output()?;
+            .spawn()?;
 
-        if !output.status.success() {
-            pb.finish_with_message("× Clone failed");
-            return Err(LlaError::Plugin(format!(
-                "Failed to clone repository: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
+        let status = child.wait()?;
+        if !status.success() {
+            pb.finish_with_message("Clone failed");
+            return Err(LlaError::Plugin("Failed to clone repository".to_string()));
         }
 
-        Self::update_progress(&pb, 30, "Finding plugins", None);
-        self.install_plugins(
+        pb.finish_and_clear();
+        drop(pb);
+
+        let result = self.install_plugins(
             &temp_dir.path().join(repo_name),
             Some((repo_name, url)),
-            Some(&pb),
-        )
+            Some(&m),
+        );
+
+        m.clear()?;
+        println!();
+
+        result
     }
 
     pub fn install_from_directory(&self, dir: &str) -> Result<()> {
-        println!("{}", "Installing from Directory".cyan().bold());
+        println!("\n{}\n", "Installing from Directory".cyan().bold());
         let m = MultiProgress::new();
-        let pb = m.add(ProgressBar::new(100));
-        pb.set_style(Self::create_progress_style());
-        pb.set_prefix("│");
-        pb.enable_steady_tick(Duration::from_millis(80));
 
-        pb.set_message("Checking source");
         let source_dir = PathBuf::from(dir.trim_end_matches('/'))
             .canonicalize()
             .map_err(|_| LlaError::Plugin(format!("Directory not found: {}", dir)))?;
 
         if !source_dir.exists() || !source_dir.is_dir() {
-            pb.finish_with_message("× Invalid directory");
             return Err(LlaError::Plugin(format!("Not a valid directory: {}", dir)));
         }
 
-        pb.inc(30);
-        pb.set_message("Finding plugins");
-        self.install_plugins(&source_dir, None, Some(&pb))
+        let result = self.install_plugins(&source_dir, None, Some(&m));
+
+        m.clear()?;
+
+        result
     }
 
     fn is_workspace_member(&self, plugin_dir: &Path) -> Result<Option<PathBuf>> {
         let mut current_dir = plugin_dir.to_path_buf();
+        let plugin_name = Self::get_display_name(plugin_dir);
+
         while let Some(parent) = current_dir.parent() {
             let workspace_cargo = parent.join("Cargo.toml");
             if workspace_cargo.exists() {
@@ -431,7 +309,12 @@ impl PluginInstaller {
                             if contents.contains(&format!("\"{}\"", rel_path_str))
                                 || contents.contains(&format!("'{}'", rel_path_str))
                             {
-                                println!("🔍 Plugin is direct workspace member at {:?}", parent);
+                                println!("🔍 Plugin is in a workspace member");
+                                println!(
+                                    "  ✓ Found {} in workspace at {:?}",
+                                    plugin_name.bright_blue(),
+                                    parent
+                                );
                                 return Ok(Some(parent.to_path_buf()));
                             }
                             if contents.contains("members = [") {
@@ -450,9 +333,11 @@ impl PluginInstaller {
 
                                 for pattern in patterns {
                                     if contents.contains(&pattern) {
+                                        println!("🔍 Plugin is in a workspace member");
                                         println!(
-                                            "🔍 Plugin is in workspace member directory at {}",
-                                            parent.display()
+                                            "  ✓ Found {} in workspace pattern {}",
+                                            plugin_name.bright_blue(),
+                                            pattern.bright_black()
                                         );
                                         return Ok(Some(parent.to_path_buf()));
                                     }
@@ -464,7 +349,11 @@ impl PluginInstaller {
             }
             current_dir = parent.to_path_buf();
         }
-        println!("🔍 Plugin is standalone");
+        println!(" Plugin is standalone");
+        println!(
+            "  ℹ {} will be built independently",
+            plugin_name.bright_blue()
+        );
         Ok(None)
     }
 
@@ -496,8 +385,14 @@ impl PluginInstaller {
                             if cargo_toml.exists() {
                                 if let Ok(contents) = fs::read_to_string(&cargo_toml) {
                                     if contents.contains("lla_plugin_interface") {
-                                        found_plugins.push(Self::get_display_name(path));
-                                        plugin_dirs.push(path.to_path_buf());
+                                        let name = Self::get_display_name(path);
+                                        if name != "lla_plugin_interface" {
+                                            if let Ok(version) = self.get_plugin_version(path) {
+                                                found_plugins
+                                                    .push(format!("{} v{}", name, version));
+                                                plugin_dirs.push(path.to_path_buf());
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -527,8 +422,13 @@ impl PluginInstaller {
                 if cargo_toml.exists() {
                     if let Ok(contents) = fs::read_to_string(&cargo_toml) {
                         if contents.contains("lla_plugin_interface") {
-                            found_plugins.push(Self::get_display_name(path));
-                            plugin_dirs.push(path.to_path_buf());
+                            let name = Self::get_display_name(path);
+                            if name != "lla_plugin_interface" {
+                                if let Ok(version) = self.get_plugin_version(path) {
+                                    found_plugins.push(format!("{} v{}", name, version));
+                                    plugin_dirs.push(path.to_path_buf());
+                                }
+                            }
                         }
                     }
                 }
@@ -574,80 +474,178 @@ impl PluginInstaller {
         &self,
         plugin_dir: &Path,
         pb: Option<&ProgressBar>,
-        base_progress: Option<u64>,
+        _base_progress: Option<u64>,
     ) -> Result<()> {
         let plugin_name = Self::get_display_name(plugin_dir);
-        let base = base_progress.unwrap_or(0);
-        let step = 15;
 
-        if let Some(pb) = pb {
-            Self::update_progress(pb, base + 1, format!("building {}", plugin_name), None);
-        }
-
-        let (build_dir, build_args) =
-            if let Some(workspace_root) = self.is_workspace_member(plugin_dir)? {
+        let (build_dir, build_args) = match self.is_workspace_member(plugin_dir)? {
+            Some(workspace_root) => {
+                if let Some(pb) = pb {
+                    pb.set_message(format!("Building {} in workspace", plugin_name));
+                }
                 (
                     workspace_root,
                     vec!["build", "--release", "-p", &plugin_name],
                 )
-            } else {
+            }
+            None => {
+                if let Some(pb) = pb {
+                    pb.set_message(format!("Building {}", plugin_name));
+                }
                 (plugin_dir.to_path_buf(), vec!["build", "--release"])
-            };
+            }
+        };
 
-        let output = Command::new("cargo")
+        let mut child = Command::new("cargo")
             .args(&build_args)
             .current_dir(&build_dir)
-            .output()?;
-
-        if !output.status.success() {
-            if let Some(pb) = pb {
-                pb.finish_with_message(format!("❌ {} build failed", plugin_name));
-            }
-            return Err(LlaError::Plugin(format!(
-                "Build failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
 
         if let Some(pb) = pb {
-            Self::update_progress(
-                pb,
-                base + step * 2,
-                format!("installing {}", plugin_name),
-                None,
-            );
+            if let Some(stderr) = child.stderr.take() {
+                let reader = std::io::BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        if line.contains("Compiling") {
+                            pb.set_message(format!("Building {}", plugin_name));
+                        }
+                    }
+                }
+            }
+        }
+
+        let status = child.wait()?;
+        if !status.success() {
+            return Err(LlaError::Plugin("Build failed".to_string()));
         }
 
         let target_dir = build_dir.join("target").join("release");
         let plugin_files = self.find_plugin_files(&target_dir, &plugin_name)?;
 
         if plugin_files.is_empty() {
-            if let Some(pb) = pb {
-                pb.finish_with_message(format!("❌ {} no files found", plugin_name));
-            }
             return Err(LlaError::Plugin(format!(
                 "No plugin files found for '{}'",
                 plugin_name
             )));
         }
 
+        if let Some(pb) = pb {
+            pb.set_message(format!("Installing {}", plugin_name));
+        }
+
         fs::create_dir_all(&self.plugins_dir)?;
 
-        for plugin_file in plugin_files {
+        for plugin_file in plugin_files.iter() {
             let dest_path = self.plugins_dir.join(plugin_file.file_name().unwrap());
             fs::copy(&plugin_file, &dest_path)?;
         }
 
-        if let Some(pb) = pb {
-            Self::update_progress(
-                pb,
-                base + step * 4,
-                format!("✓ {} installed", plugin_name),
-                None,
-            );
+        println!("  ✓ Successfully installed {}", plugin_name.bright_blue());
+        Ok(())
+    }
+
+    fn install_plugins(
+        &self,
+        root_dir: &Path,
+        repo_info: Option<(&str, &str)>,
+        multi_progress: Option<&MultiProgress>,
+    ) -> Result<()> {
+        let plugin_dirs = self.find_plugin_directories(root_dir)?;
+        if plugin_dirs.is_empty() {
+            return Err(LlaError::Plugin(format!(
+                "No plugins found in {:?}",
+                root_dir
+            )));
         }
 
-        Ok(())
+        let selected_plugins = self.select_plugins(&plugin_dirs)?;
+        let mut summary = InstallSummary::default();
+        let total_plugins = selected_plugins.len();
+
+        for plugin_dir in selected_plugins.iter() {
+            let plugin_name = Self::get_display_name(plugin_dir);
+
+            let progress_bar = if let Some(m) = multi_progress {
+                let pb = m.add(ProgressBar::new(1));
+                pb.set_style(Self::create_progress_style());
+                pb.enable_steady_tick(Duration::from_millis(80));
+                pb.set_message(format!("Setting up {}", plugin_name));
+                Some(pb)
+            } else {
+                None
+            };
+
+            match self.build_and_install_plugin(plugin_dir, progress_bar.as_ref(), None) {
+                Ok(_) => {
+                    let version = self.get_plugin_version(plugin_dir)?;
+                    let metadata = if let Some((repo_name, url)) = repo_info {
+                        PluginMetadata::new(
+                            plugin_name.clone(),
+                            version.clone(),
+                            PluginSource::Git {
+                                url: url.to_string(),
+                            },
+                            Some(repo_name.to_string()),
+                        )
+                    } else {
+                        let canonical_path = plugin_dir.canonicalize().map_err(|e| {
+                            LlaError::Plugin(format!("Failed to resolve plugin path: {}", e))
+                        })?;
+                        PluginMetadata::new(
+                            plugin_name.clone(),
+                            version.clone(),
+                            PluginSource::Local {
+                                directory: canonical_path.to_string_lossy().into_owned(),
+                            },
+                            None,
+                        )
+                    };
+
+                    if let Err(e) = self.update_plugin_metadata(&plugin_name, metadata) {
+                        summary.add_failure(plugin_name.clone(), format!("metadata error: {}", e));
+                        if let Some(ref pb) = progress_bar {
+                            pb.finish_with_message(format!("Failed to install {}", plugin_name));
+                        }
+                    } else {
+                        summary.add_success(plugin_name.clone(), version.clone());
+                        if let Some(ref pb) = progress_bar {
+                            pb.finish_with_message(format!(
+                                "✓ Installed {} v{}",
+                                plugin_name, version
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    summary.add_failure(plugin_name.clone(), e.to_string());
+                    if let Some(ref pb) = progress_bar {
+                        pb.finish_with_message(format!("✗ Failed to install {}", plugin_name));
+                    }
+                }
+            }
+
+            if let Some(ref pb) = progress_bar {
+                pb.finish_and_clear();
+            }
+        }
+
+        if let Some(m) = multi_progress {
+            m.clear()?;
+        }
+
+        println!("\nInstallation Summary");
+        summary.display();
+
+        if !summary.failed.is_empty() {
+            Err(LlaError::Plugin(format!(
+                "{}/{} plugins failed to install",
+                summary.failed.len(),
+                total_plugins
+            )))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn update_plugins(&self, plugin_name: Option<&str>) -> Result<()> {
@@ -674,25 +672,24 @@ impl PluginInstaller {
         println!("{} {} plugin(s)", style("📦").green(), plugins.len());
 
         let m = MultiProgress::new();
-        let sty = Self::create_progress_style();
+        let sty = ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
 
         let mut success = false;
-        let handles: Vec<std::thread::JoinHandle<()>> = vec![];
-
         for (name, metadata) in plugins {
-            let pb = m.add(ProgressBar::new(100));
+            let pb = m.add(ProgressBar::new(1));
             pb.set_style(sty.clone());
-            pb.set_prefix(format!("🔄 {}", name));
             pb.enable_steady_tick(Duration::from_millis(80));
-            Self::update_progress(&pb, 0, "preparing", None);
+            pb.set_message(format!("Updating {}", name));
 
             match &metadata.source {
                 PluginSource::Git { url } => {
-                    Self::update_progress(&pb, 10, "cloning repository", None);
                     let temp_dir = match tempfile::tempdir() {
                         Ok(dir) => dir,
                         Err(e) => {
-                            pb.finish_with_message(format!("❌ failed: {}", e));
+                            pb.finish_with_message(format!("✗ Failed: {}", e));
                             continue;
                         }
                     };
@@ -703,11 +700,10 @@ impl PluginInstaller {
                         .output()?;
 
                     if !output.status.success() {
-                        pb.finish_with_message("❌ clone failed");
+                        pb.finish_with_message(format!("✗ Failed to clone {}", name));
                         continue;
                     }
 
-                    Self::update_progress(&pb, 30, "locating plugin", None);
                     let repo_name = url
                         .split('/')
                         .last()
@@ -730,11 +726,14 @@ impl PluginInstaller {
 
                                 if new_version != metadata.version {
                                     pb.finish_with_message(format!(
-                                        "✨ {} → {}",
-                                        metadata.version, new_version
+                                        "✓ Updated {} {} → {}",
+                                        name, metadata.version, new_version
                                     ));
                                 } else {
-                                    pb.finish_with_message(format!("✨ {}", new_version));
+                                    pb.finish_with_message(format!(
+                                        "✓ {} is up to date ({})",
+                                        name, new_version
+                                    ));
                                 }
 
                                 updated_metadata.version = new_version;
@@ -743,23 +742,24 @@ impl PluginInstaller {
                                 success = true;
                             }
                             Err(e) => {
-                                pb.finish_with_message(format!("❌ build failed: {}", e));
+                                pb.finish_with_message(format!(
+                                    "✗ Failed to build {}: {}",
+                                    name, e
+                                ));
                             }
                         }
                     } else {
-                        pb.finish_with_message("❌ plugin not found in repo");
+                        pb.finish_with_message(format!("✗ {} not found in repository", name));
                     }
                 }
                 PluginSource::Local { directory } => {
-                    Self::update_progress(&pb, 10, "checking source", None);
                     let source_dir = PathBuf::from(directory);
 
                     if !source_dir.exists() {
-                        pb.finish_with_message("❌ source not found");
+                        pb.finish_with_message(format!("✗ Source not found for {}", name));
                         continue;
                     }
 
-                    pb.inc(40);
                     match self.build_and_install_plugin(&source_dir, Some(&pb), None) {
                         Ok(_) => {
                             let new_version = self.get_plugin_version(&source_dir)?;
@@ -767,11 +767,14 @@ impl PluginInstaller {
 
                             if new_version != metadata.version {
                                 pb.finish_with_message(format!(
-                                    "✨ {} → {}",
-                                    metadata.version, new_version
+                                    "✓ Updated {} {} → {}",
+                                    name, metadata.version, new_version
                                 ));
                             } else {
-                                pb.finish_with_message(format!("✨ {}", new_version));
+                                pb.finish_with_message(format!(
+                                    "✓ {} is up to date ({})",
+                                    name, new_version
+                                ));
                             }
 
                             updated_metadata.version = new_version;
@@ -780,29 +783,19 @@ impl PluginInstaller {
                             success = true;
                         }
                         Err(e) => {
-                            pb.finish_with_message(format!("❌ build failed: {}", e));
+                            pb.finish_with_message(format!("✗ Failed to build {}: {}", name, e));
                         }
                     }
                 }
             }
         }
 
-        for handle in handles {
-            let _ = handle.join();
-        }
-
         if success {
-            println!("\n{} Update complete", style("✅").green());
             Ok(())
         } else if let Some(name) = plugin_name {
-            Err(LlaError::Plugin(format!(
-                "Failed to update plugin: {}",
-                name
-            )))
+            Err(LlaError::Plugin(format!("Failed to update {}", name)))
         } else {
-            Err(LlaError::Plugin(
-                "No plugins were successfully updated".to_string(),
-            ))
+            Err(LlaError::Plugin("No plugins were updated".to_string()))
         }
     }
 }
