@@ -1,10 +1,10 @@
-use crate::args::{Args, Command, ConfigAction, InstallSource, ShortcutAction};
+use crate::commands::args::{Args, Command, ConfigAction, InstallSource, ShortcutAction};
+use crate::commands::file_utils::list_directory;
+use crate::commands::plugin_utils::{handle_plugin_action, list_plugins};
 use crate::config::{self, Config};
 use crate::error::{LlaError, Result};
-use crate::file_utils::list_directory;
 use crate::installer::PluginInstaller;
 use crate::plugin::PluginManager;
-use crate::plugin_utils::{handle_plugin_action, list_plugins};
 use colored::*;
 
 pub fn handle_command(

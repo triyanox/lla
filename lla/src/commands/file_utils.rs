@@ -1,4 +1,4 @@
-use crate::args::Args;
+use crate::commands::args::Args;
 use crate::config::Config;
 use crate::error::Result;
 use crate::filter::{
@@ -249,4 +249,4 @@ pub fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
     } else {
         Box::new(DefaultFormatter::new(args.show_icons))
     }
-} 
+}

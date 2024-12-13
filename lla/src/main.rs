@@ -1,19 +1,16 @@
-mod args;
-mod command_handler;
+mod commands;
 mod config;
 mod error;
-mod file_utils;
 mod filter;
 mod formatter;
 mod installer;
 mod lister;
 mod plugin;
-mod plugin_utils;
 mod sorter;
 mod utils;
 
-use args::{Args, Command};
-use command_handler::handle_command;
+use commands::args::{Args, Command};
+use commands::command_handler::handle_command;
 use config::Config;
 use error::Result;
 use plugin::PluginManager;
