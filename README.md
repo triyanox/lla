@@ -351,23 +351,59 @@ The configuration file is located at `~/.config/lla/config.toml`. You can modify
 **Configuration File Format:**
 
 ```toml
-# Core Settings
-default_sort = "name"          # Possible values: "name", "size", "date"
-default_format = "default"     # Possible values: "default", "long", "tree", "grid"
-enabled_plugins = ["git_status", "file_hash"]  # List of enabled plugins
-plugins_dir = "/home/user/.config/lla/plugins" # Plugin directory location
-default_depth = 3              # Default depth for recursive listing
+# Default sorting method for file listings
+# Possible values: "name", "size", "date"
+default_sort = "name"
 
-# Performance Tuning
+# Default format for displaying files
+# Possible values: "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table"
+default_format = "default"
+
+# Whether to show icons by default
+# When true, file and directory icons will be displayed in all views
+show_icons = false
+
+# List of enabled plugins
+enabled_plugins = []
+
+# Directory where plugins are stored
+plugins_dir = "~/.config/lla/plugins"
+
+# Maximum depth for recursive directory traversal
+# Set to null for unlimited depth (may impact performance)
+default_depth = 3
+
+# Sorting configuration
+[sort]
+# List directories before files
+dirs_first = false
+
+# Enable case-sensitive sorting
+case_sensitive = false
+
+# Use natural sorting for numbers (e.g., 2.txt before 10.txt)
+natural = true
+
+# Filtering configuration
+[filter]
+# Enable case-sensitive filtering by default
+case_sensitive = false
+
+# Formatter-specific configurations
 [formatters.tree]
-max_lines = 20000             # Maximum entries in tree view
-                             # Set to 0 for unlimited (may impact performance)
+# Maximum number of entries to display in tree view
+# Controls memory usage and performance for large directories
+# Set to 0 to show all entries (may impact performance)
+max_lines = 20000
 
+# Lister-specific configurations
 [listers.recursive]
-max_entries = 20000          # Maximum entries in recursive listing
-                             # Set to 0 for unlimited (may impact performance)
+# Maximum number of entries to process in recursive listing
+# Controls memory usage and performance for deep directory structures
+# Set to 0 to process all entries (may impact performance)
+max_entries = 20000
 
-# Command Shortcuts
+# Command shortcuts
 [shortcuts]
 find = { plugin_name = "finder", action = "search", description = "Quick file search" }
 ```
@@ -384,8 +420,10 @@ lla config               # Display current configuration
 # Modify settings
 lla config --set default_sort size
 lla config --set default_format long
-lla config --set plugins_dir /custom/path
-lla config --set default_depth 5
+lla config --set show_icons true
+lla config --set sort.dirs_first true
+lla config --set sort.case_sensitive true
+lla config --set filter.case_sensitive true
 
 # Manage shortcuts
 lla shortcut add NAME PLUGIN ACTION [-d DESCRIPTION]  # Add shortcut

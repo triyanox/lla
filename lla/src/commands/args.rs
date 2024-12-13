@@ -50,6 +50,7 @@ pub enum ShortcutAction {
     Run(String, Vec<String>),
 }
 
+#[derive(Clone)]
 pub enum ConfigAction {
     View,
     Set(String, String),
@@ -63,22 +64,22 @@ impl Args {
             if config.get_shortcut(potential_shortcut).is_some() {
                 return Self {
                     directory: ".".to_string(),
-                    depth: None,
-                    long_format: false,
-                    tree_format: false,
-                    table_format: false,
-                    grid_format: false,
-                    sizemap_format: false,
-                    timeline_format: false,
-                    git_format: false,
-                    show_icons: false,
-                    sort_by: "name".to_string(),
+                    depth: config.default_depth,
+                    long_format: config.default_format == "long",
+                    tree_format: config.default_format == "tree",
+                    table_format: config.default_format == "table",
+                    grid_format: config.default_format == "grid",
+                    sizemap_format: config.default_format == "sizemap",
+                    timeline_format: config.default_format == "timeline",
+                    git_format: config.default_format == "git",
+                    show_icons: config.show_icons,
+                    sort_by: config.default_sort.clone(),
                     sort_reverse: false,
-                    sort_dirs_first: false,
-                    sort_case_sensitive: false,
-                    sort_natural: false,
+                    sort_dirs_first: config.sort.dirs_first,
+                    sort_case_sensitive: config.sort.case_sensitive,
+                    sort_natural: config.sort.natural,
                     filter: None,
-                    case_sensitive: false,
+                    case_sensitive: config.filter.case_sensitive,
                     enable_plugin: Vec::new(),
                     disable_plugin: Vec::new(),
                     plugins_dir: config.plugins_dir.clone(),
@@ -105,53 +106,58 @@ impl Args {
                     .short('d')
                     .long("depth")
                     .takes_value(true)
-                    .help("Set the depth for tree listing"),
+                    .help("Set the depth for tree listing (default from config)"),
             )
             .arg(
                 Arg::with_name("long")
                     .short('l')
                     .long("long")
-                    .help("Use long listing format"),
+                    .help("Use long listing format (overrides config format)"),
             )
             .arg(
                 Arg::with_name("tree")
                     .short('t')
                     .long("tree")
-                    .help("Use tree listing format"),
+                    .help("Use tree listing format (overrides config format)"),
             )
             .arg(
                 Arg::with_name("table")
                     .short('T')
                     .long("table")
-                    .help("Use table listing format"),
+                    .help("Use table listing format (overrides config format)"),
             )
             .arg(
                 Arg::with_name("grid")
                     .short('g')
                     .long("grid")
-                    .help("Use grid listing format"),
+                    .help("Use grid listing format (overrides config format)"),
             )
             .arg(
                 Arg::with_name("sizemap")
                     .short('S')
                     .long("sizemap")
-                    .help("Show visual representation of file sizes"),
+                    .help("Show visual representation of file sizes (overrides config format)"),
             )
             .arg(
                 Arg::with_name("timeline")
                     .long("timeline")
-                    .help("Group files by time periods"),
+                    .help("Group files by time periods (overrides config format)"),
             )
             .arg(
                 Arg::with_name("git")
                     .short('G')
                     .long("git")
-                    .help("Show git status and information"),
+                    .help("Show git status and information (overrides config format)"),
             )
             .arg(
                 Arg::with_name("icons")
                     .long("icons")
-                    .help("Show icons for files and directories"),
+                    .help("Show icons for files and directories (overrides config setting)"),
+            )
+            .arg(
+                Arg::with_name("no-icons")
+                    .long("no-icons")
+                    .help("Hide icons for files and directories (overrides config setting)"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -170,17 +176,17 @@ impl Args {
             .arg(
                 Arg::with_name("sort-dirs-first")
                     .long("sort-dirs-first")
-                    .help("List directories before files"),
+                    .help("List directories before files (overrides config setting)"),
             )
             .arg(
                 Arg::with_name("sort-case-sensitive")
                     .long("sort-case-sensitive")
-                    .help("Enable case-sensitive sorting"),
+                    .help("Enable case-sensitive sorting (overrides config setting)"),
             )
             .arg(
                 Arg::with_name("sort-natural")
                     .long("sort-natural")
-                    .help("Use natural sorting for numbers (e.g., 2.txt before 10.txt)"),
+                    .help("Use natural sorting for numbers (overrides config setting)"),
             )
             .arg(
                 Arg::with_name("filter")
@@ -193,7 +199,7 @@ impl Args {
                 Arg::with_name("case-sensitive")
                     .short('c')
                     .long("case-sensitive")
-                    .help("Enable case-sensitive filtering"),
+                    .help("Enable case-sensitive filtering (overrides config setting)"),
             )
             .arg(
                 Arg::with_name("enable-plugin")
@@ -403,22 +409,30 @@ impl Args {
 
         Args {
             directory: matches.value_of("directory").unwrap_or(".").to_string(),
-            depth: matches.value_of("depth").and_then(|s| s.parse().ok()),
-            long_format: matches.is_present("long"),
-            tree_format: matches.is_present("tree"),
-            table_format: matches.is_present("table"),
-            grid_format: matches.is_present("grid"),
-            sizemap_format: matches.is_present("sizemap"),
-            timeline_format: matches.is_present("timeline"),
-            git_format: matches.is_present("git"),
-            show_icons: matches.is_present("icons"),
-            sort_by: matches.value_of("sort").unwrap_or("name").to_string(),
+            depth: matches
+                .value_of("depth")
+                .and_then(|s| s.parse().ok())
+                .or(config.default_depth),
+            long_format: matches.is_present("long") || config.default_format == "long",
+            tree_format: matches.is_present("tree") || config.default_format == "tree",
+            table_format: matches.is_present("table") || config.default_format == "table",
+            grid_format: matches.is_present("grid") || config.default_format == "grid",
+            sizemap_format: matches.is_present("sizemap") || config.default_format == "sizemap",
+            timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
+            git_format: matches.is_present("git") || config.default_format == "git",
+            show_icons: matches.is_present("icons")
+                || (!matches.is_present("no-icons") && config.show_icons),
+            sort_by: matches
+                .value_of("sort")
+                .unwrap_or(&config.default_sort)
+                .to_string(),
             sort_reverse: matches.is_present("sort-reverse"),
-            sort_dirs_first: matches.is_present("sort-dirs-first"),
-            sort_case_sensitive: matches.is_present("sort-case-sensitive"),
-            sort_natural: matches.is_present("sort-natural"),
+            sort_dirs_first: matches.is_present("sort-dirs-first") || config.sort.dirs_first,
+            sort_case_sensitive: matches.is_present("sort-case-sensitive")
+                || config.sort.case_sensitive,
+            sort_natural: matches.is_present("sort-natural") || config.sort.natural,
             filter: matches.value_of("filter").map(String::from),
-            case_sensitive: matches.is_present("case-sensitive"),
+            case_sensitive: matches.is_present("case-sensitive") || config.filter.case_sensitive,
             enable_plugin: matches
                 .values_of("enable-plugin")
                 .map(|v| v.map(String::from).collect())

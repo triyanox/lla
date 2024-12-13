@@ -32,10 +32,7 @@ fn main() -> Result<()> {
 fn load_config() -> Result<(Config, Option<error::LlaError>)> {
     match Config::load(&Config::get_config_path()) {
         Ok(config) => Ok((config, None)),
-        Err(e) => {
-            let error = error::LlaError::Config(format!("Failed to load config: {}", e));
-            Ok((Config::default(), Some(error)))
-        }
+        Err(e) => Ok((Config::default(), Some(e))),
     }
 }
 

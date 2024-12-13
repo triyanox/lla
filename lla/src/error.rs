@@ -1,11 +1,35 @@
+use colored::*;
 use std::fmt;
 use std::io;
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum ConfigErrorKind {
+    InvalidFormat(String),
+    InvalidValue(String, String),
+    MissingField(String),
+    InvalidPath(String),
+    ValidationError(String),
+}
+
+impl fmt::Display for ConfigErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigErrorKind::InvalidFormat(msg) => write!(f, "{}", msg),
+            ConfigErrorKind::InvalidValue(field, msg) => write!(f, "{}: {}", field.bold(), msg),
+            ConfigErrorKind::MissingField(field) => write!(f, "missing field: {}", field.bold()),
+            ConfigErrorKind::InvalidPath(path) => write!(f, "invalid path: {}", path.bold()),
+            ConfigErrorKind::ValidationError(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum LlaError {
     Io(io::Error),
     Parse(String),
-    Config(String),
+    Config(ConfigErrorKind),
     Plugin(String),
     Filter(String),
 }
@@ -13,11 +37,11 @@ pub enum LlaError {
 impl fmt::Display for LlaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LlaError::Io(err) => write!(f, "I/O error: {}", err),
-            LlaError::Parse(msg) => write!(f, "Parse error: {}", msg),
-            LlaError::Config(msg) => write!(f, "Configuration error: {}", msg),
-            LlaError::Plugin(msg) => write!(f, "Plugin error: {}", msg),
-            LlaError::Filter(msg) => write!(f, "Filter error: {}", msg),
+            LlaError::Io(err) => write!(f, "{}", err),
+            LlaError::Parse(msg) => write!(f, "{}", msg),
+            LlaError::Config(kind) => write!(f, "{}", kind),
+            LlaError::Plugin(msg) => write!(f, "{}", msg),
+            LlaError::Filter(msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -39,13 +63,13 @@ impl From<io::Error> for LlaError {
 
 impl From<toml::de::Error> for LlaError {
     fn from(err: toml::de::Error) -> Self {
-        LlaError::Parse(err.to_string())
+        LlaError::Config(ConfigErrorKind::InvalidFormat(err.to_string()))
     }
 }
 
 impl From<dialoguer::Error> for LlaError {
     fn from(err: dialoguer::Error) -> Self {
-        LlaError::Plugin(format!("Interactive mode error: {}", err))
+        LlaError::Plugin(format!("interactive mode error: {}", err))
     }
 }
 

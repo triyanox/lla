@@ -1,4 +1,4 @@
-use crate::commands::args::{Args, Command, ConfigAction, InstallSource, ShortcutAction};
+use crate::commands::args::{Args, Command, InstallSource, ShortcutAction};
 use crate::commands::file_utils::list_directory;
 use crate::commands::plugin_utils::{handle_plugin_action, list_plugins};
 use crate::config::{self, Config};
@@ -23,7 +23,7 @@ pub fn handle_command(
         Some(Command::ListPlugins) => list_plugins(plugin_manager),
         Some(Command::Use) => list_plugins(plugin_manager),
         Some(Command::InitConfig) => config::initialize_config(),
-        Some(Command::Config(action)) => handle_config_action(action),
+        Some(Command::Config(action)) => config::handle_config_command(action.clone()),
         Some(Command::PluginAction(plugin_name, action, action_args)) => {
             plugin_manager.perform_plugin_action(plugin_name, action, action_args)
         }
@@ -95,13 +95,5 @@ fn handle_install(source: &InstallSource, args: &Args) -> Result<()> {
     match source {
         InstallSource::GitHub(url) => installer.install_from_git(url),
         InstallSource::LocalDir(dir) => installer.install_from_directory(dir),
-    }
-}
-
-fn handle_config_action(action: &Option<ConfigAction>) -> Result<()> {
-    match action {
-        Some(ConfigAction::View) => config::view_config(),
-        Some(ConfigAction::Set(key, value)) => config::update_config(key, value),
-        None => config::view_config(),
     }
 }
