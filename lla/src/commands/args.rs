@@ -368,13 +368,9 @@ impl Args {
                 Some(Command::Install(InstallSource::GitHub(
                     github_url.to_string(),
                 )))
-            } else if let Some(local_dir) = install_matches.value_of("dir") {
-                Some(Command::Install(InstallSource::LocalDir(
+            } else { install_matches.value_of("dir").map(|local_dir| Command::Install(InstallSource::LocalDir(
                     local_dir.to_string(),
-                )))
-            } else {
-                None
-            }
+                ))) }
         } else if matches.subcommand_matches("list-plugins").is_some() {
             Some(Command::ListPlugins)
         } else if matches.subcommand_matches("use").is_some() {
@@ -399,13 +395,9 @@ impl Args {
                 .map(|v| v.map(String::from).collect())
                 .unwrap_or_default();
             Some(Command::PluginAction(plugin_name, action, args))
-        } else if let Some(update_matches) = matches.subcommand_matches("update") {
-            Some(Command::Update(
+        } else { matches.subcommand_matches("update").map(|update_matches| Command::Update(
                 update_matches.value_of("name").map(String::from),
-            ))
-        } else {
-            None
-        };
+            )) };
 
         Args {
             directory: matches.value_of("directory").unwrap_or(".").to_string(),

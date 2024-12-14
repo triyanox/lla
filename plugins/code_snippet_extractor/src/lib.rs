@@ -8,7 +8,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use toml;
 
 #[derive(Clone, Serialize, Deserialize)]
 struct CodeSnippet {
@@ -577,44 +576,44 @@ impl Plugin for CodeSnippetExtractorPlugin {
                             "{}",
                             "Code Snippet Extractor Commands".bright_green().bold()
                         );
-                        println!("");
+                        println!();
                         println!("{}", "Basic Commands:".bright_yellow());
                         println!("  {} <file_path> <snippet_name> <start_line> <end_line> [context_lines]", "extract".bright_cyan());
                         println!("    Extract a code snippet from a file");
-                        println!("");
+                        println!();
                         println!("  {} <file_path>", "list".bright_cyan());
                         println!("    List all snippets in a file");
-                        println!("");
+                        println!();
                         println!("  {} <file_path> <snippet_name>", "get".bright_cyan());
                         println!("    Get a specific snippet with context");
-                        println!("");
+                        println!();
                         println!("{}", "Search & Organization:".bright_yellow());
                         println!("  {} <query>", "search".bright_cyan());
                         println!("    Search through all snippets");
-                        println!("");
+                        println!();
                         println!(
                             "  {} <file_path> <snippet_name> <tag1> [tag2...]",
                             "add-tags".bright_cyan()
                         );
                         println!("    Add tags to a snippet");
-                        println!("");
+                        println!();
                         println!(
                             "  {} <file_path> <snippet_name> <tag1> [tag2...]",
                             "remove-tags".bright_cyan()
                         );
                         println!("    Remove tags from a snippet");
-                        println!("");
+                        println!();
                         println!("{}", "Import/Export:".bright_yellow());
                         println!("  {} <file_path>", "export".bright_cyan());
                         println!("    Export snippets to TOML format");
-                        println!("");
+                        println!();
                         println!("  {} <file_path> <toml_data>", "import".bright_cyan());
                         println!("    Import snippets from TOML");
-                        println!("");
+                        println!();
                         println!("{}", "Examples:".bright_yellow());
                         println!("  {} Extract lines 10-20 from a file:", "→".bright_cyan());
                         println!("    lla plugin --name code_snippet_extractor --action extract --args \"file.rs\" \"my_func\" 10 20");
-                        println!("");
+                        println!();
                         println!("  {} Add tags to a snippet:", "→".bright_cyan());
                         println!("    lla plugin --name code_snippet_extractor --action add-tags --args \"file.rs\" \"my_func\" \"rust\" \"function\"");
                         Ok(())

@@ -164,7 +164,7 @@ impl FileFormatter for TableFormatter {
             let colored_name = colorize_file_name(path).to_string();
             let name = format_with_icon(path, colored_name, self.show_icons);
 
-            let plugin_fields = plugin_manager.format_fields(&entry, "table").join(" ");
+            let plugin_fields = plugin_manager.format_fields(entry, "table").join(" ");
             let plugin_suffix = if plugin_fields.is_empty() {
                 String::new()
             } else {

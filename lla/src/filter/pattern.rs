@@ -41,10 +41,8 @@ impl PatternFilter {
         if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
             if self.match_all {
                 return self.patterns.iter().all(|pattern| name.contains(pattern));
-            } else {
-                if self.patterns.iter().any(|pattern| name.contains(pattern)) {
-                    return true;
-                }
+            } else if self.patterns.iter().any(|pattern| name.contains(pattern)) {
+                return true;
             }
         }
 

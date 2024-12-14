@@ -10,7 +10,6 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use toml;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct KeywordMatch {
@@ -495,29 +494,29 @@ impl Plugin for KeywordSearchPlugin {
                 }
                 "help" => {
                     println!("{}", "Keyword Search Plugin".bright_green().bold());
-                    println!("");
+                    println!();
                     println!("{}", "Actions:".bright_yellow());
                     println!(
                         "  {} <keyword1> [keyword2 ...]",
                         "set-keywords".bright_cyan()
                     );
                     println!("    Set keywords to search for in files");
-                    println!("");
+                    println!();
                     println!("  {}", "show-config".bright_cyan());
                     println!("    Display current plugin configuration");
-                    println!("");
+                    println!();
                     println!("  {} [true|false]", "set-case-sensitive".bright_cyan());
                     println!("    Enable or disable case-sensitive search");
-                    println!("");
+                    println!();
                     println!("  {} <number>", "set-context-lines".bright_cyan());
                     println!("    Set number of context lines to show around matches");
-                    println!("");
+                    println!();
                     println!("  {} <number>", "set-max-matches".bright_cyan());
                     println!("    Set maximum number of matches to show per file");
-                    println!("");
+                    println!();
                     println!("  {} <file_path>", "search".bright_cyan());
                     println!("    Search for configured keywords in a specific file");
-                    println!("");
+                    println!();
                     println!("  Configure search:");
                     println!(
                         "    {} --name keyword_search --action set-context-lines --args 3",

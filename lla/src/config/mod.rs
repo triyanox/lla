@@ -66,18 +66,12 @@ impl Default for SortConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default)]
 pub struct FilterConfig {
     #[serde(default)]
     pub case_sensitive: bool,
 }
 
-impl Default for FilterConfig {
-    fn default() -> Self {
-        Self {
-            case_sensitive: false,
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -387,14 +381,12 @@ max_entries = {}"#,
         }
 
         for plugin in &self.enabled_plugins {
-            let possible_names = vec![
-                format!("lib{}.dylib", plugin),
+            let possible_names = [format!("lib{}.dylib", plugin),
                 format!("lib{}.so", plugin),
                 format!("{}.dll", plugin),
                 format!("{}.dylib", plugin),
                 format!("{}.so", plugin),
-                plugin.clone(),
-            ];
+                plugin.clone()];
 
             let exists = possible_names
                 .iter()
@@ -447,7 +439,7 @@ max_entries = {}"#,
                 if !["name", "size", "date"].contains(&value) {
                     return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
                         key.to_string(),
-                        format!("must be one of: name, size, date"),
+                        "must be one of: name, size, date".to_string(),
                     )));
                 }
                 self.default_sort = value.to_string();

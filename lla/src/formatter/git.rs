@@ -253,7 +253,7 @@ impl FileFormatter for GitFormatter {
                 .repeat(max_name_width + max_hash_width + max_time_width + max_author_width + 40)
                 .bright_black(),
         );
-        output.push_str("\n");
+        output.push('\n');
 
         let mut entries = Vec::new();
         for file in files {
@@ -285,9 +285,9 @@ impl FileFormatter for GitFormatter {
             let name_padding = " ".repeat(max_name_width.saturating_sub(name_width) as usize);
 
             let hash_padding =
-                " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()) as usize);
+                " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()));
             let time_padding =
-                " ".repeat(max_time_width.saturating_sub(commit_info.1.len()) as usize);
+                " ".repeat(max_time_width.saturating_sub(commit_info.1.len()));
 
             let author_part = if commit_info.2 != "-" {
                 format!("by {} ", commit_info.2.bright_blue())

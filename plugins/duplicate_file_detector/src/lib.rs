@@ -79,7 +79,7 @@ impl DuplicateFileDetectorPlugin {
                 .metadata()
                 .ok()
                 .and_then(|m| m.modified().ok())
-                .unwrap_or_else(|| SystemTime::now());
+                .unwrap_or_else(SystemTime::now);
 
             if !entries.iter().any(|f| f.path == entry.path) {
                 entries.push(FileInfo {
@@ -164,7 +164,7 @@ impl Plugin for DuplicateFileDetectorPlugin {
                     None => return self.encode_error("Missing entry in format field request"),
                 };
 
-                let formatted = if let Some(_) = entry.custom_fields.get("has_duplicates") {
+                let formatted = if entry.custom_fields.get("has_duplicates").is_some() {
                     match req.format.as_str() {
                         "long" => Some(format!(
                             "{} {}",

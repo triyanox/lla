@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use toml;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct LanguageRules {

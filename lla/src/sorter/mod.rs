@@ -2,6 +2,7 @@ use crate::error::Result;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy)]
+#[derive(Default)]
 pub struct SortOptions {
     pub reverse: bool,
     pub dirs_first: bool,
@@ -9,16 +10,6 @@ pub struct SortOptions {
     pub natural: bool,
 }
 
-impl Default for SortOptions {
-    fn default() -> Self {
-        Self {
-            reverse: false,
-            dirs_first: false,
-            case_sensitive: false,
-            natural: false,
-        }
-    }
-}
 
 pub trait FileSorter: Send + Sync {
     fn sort_files(&self, files: &mut [PathBuf], options: SortOptions) -> Result<()>;

@@ -17,7 +17,7 @@ impl CaseInsensitiveFilter {
             .file_name()
             .and_then(|name| name.to_str())
             .map(|name| name.to_lowercase())
-            .unwrap_or_else(String::new);
+            .unwrap_or_default();
         parent.join(filename)
     }
 }
@@ -26,13 +26,13 @@ impl FileFilter for CaseInsensitiveFilter {
     fn filter_files(&self, files: &[PathBuf]) -> Result<Vec<PathBuf>> {
         let lowercase_files: Vec<PathBuf> = files
             .iter()
-            .map(|path| Self::to_lowercase_path(path))
+            .map(Self::to_lowercase_path)
             .collect();
 
         let filtered = self.inner.filter_files(&lowercase_files)?;
         let filtered_lowercase: Vec<PathBuf> = filtered
             .iter()
-            .map(|path| Self::to_lowercase_path(path))
+            .map(Self::to_lowercase_path)
             .collect();
 
         Ok(files

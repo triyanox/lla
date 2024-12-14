@@ -223,8 +223,8 @@ impl PluginManager {
                                     match proto::PluginMessage::decode(&response_vec[..]) {
                                         Ok(response_msg) => match response_msg.message {
                                             Some(Message::NameResponse(name)) => {
-                                                if !self.plugins.contains_key(&name) {
-                                                    self.plugins.insert(name, (library, api));
+                                                if let std::collections::hash_map::Entry::Vacant(e) = self.plugins.entry(name) {
+                                                    e.insert((library, api));
                                                     self.loaded_paths.insert(path);
                                                 }
                                             }
@@ -473,7 +473,7 @@ impl PluginManager {
                 message: Some(Message::GetName(true)),
             };
             let mut buf = Vec::with_capacity(request.encoded_len());
-            if let Err(_) = request.encode(&mut buf) {
+            if request.encode(&mut buf).is_err() {
                 return Ok(false);
             }
 
