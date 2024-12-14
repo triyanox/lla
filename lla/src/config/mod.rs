@@ -137,7 +137,7 @@ impl Config {
 # This file controls the behavior and appearance of the lla command
 
 # Default sorting method for file listings
-# Possible values: 
+# Possible values:
 #   - "name": Sort alphabetically by filename (default)
 #   - "size": Sort by file size, largest first
 #   - "date": Sort by modification time, newest first
@@ -433,6 +433,16 @@ max_entries = {}"#,
 
     pub fn set_value(&mut self, key: &str, value: &str) -> Result<()> {
         match key.split('.').collect::<Vec<_>>().as_slice() {
+            ["plugins_dir"] => {
+                let new_dir = PathBuf::from(value);
+                fs::create_dir_all(&new_dir).map_err(|_| {
+                    LlaError::Config(ConfigErrorKind::InvalidPath(format!(
+                        "Failed to create directory: {}",
+                        new_dir.display()
+                    )))
+                })?;
+                self.plugins_dir = new_dir;
+            }
             ["default_sort"] => {
                 if !["name", "size", "date"].contains(&value) {
                     return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
