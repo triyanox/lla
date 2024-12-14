@@ -675,7 +675,7 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "lla"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "atty",
  "bytes",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "lla_plugin_interface"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "prost",
  "prost-build",
