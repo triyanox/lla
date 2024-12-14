@@ -7,10 +7,8 @@ use std::collections::HashSet;
 
 pub fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
     if atty::is(atty::Stream::Stdout) {
-        let plugins: Vec<(String, String, String)> = plugin_manager
-            .list_plugins()
-            .into_iter()
-            .collect();
+        let plugins: Vec<(String, String, String)> =
+            plugin_manager.list_plugins().into_iter().collect();
 
         let plugin_names: Vec<String> = plugins
             .iter()

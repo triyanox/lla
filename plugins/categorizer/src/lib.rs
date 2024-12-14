@@ -29,14 +29,12 @@ impl Default for CategoryRule {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct CategoryStats {
     count: usize,
     total_size: u64,
     subcategory_counts: HashMap<String, usize>,
 }
-
 
 pub struct FileCategoryPlugin {
     rules: Vec<CategoryRule>,

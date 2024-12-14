@@ -284,10 +284,8 @@ impl FileFormatter for GitFormatter {
             let name_width = strip_ansi_codes(&name).width();
             let name_padding = " ".repeat(max_name_width.saturating_sub(name_width) as usize);
 
-            let hash_padding =
-                " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()));
-            let time_padding =
-                " ".repeat(max_time_width.saturating_sub(commit_info.1.len()));
+            let hash_padding = " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()));
+            let time_padding = " ".repeat(max_time_width.saturating_sub(commit_info.1.len()));
 
             let author_part = if commit_info.2 != "-" {
                 format!("by {} ", commit_info.2.bright_blue())

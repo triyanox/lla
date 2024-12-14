@@ -65,13 +65,11 @@ impl Default for SortConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[derive(Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FilterConfig {
     #[serde(default)]
     pub case_sensitive: bool,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -381,12 +379,14 @@ max_entries = {}"#,
         }
 
         for plugin in &self.enabled_plugins {
-            let possible_names = [format!("lib{}.dylib", plugin),
+            let possible_names = [
+                format!("lib{}.dylib", plugin),
                 format!("lib{}.so", plugin),
                 format!("{}.dll", plugin),
                 format!("{}.dylib", plugin),
                 format!("{}.so", plugin),
-                plugin.clone()];
+                plugin.clone(),
+            ];
 
             let exists = possible_names
                 .iter()
