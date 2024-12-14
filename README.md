@@ -52,7 +52,7 @@ paru -S lla
 pkgin install lla
 
 # Manual - Example is for amd64 GNU, replaces the file names if downloading for a different arch.
-wget -c https://github.com/triyanox/lla/releases/download/v0.3.1/lla-linux-amd64 -O lla
+wget -c https://github.com/triyanox/lla/releases/download/v0.3.2/lla-linux-amd64 -O lla
 sudo chmod +x lla
 sudo chown root:root lla
 sudo mv lla /usr/local/bin/lla
@@ -351,25 +351,91 @@ The configuration file is located at `~/.config/lla/config.toml`. You can modify
 **Configuration File Format:**
 
 ```toml
-# Core Settings
-default_sort = "name"          # Possible values: "name", "size", "date"
-default_format = "default"     # Possible values: "default", "long", "tree", "grid"
-enabled_plugins = ["git_status", "file_hash"]  # List of enabled plugins
-plugins_dir = "/home/user/.config/lla/plugins" # Plugin directory location
-default_depth = 3              # Default depth for recursive listing
+# LLA Configuration File
+# This file controls the behavior and appearance of the lla command
 
-# Performance Tuning
+# Default sorting method for file listings
+# Possible values:
+#   - "name": Sort alphabetically by filename (default)
+#   - "size": Sort by file size, largest first
+#   - "date": Sort by modification time, newest first
+default_sort = "name"
+
+# Default format for displaying files
+# Possible values:
+#   - "default": Quick and clean directory listing
+#   - "long": Detailed file information with metadata
+#   - "tree": Hierarchical directory visualization
+#   - "grid": Organized grid layout for better readability
+#   - "git": Git-aware view with repository status
+#   - "timeline": Group files by time periods
+#   - "sizemap": Visual representation of file sizes
+#   - "table": Structured data display
+default_format = "default"
+
+# Whether to show icons by default
+# When true, file and directory icons will be displayed in all views
+# Default: false
+show_icons = false
+
+# List of enabled plugins
+# Each plugin provides additional functionality
+# Examples:
+#   - "git_status": Show Git repository information
+#   - "file_hash": Calculate and display file hashes
+#   - "file_tagger": Add and manage file tags
+enabled_plugins = []
+
+# Directory where plugins are stored
+# Default: ~/.config/lla/plugins
+plugins_dir = "~/.config/lla/plugins"
+
+# Maximum depth for recursive directory traversal
+# Controls how deep lla will go when showing directory contents
+# Set to None for unlimited depth (may impact performance)
+# Default: 3 levels deep
+default_depth = 3
+
+# Sorting configuration
+[sort]
+# List directories before files
+# Default: false
+dirs_first = false
+
+# Enable case-sensitive sorting
+# Default: false
+case_sensitive = false
+
+# Use natural sorting for numbers (e.g., 2.txt before 10.txt)
+# Default: true
+natural = true
+
+# Filtering configuration
+[filter]
+# Enable case-sensitive filtering by default
+# Default: false
+case_sensitive = false
+
+# Formatter-specific configurations
 [formatters.tree]
-max_lines = 20000             # Maximum entries in tree view
-                             # Set to 0 for unlimited (may impact performance)
+# Maximum number of entries to display in tree view
+# Controls memory usage and performance for large directories
+# Set to 0 to show all entries (may impact performance)
+# Default: 20000 entries
+max_lines = 20000
 
+# Lister-specific configurations
 [listers.recursive]
-max_entries = 20000          # Maximum entries in recursive listing
-                             # Set to 0 for unlimited (may impact performance)
+# Maximum number of entries to process in recursive listing
+# Controls memory usage and performance for deep directory structures
+# Set to 0 to process all entries (may impact performance)
+# Default: 20000 entries
+max_entries = 20000
 
-# Command Shortcuts
+# Command shortcuts
+# Define custom shortcuts for frequently used plugin commands
 [shortcuts]
-find = { plugin_name = "finder", action = "search", description = "Quick file search" }
+extract={ plugin_name = "code_snippet_extractor", action = "extract", description = "Extract code snippets"}
 ```
 
 **Configuration Commands:**
@@ -384,8 +450,10 @@ lla config               # Display current configuration
 # Modify settings
 lla config --set default_sort size
 lla config --set default_format long
-lla config --set plugins_dir /custom/path
-lla config --set default_depth 5
+lla config --set show_icons true
+lla config --set sort.dirs_first true
+lla config --set sort.case_sensitive true
+lla config --set filter.case_sensitive true
 
 # Manage shortcuts
 lla shortcut add NAME PLUGIN ACTION [-d DESCRIPTION]  # Add shortcut
