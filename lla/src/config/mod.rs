@@ -276,14 +276,12 @@ max_entries = {}"#,
     }
 
     pub fn enable_plugin(&mut self, plugin_name: &str) -> Result<()> {
-        let plugin_path = self.plugins_dir.join(plugin_name);
-        if !plugin_path.exists() {
-            return Err(LlaError::Config(ConfigErrorKind::ValidationError(format!(
-                "Plugin not found: {}",
-                plugin_name
-            ))));
-        }
-
+        self.ensure_plugins_dir().map_err(|e| {
+            LlaError::Config(ConfigErrorKind::InvalidPath(format!(
+                "Failed to create plugins directory: {}",
+                e
+            )))
+        })?;
         if !self.enabled_plugins.contains(&plugin_name.to_string()) {
             self.enabled_plugins.push(plugin_name.to_string());
             self.save(&Self::get_config_path())?;
@@ -389,8 +387,20 @@ max_entries = {}"#,
         }
 
         for plugin in &self.enabled_plugins {
-            let plugin_path = self.plugins_dir.join(plugin);
-            if !plugin_path.exists() {
+            let possible_names = vec![
+                format!("lib{}.dylib", plugin),
+                format!("lib{}.so", plugin),
+                format!("{}.dll", plugin),
+                format!("{}.dylib", plugin),
+                format!("{}.so", plugin),
+                plugin.clone(),
+            ];
+
+            let exists = possible_names
+                .iter()
+                .any(|name| self.plugins_dir.join(name).exists());
+
+            if !exists {
                 return Err(LlaError::Config(ConfigErrorKind::ValidationError(format!(
                     "Enabled plugin not found: {}",
                     plugin
