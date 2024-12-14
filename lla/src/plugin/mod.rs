@@ -223,7 +223,10 @@ impl PluginManager {
                                     match proto::PluginMessage::decode(&response_vec[..]) {
                                         Ok(response_msg) => match response_msg.message {
                                             Some(Message::NameResponse(name)) => {
-                                                if let std::collections::hash_map::Entry::Vacant(e) = self.plugins.entry(name) {
+                                                if let std::collections::hash_map::Entry::Vacant(
+                                                    e,
+                                                ) = self.plugins.entry(name)
+                                                {
                                                     e.insert((library, api));
                                                     self.loaded_paths.insert(path);
                                                 }

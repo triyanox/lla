@@ -24,16 +24,11 @@ impl CaseInsensitiveFilter {
 
 impl FileFilter for CaseInsensitiveFilter {
     fn filter_files(&self, files: &[PathBuf]) -> Result<Vec<PathBuf>> {
-        let lowercase_files: Vec<PathBuf> = files
-            .iter()
-            .map(Self::to_lowercase_path)
-            .collect();
+        let lowercase_files: Vec<PathBuf> = files.iter().map(Self::to_lowercase_path).collect();
 
         let filtered = self.inner.filter_files(&lowercase_files)?;
-        let filtered_lowercase: Vec<PathBuf> = filtered
-            .iter()
-            .map(Self::to_lowercase_path)
-            .collect();
+        let filtered_lowercase: Vec<PathBuf> =
+            filtered.iter().map(Self::to_lowercase_path).collect();
 
         Ok(files
             .iter()
