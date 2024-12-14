@@ -96,7 +96,7 @@ impl GitStatusPlugin {
 
         for line in status.lines() {
             let status_chars: Vec<char> = line.chars().take(2).collect();
-            let index_status = status_chars.get(0).copied().unwrap_or(' ');
+            let index_status = status_chars.first().copied().unwrap_or(' ');
             let worktree_status = status_chars.get(1).copied().unwrap_or(' ');
 
             match (index_status, worktree_status) {
@@ -275,7 +275,7 @@ impl Plugin for GitStatusPlugin {
                                 }),
                             ]
                             .into_iter()
-                            .filter_map(|s| s)
+                            .flatten()
                             .collect::<Vec<_>>();
 
                             let status_line = if stats.is_empty() {

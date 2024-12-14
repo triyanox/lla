@@ -10,7 +10,6 @@ pub fn list_plugins(plugin_manager: &mut PluginManager) -> Result<()> {
         let plugins: Vec<(String, String, String)> = plugin_manager
             .list_plugins()
             .into_iter()
-            .map(|(name, version, desc)| (name, version, desc))
             .collect();
 
         let plugin_names: Vec<String> = plugins

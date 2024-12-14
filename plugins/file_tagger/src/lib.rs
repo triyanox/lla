@@ -229,14 +229,14 @@ impl Plugin for FileTaggerPlugin {
                 }
                 "help" => {
                     println!("{}", "File Tagger Commands".bright_green().bold());
-                    println!("");
+                    println!();
                     println!("{}", "Available actions:".bright_yellow());
                     println!("  {} <file_path> <tag>", "add-tag".bright_cyan());
                     println!("    Add a tag to a file");
-                    println!("");
+                    println!();
                     println!("  {} <file_path> <tag>", "remove-tag".bright_cyan());
                     println!("    Remove a tag from a file");
-                    println!("");
+                    println!();
                     println!("  {} <file_path>", "list-tags".bright_cyan());
                     println!("    List all tags for a file");
                     Message::ActionResponse(proto::ActionResponse {

@@ -397,7 +397,7 @@ pub fn get_icon(path: &Path) -> &'static str {
     if let Some(icon) = FILE_ICONS.get(extension.as_str()) {
         return icon;
     }
-    &"\u{f016}"
+    "\u{f016}"
 }
 
 fn get_folder_icon(path: &Path) -> &'static str {

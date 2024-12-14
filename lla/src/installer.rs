@@ -1,5 +1,4 @@
 use crate::error::{LlaError, Result};
-use atty;
 use colored::Colorize;
 use console::{style, Term};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};
@@ -538,7 +537,7 @@ impl PluginInstaller {
 
         for plugin_file in plugin_files.iter() {
             let dest_path = self.plugins_dir.join(plugin_file.file_name().unwrap());
-            fs::copy(&plugin_file, &dest_path)?;
+            fs::copy(plugin_file, &dest_path)?;
         }
 
         println!("  ✓ Successfully installed {}", plugin_name.bright_blue());

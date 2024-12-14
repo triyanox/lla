@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use toml;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CategoryRule {
@@ -31,21 +30,13 @@ impl Default for CategoryRule {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 struct CategoryStats {
     count: usize,
     total_size: u64,
     subcategory_counts: HashMap<String, usize>,
 }
 
-impl Default for CategoryStats {
-    fn default() -> Self {
-        Self {
-            count: 0,
-            total_size: 0,
-            subcategory_counts: HashMap::new(),
-        }
-    }
-}
 
 pub struct FileCategoryPlugin {
     rules: Vec<CategoryRule>,
