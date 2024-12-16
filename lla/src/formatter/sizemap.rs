@@ -1,8 +1,9 @@
 use super::FileFormatter;
+use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::colorize_file_name;
+use crate::theme::{self, ColorValue};
+use crate::utils::color::{self, colorize_file_name, colorize_file_name_with_icon};
 use crate::utils::icons::format_with_icon;
-use crate::{error::Result, utils::color::colorize_file_name_with_icon};
 use colored::*;
 use lla_plugin_interface::proto::DecoratedEntry;
 use std::path::Path;
@@ -60,19 +61,28 @@ impl SizeMapFormatter {
     }
 
     fn create_bar(percentage: f64, width: usize) -> String {
+        let theme = color::get_theme();
         let percent_width = 6;
         let bar_width = width.saturating_sub(percent_width);
         let filled_width = ((percentage / 100.0) * bar_width as f64) as usize;
 
         let (bar_char, partial_char) = if percentage > 75.0 {
-            ("█".red(), "▓".red())
+            let color = theme::color_value_to_color(&theme.colors.permission_write);
+            ("█".color(color), "▓".color(color))
         } else if percentage > 50.0 {
-            ("█".yellow(), "▓".yellow())
+            let color = theme::color_value_to_color(&theme.colors.executable);
+            ("█".color(color), "▓".color(color))
         } else if percentage > 25.0 {
-            ("█".cyan(), "▓".cyan())
+            let color = theme::color_value_to_color(&theme.colors.symlink);
+            ("█".color(color), "▓".color(color))
         } else {
-            ("█".bright_blue(), "▓".bright_blue())
+            let color = theme::color_value_to_color(&theme.colors.directory);
+            ("█".color(color), "▓".color(color))
         };
+
+        let empty = "⋅".color(theme::color_value_to_color(&ColorValue::Named(
+            "bright black".to_string(),
+        )));
 
         let filled = if filled_width > 0 {
             bar_char.to_string().repeat(filled_width - 1)
@@ -84,9 +94,9 @@ impl SizeMapFormatter {
         } else {
             String::new()
         };
-        let empty = "⋅"
-            .repeat(bar_width.saturating_sub(filled_width))
-            .bright_black();
+        let empty = empty
+            .to_string()
+            .repeat(bar_width.saturating_sub(filled_width));
 
         format!("{}{}{} {:>4.1}%", filled, partial, empty, percentage)
     }

@@ -13,6 +13,7 @@ pub struct Args {
     pub timeline_format: bool,
     pub git_format: bool,
     pub show_icons: bool,
+    pub no_color: bool,
     pub sort_by: String,
     pub sort_reverse: bool,
     pub sort_dirs_first: bool,
@@ -73,6 +74,7 @@ impl Args {
                     timeline_format: config.default_format == "timeline",
                     git_format: config.default_format == "git",
                     show_icons: config.show_icons,
+                    no_color: false,
                     sort_by: config.default_sort.clone(),
                     sort_reverse: false,
                     sort_dirs_first: config.sort.dirs_first,
@@ -158,6 +160,11 @@ impl Args {
                 Arg::with_name("no-icons")
                     .long("no-icons")
                     .help("Hide icons for files and directories (overrides config setting)"),
+            )
+            .arg(
+                Arg::with_name("no-color")
+                    .long("no-color")
+                    .help("Disable all colors in the output"),
             )
             .arg(
                 Arg::with_name("sort")
@@ -418,6 +425,7 @@ impl Args {
             git_format: matches.is_present("git") || config.default_format == "git",
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
+            no_color: matches.is_present("no-color"),
             sort_by: matches
                 .value_of("sort")
                 .unwrap_or(&config.default_sort)

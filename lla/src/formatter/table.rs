@@ -1,7 +1,8 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::*;
+use crate::theme::{self, ColorValue};
+use crate::utils::color::{self, *};
 use crate::utils::icons::format_with_icon;
 use colored::*;
 use lla_plugin_interface::proto::DecoratedEntry;
@@ -63,7 +64,17 @@ impl TableFormatter {
         widths
     }
 
+    fn get_border_color() -> Color {
+        theme::color_value_to_color(&ColorValue::Named("bright black".to_string()))
+    }
+
+    fn get_header_color() -> Color {
+        let theme = color::get_theme();
+        theme::color_value_to_color(&theme.colors.directory)
+    }
+
     fn create_separator(widths: &[usize]) -> String {
+        let border_color = Self::get_border_color();
         let mut separator = String::new();
         separator.push('├');
         for (i, &width) in widths.iter().enumerate() {
@@ -73,10 +84,12 @@ impl TableFormatter {
             }
         }
         separator.push('┤');
-        separator.bright_black().to_string()
+        separator.color(border_color).to_string()
     }
 
     fn create_header(widths: &[usize]) -> String {
+        let border_color = Self::get_border_color();
+        let header_color = Self::get_header_color();
         let headers = ["Permissions", "Size", "Modified", "Name"];
         let mut header = String::new();
         header.push('│');
@@ -85,16 +98,18 @@ impl TableFormatter {
             header.push(' ');
             header.push_str(
                 &format!("{:width$}", title, width = width)
+                    .color(header_color)
                     .bold()
                     .to_string(),
             );
             header.push(' ');
             header.push('│');
         }
-        header.bright_black().to_string()
+        header.color(border_color).to_string()
     }
 
     fn create_top_border(widths: &[usize]) -> String {
+        let border_color = Self::get_border_color();
         let mut border = String::new();
         border.push('┌');
         for (i, &width) in widths.iter().enumerate() {
@@ -104,10 +119,11 @@ impl TableFormatter {
             }
         }
         border.push('┐');
-        border.bright_black().to_string()
+        border.color(border_color).to_string()
     }
 
     fn create_bottom_border(widths: &[usize]) -> String {
+        let border_color = Self::get_border_color();
         let mut border = String::new();
         border.push('└');
         for (i, &width) in widths.iter().enumerate() {
@@ -117,7 +133,7 @@ impl TableFormatter {
             }
         }
         border.push('┘');
-        border.bright_black().to_string()
+        border.color(border_color).to_string()
     }
 
     fn format_cell(content: &str, width: usize, align_right: bool) -> String {

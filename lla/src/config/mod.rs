@@ -1,5 +1,6 @@
 use crate::commands::args::ConfigAction;
 use crate::error::{ConfigErrorKind, LlaError, Result};
+use crate::theme::{load_theme, Theme};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -90,6 +91,12 @@ pub struct Config {
     pub listers: ListerConfig,
     #[serde(default)]
     pub shortcuts: HashMap<String, ShortcutCommand>,
+    #[serde(default = "default_theme_name")]
+    pub theme: String,
+}
+
+fn default_theme_name() -> String {
+    "default".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +159,11 @@ default_format = "{}"
 # Default: false
 show_icons = {}
 
+# The theme to use for coloring
+# Place custom themes in ~/.config/lla/themes/
+# Default: "default"
+theme = "{}"
+
 # List of enabled plugins
 # Each plugin provides additional functionality
 # Examples:
@@ -208,6 +220,7 @@ max_entries = {}"#,
             self.default_sort,
             self.default_format,
             self.show_icons,
+            self.theme,
             serde_json::to_string(&self.enabled_plugins).unwrap(),
             self.plugins_dir.to_string_lossy(),
             match self.default_depth {
@@ -545,6 +558,21 @@ max_entries = {}"#,
                 }
                 self.listers.recursive.max_entries = Some(max_entries);
             }
+            ["theme"] => {
+                if let Ok(themes) = crate::theme::list_themes() {
+                    if !themes.contains(&value.to_string()) {
+                        return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
+                            key.to_string(),
+                            format!(
+                                "Theme '{}' not found. Available themes: {}",
+                                value,
+                                themes.join(", ")
+                            ),
+                        )));
+                    }
+                }
+                self.theme = value.to_string();
+            }
             _ => {
                 return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
                     key.to_string(),
@@ -554,6 +582,10 @@ max_entries = {}"#,
         }
         self.save(&Self::get_config_path())?;
         Ok(())
+    }
+
+    pub fn get_theme(&self) -> Theme {
+        load_theme(&self.theme).unwrap_or_default()
     }
 }
 
@@ -582,12 +614,24 @@ impl Default for Config {
                 },
             },
             shortcuts: HashMap::new(),
+            theme: default_theme_name(),
         }
     }
 }
 
 pub fn initialize_config() -> Result<()> {
     let config_path = Config::get_config_path();
+    let config_dir = config_path.parent().unwrap();
+    let themes_dir = config_dir.join("themes");
+
+    fs::create_dir_all(&config_dir)?;
+    fs::create_dir_all(&themes_dir)?;
+    let default_theme_path = themes_dir.join("default.toml");
+    if !default_theme_path.exists() {
+        let default_theme_content = include_str!("default.toml");
+        fs::write(&default_theme_path, default_theme_content)?;
+        println!("Created default theme at {:?}", default_theme_path);
+    }
 
     if config_path.exists() {
         println!("Config file already exists at {:?}", config_path);

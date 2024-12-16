@@ -1,0 +1,160 @@
+name = "dark"
+author = "Mohamed Achaq"
+description = "A modern dark theme with enhanced visibility and rich colors for dark terminals"
+
+[colors]
+file = { r = 220, g = 223, b = 228 }
+directory = { r = 127, g = 222, b = 255 }
+symlink = { r = 127, g = 222, b = 255 }
+executable = { r = 80, g = 250, b = 123 }
+
+size = { r = 98, g = 209, b = 150 }
+date = { r = 187, g = 154, b = 247 }
+user = { r = 255, g = 121, b = 198 }
+group = { r = 139, g = 148, b = 158 }
+
+permission_dir = { r = 82, g = 139, b = 255 }
+permission_read = { r = 80, g = 250, b = 123 }
+permission_write = { r = 255, g = 184, b = 108 }
+permission_exec = { r = 255, g = 121, b = 198 }
+permission_none = { r = 68, g = 71, b = 90 }
+
+[special_files]
+[special_files.folders]
+"node_modules" = { r = 68, g = 71, b = 90 }
+"target" = { r = 68, g = 71, b = 90 }
+"dist" = { r = 68, g = 71, b = 90 }
+".git" = { r = 255, g = 121, b = 198 }
+"build" = { r = 68, g = 71, b = 90 }
+".cache" = { r = 68, g = 71, b = 90 }
+
+"*-env" = { r = 80, g = 250, b = 123 }
+"venv" = { r = 80, g = 250, b = 123 }
+".env" = { r = 80, g = 250, b = 123 }
+
+"*.d" = { r = 82, g = 139, b = 255 }
+"*_cache" = { r = 68, g = 71, b = 90 }
+"*-cache" = { r = 68, g = 71, b = 90 }
+
+[special_files.dotfiles]
+".gitignore" = { r = 127, g = 222, b = 255 }
+".env" = { r = 255, g = 184, b = 108 }
+".dockerignore" = { r = 127, g = 222, b = 255 }
+".editorconfig" = { r = 127, g = 222, b = 255 }
+".prettierrc" = { r = 127, g = 222, b = 255 }
+".eslintrc" = { r = 127, g = 222, b = 255 }
+".babelrc" = { r = 127, g = 222, b = 255 }
+
+[special_files.exact_match]
+"Dockerfile" = { r = 127, g = 222, b = 255 }
+"docker-compose.yml" = { r = 127, g = 222, b = 255 }
+"Makefile" = { r = 255, g = 121, b = 198 }
+"CMakeLists.txt" = { r = 255, g = 121, b = 198 }
+"README.md" = { r = 255, g = 184, b = 108 }
+"LICENSE" = { r = 255, g = 184, b = 108 }
+"package.json" = { r = 255, g = 184, b = 108 }
+"Cargo.toml" = { r = 255, g = 121, b = 198 }
+"go.mod" = { r = 127, g = 222, b = 255 }
+"flake.nix" = { r = 82, g = 139, b = 255 }
+"flake.lock" = { r = 68, g = 71, b = 90 }
+"shell.nix" = { r = 82, g = 139, b = 255 }
+"default.nix" = { r = 82, g = 139, b = 255 }
+
+[special_files.patterns]
+"*rc" = { r = 127, g = 222, b = 255 }
+"*.min.*" = { r = 68, g = 71, b = 90 }
+"*.test.*" = { r = 80, g = 250, b = 123 }
+"*.spec.*" = { r = 80, g = 250, b = 123 }
+"*.lock" = { r = 68, g = 71, b = 90 }
+"*.config.*" = { r = 127, g = 222, b = 255 }
+
+[extensions.groups]
+rust = ["rs", "toml"]
+python = ["py", "pyi", "pyw", "ipynb"]
+javascript = ["js", "mjs", "cjs", "jsx"]
+typescript = ["ts", "tsx", "d.ts"]
+java = ["java", "jar", "class"]
+csharp = ["cs", "csx"]
+cpp = ["cpp", "cc", "cxx", "c++", "hpp", "hxx", "h++"]
+go = ["go"]
+ruby = ["rb", "erb"]
+php = ["php", "phtml"]
+swift = ["swift"]
+kotlin = ["kt", "kts"]
+nix = ["nix"]
+
+markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
+style = ["css", "scss", "sass", "less", "styl"]
+web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
+
+shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
+script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
+
+doc = [
+    "md",
+    "rst",
+    "txt",
+    "org",
+    "wiki",
+    "adoc",
+    "tex",
+    "pdf",
+    "epub",
+    "doc",
+    "docx",
+    "rtf",
+]
+
+image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
+video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
+audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+
+data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
+archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
+
+[extensions.colors]
+rust = { r = 255, g = 121, b = 198 }
+python = { r = 80, g = 250, b = 123 }
+javascript = { r = 255, g = 184, b = 108 }
+typescript = { r = 82, g = 139, b = 255 }
+java = { r = 255, g = 121, b = 198 }
+csharp = { r = 80, g = 250, b = 123 }
+cpp = { r = 255, g = 121, b = 198 }
+go = { r = 127, g = 222, b = 255 }
+ruby = { r = 255, g = 121, b = 198 }
+php = { r = 80, g = 250, b = 123 }
+swift = { r = 255, g = 121, b = 198 }
+kotlin = { r = 80, g = 250, b = 123 }
+nix = { r = 127, g = 222, b = 255 }
+
+markup = { r = 187, g = 154, b = 247 }
+style = { r = 127, g = 222, b = 255 }
+web_config = { r = 255, g = 184, b = 108 }
+
+shell = { r = 80, g = 250, b = 123 }
+script = { r = 255, g = 184, b = 108 }
+
+doc = { r = 220, g = 223, b = 228 }
+
+image = { r = 187, g = 154, b = 247 }
+video = { r = 187, g = 154, b = 247 }
+audio = { r = 187, g = 154, b = 247 }
+
+data = { r = 255, g = 184, b = 108 }
+archive = { r = 255, g = 121, b = 198 }
+
+rs = { r = 255, g = 121, b = 198 }
+py = { r = 80, g = 250, b = 123 }
+js = { r = 255, g = 184, b = 108 }
+ts = { r = 82, g = 139, b = 255 }
+jsx = { r = 255, g = 184, b = 108 }
+tsx = { r = 82, g = 139, b = 255 }
+vue = { r = 80, g = 250, b = 123 }
+css = { r = 127, g = 222, b = 255 }
+scss = { r = 127, g = 222, b = 255 }
+html = { r = 187, g = 154, b = 247 }
+md = { r = 220, g = 223, b = 228 }
+json = { r = 255, g = 184, b = 108 }
+yaml = { r = 255, g = 184, b = 108 }
+toml = { r = 255, g = 184, b = 108 }
+sql = { r = 127, g = 222, b = 255 }

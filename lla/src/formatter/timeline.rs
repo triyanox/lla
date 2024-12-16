@@ -1,7 +1,8 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::theme::{self, ColorValue};
+use crate::utils::color::{self, colorize_file_name, colorize_file_name_with_icon};
 use crate::utils::icons::format_with_icon;
 use chrono::{DateTime, Duration, Local};
 use colored::*;
@@ -38,6 +39,25 @@ impl TimelineFormatter {
         } else {
             dt.format("%b %d, %Y").to_string()
         }
+    }
+
+    fn get_header_color() -> Color {
+        let theme = color::get_theme();
+        theme::color_value_to_color(&theme.colors.directory)
+    }
+
+    fn get_separator_color() -> Color {
+        theme::color_value_to_color(&ColorValue::Named("bright black".to_string()))
+    }
+
+    fn get_time_color() -> Color {
+        let theme = color::get_theme();
+        theme::color_value_to_color(&theme.colors.date)
+    }
+
+    fn get_commit_color() -> Color {
+        let theme = color::get_theme();
+        theme::color_value_to_color(&theme.colors.symlink)
     }
 }
 
@@ -110,8 +130,8 @@ impl FileFormatter for TimelineFormatter {
         for (group, entries) in groups {
             output.push_str(&format!(
                 "\n{}\n{}\n",
-                group.display_name().bright_blue().bold(),
-                "─".repeat(40).bright_black()
+                group.display_name().color(Self::get_header_color()).bold(),
+                "─".repeat(40).color(Self::get_separator_color())
             ));
 
             for entry in entries {
@@ -119,7 +139,7 @@ impl FileFormatter for TimelineFormatter {
                 let modified = UNIX_EPOCH + std::time::Duration::from_secs(modified);
                 let dt = DateTime::<Local>::from(modified);
 
-                let time_str = Self::format_relative_time(dt).bright_black();
+                let time_str = Self::format_relative_time(dt).color(Self::get_time_color());
 
                 let path = Path::new(&entry.path);
                 let colored_name = colorize_file_name(path).to_string();
@@ -134,7 +154,7 @@ impl FileFormatter for TimelineFormatter {
                     .split_whitespace()
                     .find(|s| s.contains("commit:"))
                 {
-                    format!(" {}", git_field.bright_yellow())
+                    format!(" {}", git_field.color(Self::get_commit_color()))
                 } else {
                     String::new()
                 };

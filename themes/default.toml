@@ -1,0 +1,141 @@
+name = "default"
+author = "Mohamed Achaq"
+description = "A modern, high-contrast theme for lla with carefully selected colors for optimal visibility"
+
+[colors]
+file = { r = 220, g = 220, b = 220 }
+directory = { r = 74, g = 144, b = 226 }
+symlink = { r = 42, g = 161, b = 152 }
+executable = { r = 126, g = 211, b = 33 }
+
+size = { r = 42, g = 161, b = 152 }
+date = { r = 170, g = 170, b = 170 }
+user = { r = 108, g = 113, b = 196 }
+group = { r = 146, g = 146, b = 146 }
+
+permission_dir = { r = 74, g = 144, b = 226 }
+permission_read = { r = 42, g = 161, b = 152 }
+permission_write = { r = 203, g = 75, b = 22 }
+permission_exec = { r = 126, g = 211, b = 33 }
+permission_none = { r = 146, g = 146, b = 146 }
+
+[special_files]
+[special_files.folders]
+"node_modules" = { r = 146, g = 146, b = 146 }
+"target" = { r = 146, g = 146, b = 146 }
+"dist" = { r = 146, g = 146, b = 146 }
+".git" = { r = 203, g = 75, b = 22 }
+"build" = { r = 146, g = 146, b = 146 }
+".cache" = { r = 146, g = 146, b = 146 }
+
+"*-env" = { r = 126, g = 211, b = 33 }
+"venv" = { r = 126, g = 211, b = 33 }
+".env" = { r = 126, g = 211, b = 33 }
+
+"*.d" = { r = 74, g = 144, b = 226 }
+"*_cache" = { r = 146, g = 146, b = 146 }
+"*-cache" = { r = 146, g = 146, b = 146 }
+
+[special_files.dotfiles]
+".gitignore" = { r = 42, g = 161, b = 152 }
+".env" = { r = 203, g = 75, b = 22 }
+".dockerignore" = { r = 42, g = 161, b = 152 }
+".editorconfig" = { r = 42, g = 161, b = 152 }
+".prettierrc" = { r = 42, g = 161, b = 152 }
+".eslintrc" = { r = 42, g = 161, b = 152 }
+".babelrc" = { r = 42, g = 161, b = 152 }
+
+[special_files.exact_match]
+"Dockerfile" = { r = 42, g = 161, b = 152 }
+"docker-compose.yml" = { r = 42, g = 161, b = 152 }
+"Makefile" = { r = 211, g = 54, b = 130 }
+"CMakeLists.txt" = { r = 211, g = 54, b = 130 }
+"README.md" = { r = 255, g = 199, b = 6 }
+"LICENSE" = { r = 255, g = 199, b = 6 }
+"package.json" = { r = 203, g = 75, b = 22 }
+"Cargo.toml" = { r = 203, g = 75, b = 22 }
+"go.mod" = { r = 42, g = 161, b = 152 }
+"flake.nix" = { r = 108, g = 113, b = 196 }
+"flake.lock" = { r = 146, g = 146, b = 146 }
+"shell.nix" = { r = 108, g = 113, b = 196 }
+"default.nix" = { r = 108, g = 113, b = 196 }
+
+[special_files.patterns]
+"*rc" = { r = 42, g = 161, b = 152 }
+"*.min.*" = { r = 146, g = 146, b = 146 }
+"*.test.*" = { r = 126, g = 211, b = 33 }
+"*.spec.*" = { r = 126, g = 211, b = 33 }
+"*.lock" = { r = 146, g = 146, b = 146 }
+"*.config.*" = { r = 42, g = 161, b = 152 }
+
+[extensions.groups]
+rust = ["rs", "toml", "lock"]
+script = ["js", "mjs", "cjs", "jsx", "json", "json5", "yaml", "yml"]
+typescript = ["ts", "tsx", "d.ts"]
+markup = ["html", "htm", "xml", "vue", "ejs"]
+style = ["css", "scss", "sass", "less", "conf", "config", "ini", "env"]
+executable = [
+    "py",
+    "pyi",
+    "pyw",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "bat",
+    "cmd",
+    "ps1",
+]
+doc = ["md", "rst", "txt", "doc", "docx", "pdf", "org", "wiki"]
+media = [
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "svg",
+    "bmp",
+    "ico",
+    "webp",
+    "tiff",
+    "mp4",
+    "mov",
+    "avi",
+    "mkv",
+    "flv",
+    "wmv",
+    "webm",
+    "m4v",
+    "3gp",
+]
+archive = ["zip", "tar", "gz", "rar", "7z", "iso", "dmg", "exe", "dll"]
+data = ["csv", "tsv", "sqlite", "db"]
+
+[extensions.colors]
+rust = { r = 211, g = 54, b = 130 }
+script = { r = 255, g = 199, b = 6 }
+typescript = { r = 74, g = 144, b = 226 }
+markup = { r = 108, g = 113, b = 196 }
+style = { r = 42, g = 161, b = 152 }
+executable = { r = 126, g = 211, b = 33 }
+doc = { r = 220, g = 220, b = 220 }
+media = { r = 211, g = 54, b = 130 }
+archive = { r = 203, g = 75, b = 22 }
+data = { r = 255, g = 199, b = 6 }
+
+rs = { r = 211, g = 54, b = 130 }
+toml = { r = 211, g = 54, b = 130 }
+lock = { r = 146, g = 146, b = 146 }
+js = { r = 255, g = 199, b = 6 }
+json = { r = 255, g = 199, b = 6 }
+yaml = { r = 255, g = 199, b = 6 }
+yml = { r = 255, g = 199, b = 6 }
+ts = { r = 74, g = 144, b = 226 }
+tsx = { r = 74, g = 144, b = 226 }
+html = { r = 108, g = 113, b = 196 }
+xml = { r = 108, g = 113, b = 196 }
+css = { r = 42, g = 161, b = 152 }
+scss = { r = 42, g = 161, b = 152 }
+py = { r = 126, g = 211, b = 33 }
+sh = { r = 126, g = 211, b = 33 }
+md = { r = 220, g = 220, b = 220 }
+txt = { r = 220, g = 220, b = 220 }

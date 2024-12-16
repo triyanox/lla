@@ -1,5 +1,7 @@
+use crate::commands::args::Args;
 use crate::error::{LlaError, Result};
-use colored::Colorize;
+use crate::utils::color::ColorState;
+use colored::{ColoredString, Colorize};
 use console::{style, Term};
 use dialoguer::{theme::ColorfulTheme, MultiSelect};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -104,12 +106,22 @@ impl InstallSummary {
 
 pub struct PluginInstaller {
     plugins_dir: PathBuf,
+    color_state: ColorState,
 }
 
 impl PluginInstaller {
-    pub fn new(plugins_dir: &Path) -> Self {
+    pub fn new(plugins_dir: &Path, args: &Args) -> Self {
         PluginInstaller {
             plugins_dir: plugins_dir.to_path_buf(),
+            color_state: ColorState::new(args),
+        }
+    }
+
+    fn display_colored(&self, text: &str, color_fn: fn(&str) -> ColoredString) -> String {
+        if self.color_state.is_enabled() {
+            color_fn(text).to_string()
+        } else {
+            text.to_string()
         }
     }
 
@@ -400,7 +412,11 @@ impl PluginInstaller {
                     if !found_plugins.is_empty() {
                         println!(
                             "🔍 Found plugins: {}",
-                            style(found_plugins.join(", ")).cyan()
+                            if self.color_state.is_enabled() {
+                                style(found_plugins.join(", ")).cyan().to_string()
+                            } else {
+                                found_plugins.join(", ")
+                            }
                         );
                         return Ok(plugin_dirs);
                     }
@@ -437,7 +453,11 @@ impl PluginInstaller {
         if !found_plugins.is_empty() {
             println!(
                 "🔍 Found plugins: {}",
-                style(found_plugins.join(", ")).cyan()
+                if self.color_state.is_enabled() {
+                    style(found_plugins.join(", ")).cyan().to_string()
+                } else {
+                    found_plugins.join(", ")
+                }
             );
         }
 
@@ -540,7 +560,10 @@ impl PluginInstaller {
             fs::copy(plugin_file, &dest_path)?;
         }
 
-        println!("  ✓ Successfully installed {}", plugin_name.bright_blue());
+        println!(
+            "  ✓ Successfully installed {}",
+            self.display_colored(&plugin_name, |s| s.bright_blue())
+        );
         Ok(())
     }
 

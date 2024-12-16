@@ -31,6 +31,7 @@
   - [Filter System](#filter-system)
   - [Plugin System](#plugin-system)
 - [Configuration](#configuration)
+- [Theming](#theming)
 - [Development](#development)
   - [Plugin Development](#plugin-development)
   - [Contributing](#contributing)
@@ -468,6 +469,80 @@ lla config --set default_sort size
 lla config --set default_format long
 ```
 
+## Theming
+
+LLA includes a powerful theming system that allows you to customize the appearance of your file listings. Themes are defined in TOML files and stored in `~/.config/lla/themes/`.
+
+**Theme Structure:**
+
+```toml
+# Theme metadata
+name = "my_theme"
+author = "Your Name"
+description = "A description of your theme"
+
+# Core colors
+[colors]
+file = "#FFFFFF"        # Regular files
+directory = "#89AFFF"   # Directories
+symlink = "#89DBFF"     # Symbolic links
+executable = "#5DE4B3"  # Executable files
+
+# Special files
+[special_files]
+folders."node_modules" = "#666666"
+dotfiles.".env" = "#FFFFC2"
+exact_match."README.md" = "#FFFFC2"
+patterns."*.min.*" = "#282E30"
+
+# Extension-based colors
+[extensions.groups]
+rust = ["rs", "toml"]
+web = ["html", "css", "js"]
+
+[extensions.colors]
+rust = "#FF5733"
+web = "#61AFEF"
+```
+
+**Built-in Themes:**
+
+- **default**: Traditional terminal colors optimized for visibility
+- **dark**: Modern dark theme with enhanced visibility
+- **light**: Clean theme optimized for light terminals
+- **ayu_dark**, **ayu_light**, **ayu_mirage**: Inspired by the Ayu color scheme
+- **catppuccin_mocha**: Soothing pastel theme with warm colors
+- **dracula**: Classic Dracula scheme with vibrant colors
+- **gruvbox_dark**: Retro groove theme with earthy tones
+- **material_ocean**: Deep blue Material Design theme
+- **nord**: Arctic, north-bluish color palette
+- **one_dark**: Atom-inspired balanced dark theme
+- **poimandres**: Deep space aesthetic theme
+- **tokyo_night**: Vibrant dark theme inspired by Tokyo nights
+- **vesper**: Minimalist dark theme with warm accents
+
+**Using Themes:**
+
+Copy the theme you want to use to your `~/.config/lla/themes/` directory.
+
+and then set the theme in your config or use the command line:
+
+```bash
+# Set theme in config
+lla config --set theme dark
+
+# Disable colors
+lla config --set theme none
+```
+
+also you can disable colors all together by using the `--no-colors` flag:
+
+```bash
+lla --no-colors # works with all listing commands
+```
+
+For more detailed information about theming, see the [themes documentation](themes/README.md).
+
 ## Development
 
 ### Plugin Development
@@ -481,6 +556,10 @@ Develop custom plugins using the `Plugin` trait from [lla_plugin_interface](http
 3. Commit your changes (`git commit -m 'Add some new-feature'`)
 4. Push to the branch (`git push origin feature/new-feature`)
 5. Open a Pull Request
+
+If you want to add a new theme, please add it to the `themes/` directory.
+
+If you want to add a new plugin, please add it to the `plugins/` directory or you can use your own repo to host it.
 
 ## License
 
