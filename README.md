@@ -31,6 +31,7 @@
   - [Filter System](#filter-system)
   - [Plugin System](#plugin-system)
 - [Configuration](#configuration)
+- [Theming](#theming)
 - [Development](#development)
   - [Plugin Development](#plugin-development)
   - [Contributing](#contributing)
@@ -467,6 +468,61 @@ CLI Configuration:
 lla config --set default_sort size
 lla config --set default_format long
 ```
+
+## Theming
+
+LLA includes a powerful theming system that allows you to customize the appearance of your file listings. Themes are defined in TOML files and stored in `~/.config/lla/themes/`.
+
+**Built-in Themes:**
+
+- **default**: Traditional terminal colors
+- **dark**: Modern dark theme optimized for dark terminals
+- **light**: Clean theme optimized for light terminals
+- **poimandres**: Theme inspired by the Poimandres color scheme
+
+**Using Themes:**
+
+```bash
+# Set theme in config
+lla config --set theme dark
+
+# Disable colors
+lla config --set theme none
+# Or use --no-colors flag
+lla --no-colors
+```
+
+**Theme Structure:**
+
+```toml
+# Theme metadata
+name = "my_theme"
+author = "Your Name"
+description = "A description of your theme"
+
+# Core colors
+[colors]
+file = "#FFFFFF"        # Regular files
+directory = "#89AFFF"   # Directories
+symlink = "#89DBFF"     # Symbolic links
+executable = "#5DE4B3"  # Executable files
+
+# Special files
+[special_files.folders]
+"node_modules" = "#666666"
+".git" = "#FF6B6B"
+
+[special_files.dotfiles]
+".gitignore" = "#89DBFF"
+".env" = "#FFFFC2"
+
+# Extension-based colors
+[extensions.groups]
+rust = ["rs", "toml"]
+web = ["html", "css", "js"]
+```
+
+For more detailed information about theming, see the [themes documentation](themes/README.md).
 
 ## Development
 
