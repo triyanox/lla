@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2024-12-16
+
+### Added
+
+- A theming system to customize the look of `lla`
+- New configuration option `theme`
+- An extensive theming preset library
+- Add the `--no-color` flag to disable color output, and works will all listing formats
+- New package managers support:
+
+  - Flatpak
+  - Debian
+  - Scoop
+  - Winget
+
+- Include window builds in the releases
+
+### Fixed
+
+- Minor fixes and improvements
+- Stability improvements
+
 ## [0.3.4] - 2024-12-14
 
 ### Added
