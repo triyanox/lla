@@ -1,7 +1,8 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
-use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
+use crate::theme::{self, ColorValue};
+use crate::utils::color::{self, colorize_file_name, colorize_file_name_with_icon};
 use crate::utils::icons::format_with_icon;
 use colored::*;
 use console::strip_ansi_codes;
@@ -22,6 +23,10 @@ impl GitFormatter {
 
     fn strip_ansi(s: &str) -> String {
         String::from_utf8(strip_ansi_escapes::strip(s).unwrap_or_default()).unwrap_or_default()
+    }
+
+    fn get_theme_color(value: &ColorValue) -> Color {
+        theme::color_value_to_color(value)
     }
 }
 #[derive(Debug, Default)]
@@ -68,31 +73,38 @@ impl GitFormatter {
     }
 
     fn format_git_status(status: &str) -> (String, String) {
+        let theme = color::get_theme();
+        let staged_color = Self::get_theme_color(&theme.colors.executable);
+        let modified_color = Self::get_theme_color(&ColorValue::Named("yellow".to_string()));
+        let deleted_color = Self::get_theme_color(&ColorValue::Named("red".to_string()));
+        let renamed_color = Self::get_theme_color(&theme.colors.symlink);
+        let untracked_color = Self::get_theme_color(&ColorValue::Named("bright black".to_string()));
+
         let status_str = match status {
-            "M." => "[staged]".green(),
-            "A." => "[added]".green(),
-            "D." => "[deleted]".red(),
-            "R." => "[renamed]".blue(),
-            "C." => "[copied]".blue(),
+            "M." => format!("[staged]").color(staged_color),
+            "A." => format!("[added]").color(staged_color),
+            "D." => format!("[deleted]").color(deleted_color),
+            "R." => format!("[renamed]").color(renamed_color),
+            "C." => format!("[copied]").color(renamed_color),
 
-            ".M" => "[modified]".yellow(),
-            ".D" => "[deleted]".red(),
+            ".M" => format!("[modified]").color(modified_color),
+            ".D" => format!("[deleted]").color(deleted_color),
 
-            "MM" => "[modified*]".yellow(),
-            "AM" => "[added+]".green(),
-            "DM" => "[deleted*]".red(),
+            "MM" => format!("[modified*]").color(modified_color),
+            "AM" => format!("[added+]").color(staged_color),
+            "DM" => format!("[deleted*]").color(deleted_color),
 
-            "UU" => "[conflict]".red(),
+            "UU" => format!("[conflict]").color(deleted_color),
 
-            "??" => "[untracked]".bright_black(),
-            "!!" => "[ignored]".bright_black(),
-            "." => "[unchanged]".normal(),
+            "??" => format!("[untracked]").color(untracked_color),
+            "!!" => format!("[ignored]").color(untracked_color),
+            "." => format!("[unchanged]").normal(),
 
-            s if s.starts_with('M') => format!("[modified+{}]", &s[1..]).yellow(),
-            s if s.starts_with('A') => format!("[added+{}]", &s[1..]).green(),
-            s if s.starts_with('D') => format!("[deleted+{}]", &s[1..]).red(),
-            s if s.starts_with('R') => format!("[renamed+{}]", &s[1..]).blue(),
-            s if s.starts_with('C') => format!("[copied+{}]", &s[1..]).blue(),
+            s if s.starts_with('M') => format!("[modified+{}]", &s[1..]).color(modified_color),
+            s if s.starts_with('A') => format!("[added+{}]", &s[1..]).color(staged_color),
+            s if s.starts_with('D') => format!("[deleted+{}]", &s[1..]).color(deleted_color),
+            s if s.starts_with('R') => format!("[renamed+{}]", &s[1..]).color(renamed_color),
+            s if s.starts_with('C') => format!("[copied+{}]", &s[1..]).color(renamed_color),
             s => format!("[{}]", s).normal(),
         };
 
@@ -191,6 +203,15 @@ impl FileFormatter for GitFormatter {
             return Ok(String::new());
         }
 
+        let theme = color::get_theme();
+        let branch_color = Self::get_theme_color(&theme.colors.executable);
+        let ahead_color = Self::get_theme_color(&ColorValue::Named("yellow".to_string()));
+        let behind_color = Self::get_theme_color(&ColorValue::Named("red".to_string()));
+        let separator_color = Self::get_theme_color(&ColorValue::Named("bright black".to_string()));
+        let hash_color = Self::get_theme_color(&theme.colors.symlink);
+        let time_color = Self::get_theme_color(&ColorValue::Named("bright black".to_string()));
+        let author_color = Self::get_theme_color(&theme.colors.user);
+
         let workspace_root = Path::new(&files[0].path)
             .ancestors()
             .find(|p| p.join(".git").exists())
@@ -225,19 +246,19 @@ impl FileFormatter for GitFormatter {
 
         let mut output = format!(
             "\n{} {}{}{}\n{}\n",
-            "⎇".bright_blue(),
-            git_info.branch.green().bold(),
+            "⎇".color(branch_color),
+            git_info.branch.color(branch_color).bold(),
             if git_info.ahead > 0 {
-                format!(" ↑{}", git_info.ahead).yellow()
+                format!(" ↑{}", git_info.ahead).color(ahead_color)
             } else {
                 "".into()
             },
             if git_info.behind > 0 {
-                format!(" ↓{}", git_info.behind).red()
+                format!(" ↓{}", git_info.behind).color(behind_color)
             } else {
                 "".into()
             },
-            "─".repeat(40).bright_black()
+            "─".repeat(40).color(separator_color)
         );
 
         output.push_str(&format!(
@@ -287,21 +308,19 @@ impl FileFormatter for GitFormatter {
             let hash_padding = " ".repeat(max_hash_width.saturating_sub(commit_info.0.len()));
             let time_padding = " ".repeat(max_time_width.saturating_sub(commit_info.1.len()));
 
-            let author_part = if commit_info.2 != "-" {
-                format!("by {} ", commit_info.2.bright_blue())
-            } else {
-                "".into()
-            };
-
             output.push_str(&format!(
                 "{}{}  @{}{}  {}{}  {}{}{}",
                 name,
                 name_padding,
-                commit_info.0.bright_yellow(),
+                commit_info.0.color(hash_color),
                 hash_padding,
-                commit_info.1.bright_black(),
+                commit_info.1.color(time_color),
                 time_padding,
-                author_part,
+                if commit_info.2 != "-" {
+                    format!("by {} ", commit_info.2.color(author_color))
+                } else {
+                    "".into()
+                },
                 status,
                 if plugin_fields.is_empty() {
                     String::new()

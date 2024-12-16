@@ -7,6 +7,7 @@ mod installer;
 mod lister;
 mod plugin;
 mod sorter;
+mod theme;
 mod utils;
 
 use commands::args::{Args, Command};
@@ -14,10 +15,15 @@ use commands::command_handler::handle_command;
 use config::Config;
 use error::Result;
 use plugin::PluginManager;
+use utils::color::set_theme;
 
 fn main() -> Result<()> {
     let (mut config, config_error) = load_config()?;
+
+    set_theme(config.get_theme());
+
     let args = Args::parse(&config);
+    theme::set_no_color(args.no_color);
 
     if let Some(Command::Clean) = args.command {
         println!("🔄 Starting plugin cleaning...");

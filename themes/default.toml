@@ -1,0 +1,155 @@
+# lla default theme
+name = "default"
+author = "Mohamed Achaq"
+description = "A modern, high-contrast theme for lla with carefully selected colors for optimal visibility"
+
+[colors]
+# Core UI Elements
+file = { r = 220, g = 220, b = 220 }      # Light Gray - Better than pure white for eye comfort
+directory = { r = 74, g = 144, b = 226 }  # Vibrant Blue - More saturated and visible
+symlink = { r = 42, g = 161, b = 152 }    # Teal - Distinct from directory
+executable = { r = 126, g = 211, b = 33 } # Lime Green - More visible than traditional green
+
+# Metadata
+size = { r = 42, g = 161, b = 152 }   # Teal - Softer than pure green
+date = { r = 170, g = 170, b = 170 }  # Medium Gray - Subtle but readable
+user = { r = 108, g = 113, b = 196 }  # Soft Purple - Distinct from other elements
+group = { r = 146, g = 146, b = 146 } # Darker Gray - Subtle but visible
+
+# Permissions
+permission_dir = { r = 74, g = 144, b = 226 }   # Vibrant Blue - Matches directory
+permission_read = { r = 42, g = 161, b = 152 }  # Teal - Clear and visible
+permission_write = { r = 203, g = 75, b = 22 }  # Orange - Warning color
+permission_exec = { r = 126, g = 211, b = 33 }  # Lime Green - Matches executable
+permission_none = { r = 146, g = 146, b = 146 } # Darker Gray - Clearly shows lack of permission
+
+[special_files]
+# Special Folders
+[special_files.folders]
+# Development folders
+"node_modules" = { r = 146, g = 146, b = 146 } # Darker Gray
+"target" = { r = 146, g = 146, b = 146 }       # Darker Gray
+"dist" = { r = 146, g = 146, b = 146 }         # Darker Gray
+".git" = { r = 203, g = 75, b = 22 }           # Orange - More visible than red
+"build" = { r = 146, g = 146, b = 146 }        # Darker Gray
+".cache" = { r = 146, g = 146, b = 146 }       # Darker Gray
+
+# Environment folders
+"*-env" = { r = 126, g = 211, b = 33 } # Lime Green
+"venv" = { r = 126, g = 211, b = 33 }  # Lime Green
+".env" = { r = 126, g = 211, b = 33 }  # Lime Green
+
+# Pattern matches for folders
+"*.d" = { r = 74, g = 144, b = 226 }      # Vibrant Blue
+"*_cache" = { r = 146, g = 146, b = 146 } # Darker Gray
+"*-cache" = { r = 146, g = 146, b = 146 } # Darker Gray
+
+# Dotfiles
+[special_files.dotfiles]
+".gitignore" = { r = 42, g = 161, b = 152 }    # Teal
+".env" = { r = 203, g = 75, b = 22 }           # Orange - Important files
+".dockerignore" = { r = 42, g = 161, b = 152 } # Teal
+".editorconfig" = { r = 42, g = 161, b = 152 } # Teal
+".prettierrc" = { r = 42, g = 161, b = 152 }   # Teal
+".eslintrc" = { r = 42, g = 161, b = 152 }     # Teal
+".babelrc" = { r = 42, g = 161, b = 152 }      # Teal
+
+# Exact matches
+[special_files.exact_match]
+"Dockerfile" = { r = 42, g = 161, b = 152 }         # Teal
+"docker-compose.yml" = { r = 42, g = 161, b = 152 } # Teal
+"Makefile" = { r = 211, g = 54, b = 130 }           # Deep Pink - Important build files
+"CMakeLists.txt" = { r = 211, g = 54, b = 130 }     # Deep Pink
+"README.md" = { r = 255, g = 199, b = 6 }           # Gold - Important documentation
+"LICENSE" = { r = 255, g = 199, b = 6 }             # Gold
+"package.json" = { r = 203, g = 75, b = 22 }        # Orange
+"Cargo.toml" = { r = 203, g = 75, b = 22 }          # Orange
+"go.mod" = { r = 42, g = 161, b = 152 }             # Teal
+"flake.nix" = { r = 108, g = 113, b = 196 }         # Soft Purple
+"flake.lock" = { r = 146, g = 146, b = 146 }        # Darker Gray
+"shell.nix" = { r = 108, g = 113, b = 196 }         # Soft Purple
+"default.nix" = { r = 108, g = 113, b = 196 }       # Soft Purple
+
+# Pattern matches
+[special_files.patterns]
+"*rc" = { r = 42, g = 161, b = 152 }        # Teal
+"*.min.*" = { r = 146, g = 146, b = 146 }   # Darker Gray
+"*.test.*" = { r = 126, g = 211, b = 33 }   # Lime Green
+"*.spec.*" = { r = 126, g = 211, b = 33 }   # Lime Green
+"*.lock" = { r = 146, g = 146, b = 146 }    # Darker Gray
+"*.config.*" = { r = 42, g = 161, b = 152 } # Teal
+
+[extensions.groups]
+# Development files
+rust = ["rs", "toml", "lock"]
+script = ["js", "mjs", "cjs", "jsx", "json", "json5", "yaml", "yml"]
+typescript = ["ts", "tsx", "d.ts"]
+markup = ["html", "htm", "xml", "vue", "ejs"]
+style = ["css", "scss", "sass", "less", "conf", "config", "ini", "env"]
+executable = [
+    "py",
+    "pyi",
+    "pyw",
+    "sh",
+    "bash",
+    "zsh",
+    "fish",
+    "bat",
+    "cmd",
+    "ps1",
+]
+doc = ["md", "rst", "txt", "doc", "docx", "pdf", "org", "wiki"]
+media = [
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "svg",
+    "bmp",
+    "ico",
+    "webp",
+    "tiff",
+    "mp4",
+    "mov",
+    "avi",
+    "mkv",
+    "flv",
+    "wmv",
+    "webm",
+    "m4v",
+    "3gp",
+]
+archive = ["zip", "tar", "gz", "rar", "7z", "iso", "dmg", "exe", "dll"]
+data = ["csv", "tsv", "sqlite", "db"]
+
+[extensions.colors]
+# Development
+rust = { r = 211, g = 54, b = 130 }       # Deep Pink
+script = { r = 255, g = 199, b = 6 }      # Gold
+typescript = { r = 74, g = 144, b = 226 } # Vibrant Blue
+markup = { r = 108, g = 113, b = 196 }    # Soft Purple
+style = { r = 42, g = 161, b = 152 }      # Teal
+executable = { r = 126, g = 211, b = 33 } # Lime Green
+doc = { r = 220, g = 220, b = 220 }       # Light Gray
+media = { r = 211, g = 54, b = 130 }      # Deep Pink
+archive = { r = 203, g = 75, b = 22 }     # Orange
+data = { r = 255, g = 199, b = 6 }        # Gold
+
+# Individual extension overrides
+rs = { r = 211, g = 54, b = 130 }    # Deep Pink
+toml = { r = 211, g = 54, b = 130 }  # Deep Pink
+lock = { r = 146, g = 146, b = 146 } # Darker Gray
+js = { r = 255, g = 199, b = 6 }     # Gold
+json = { r = 255, g = 199, b = 6 }   # Gold
+yaml = { r = 255, g = 199, b = 6 }   # Gold
+yml = { r = 255, g = 199, b = 6 }    # Gold
+ts = { r = 74, g = 144, b = 226 }    # Vibrant Blue
+tsx = { r = 74, g = 144, b = 226 }   # Vibrant Blue
+html = { r = 108, g = 113, b = 196 } # Soft Purple
+xml = { r = 108, g = 113, b = 196 }  # Soft Purple
+css = { r = 42, g = 161, b = 152 }   # Teal
+scss = { r = 42, g = 161, b = 152 }  # Teal
+py = { r = 126, g = 211, b = 33 }    # Lime Green
+sh = { r = 126, g = 211, b = 33 }    # Lime Green
+md = { r = 220, g = 220, b = 220 }   # Light Gray
+txt = { r = 220, g = 220, b = 220 }  # Light Gray

@@ -1,0 +1,184 @@
+# lla dark theme
+name = "dark"
+author = "Mohamed Achaq"
+description = "A modern dark theme with enhanced visibility and rich colors for dark terminals"
+
+[colors]
+# Core UI Elements
+file = { r = 220, g = 223, b = 228 }      # Soft white for better readability
+directory = { r = 127, g = 222, b = 255 } # Cyan
+symlink = { r = 127, g = 222, b = 255 }   # Bright cyan
+executable = { r = 80, g = 250, b = 123 } # Bright green
+
+# Metadata
+size = { r = 98, g = 209, b = 150 }   # Soft green
+date = { r = 187, g = 154, b = 247 }  # Soft purple
+user = { r = 255, g = 121, b = 198 }  # Bright pink
+group = { r = 139, g = 148, b = 158 } # Muted gray
+
+# Permissions
+permission_dir = { r = 82, g = 139, b = 255 }    # Vibrant blue
+permission_read = { r = 80, g = 250, b = 123 }   # Bright green
+permission_write = { r = 255, g = 184, b = 108 } # Soft orange
+permission_exec = { r = 255, g = 121, b = 198 }  # Bright pink
+permission_none = { r = 68, g = 71, b = 90 }     # Dark gray
+
+[special_files]
+# Special Folders
+[special_files.folders]
+# Development folders
+"node_modules" = { r = 68, g = 71, b = 90 } # Dark gray
+"target" = { r = 68, g = 71, b = 90 }       # Dark gray
+"dist" = { r = 68, g = 71, b = 90 }         # Dark gray
+".git" = { r = 255, g = 121, b = 198 }      # Bright pink
+"build" = { r = 68, g = 71, b = 90 }        # Dark gray
+".cache" = { r = 68, g = 71, b = 90 }       # Dark gray
+
+# Environment folders
+"*-env" = { r = 80, g = 250, b = 123 } # Bright green
+"venv" = { r = 80, g = 250, b = 123 }  # Bright green
+".env" = { r = 80, g = 250, b = 123 }  # Bright green
+
+# Pattern matches for folders
+"*.d" = { r = 82, g = 139, b = 255 }   # Vibrant blue - Type definition folders
+"*_cache" = { r = 68, g = 71, b = 90 } # Dark gray - Cache folders
+"*-cache" = { r = 68, g = 71, b = 90 } # Dark gray - Cache folders
+
+# Dotfiles
+[special_files.dotfiles]
+".gitignore" = { r = 127, g = 222, b = 255 }    # Bright cyan
+".env" = { r = 255, g = 184, b = 108 }          # Soft orange
+".dockerignore" = { r = 127, g = 222, b = 255 } # Bright cyan
+".editorconfig" = { r = 127, g = 222, b = 255 } # Bright cyan
+".prettierrc" = { r = 127, g = 222, b = 255 }   # Bright cyan
+".eslintrc" = { r = 127, g = 222, b = 255 }     # Bright cyan
+".babelrc" = { r = 127, g = 222, b = 255 }      # Bright cyan
+
+# Exact matches
+[special_files.exact_match]
+"Dockerfile" = { r = 127, g = 222, b = 255 }         # Bright cyan
+"docker-compose.yml" = { r = 127, g = 222, b = 255 } # Bright cyan
+"Makefile" = { r = 255, g = 121, b = 198 }           # Bright pink
+"CMakeLists.txt" = { r = 255, g = 121, b = 198 }     # Bright pink
+"README.md" = { r = 255, g = 184, b = 108 }          # Soft orange
+"LICENSE" = { r = 255, g = 184, b = 108 }            # Soft orange
+"package.json" = { r = 255, g = 184, b = 108 }       # Soft orange
+"Cargo.toml" = { r = 255, g = 121, b = 198 }         # Bright pink
+"go.mod" = { r = 127, g = 222, b = 255 }             # Bright cyan
+"flake.nix" = { r = 82, g = 139, b = 255 }           # Vibrant blue
+"flake.lock" = { r = 68, g = 71, b = 90 }            # Dark gray
+"shell.nix" = { r = 82, g = 139, b = 255 }           # Vibrant blue
+"default.nix" = { r = 82, g = 139, b = 255 }         # Vibrant blue
+
+# Pattern matches
+[special_files.patterns]
+"*rc" = { r = 127, g = 222, b = 255 }        # Bright cyan
+"*.min.*" = { r = 68, g = 71, b = 90 }       # Dark gray
+"*.test.*" = { r = 80, g = 250, b = 123 }    # Bright green
+"*.spec.*" = { r = 80, g = 250, b = 123 }    # Bright green
+"*.lock" = { r = 68, g = 71, b = 90 }        # Dark gray
+"*.config.*" = { r = 127, g = 222, b = 255 } # Bright cyan
+
+[extensions.groups]
+# Development files
+rust = ["rs", "toml"]
+python = ["py", "pyi", "pyw", "ipynb"]
+javascript = ["js", "mjs", "cjs", "jsx"]
+typescript = ["ts", "tsx", "d.ts"]
+java = ["java", "jar", "class"]
+csharp = ["cs", "csx"]
+cpp = ["cpp", "cc", "cxx", "c++", "hpp", "hxx", "h++"]
+go = ["go"]
+ruby = ["rb", "erb"]
+php = ["php", "phtml"]
+swift = ["swift"]
+kotlin = ["kt", "kts"]
+nix = ["nix"]
+
+# Web files
+markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
+style = ["css", "scss", "sass", "less", "styl"]
+web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
+
+# Shell and scripts
+shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
+script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
+
+# Documentation
+doc = [
+    "md",
+    "rst",
+    "txt",
+    "org",
+    "wiki",
+    "adoc",
+    "tex",
+    "pdf",
+    "epub",
+    "doc",
+    "docx",
+    "rtf",
+]
+
+# Media files
+image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
+video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
+audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+
+# Data and config
+data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
+archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
+
+[extensions.colors]
+# Development
+rust = { r = 255, g = 121, b = 198 }       # Bright pink
+python = { r = 80, g = 250, b = 123 }      # Bright green
+javascript = { r = 255, g = 184, b = 108 } # Soft orange
+typescript = { r = 82, g = 139, b = 255 }  # Vibrant blue
+java = { r = 255, g = 121, b = 198 }       # Bright pink
+csharp = { r = 80, g = 250, b = 123 }      # Bright green
+cpp = { r = 255, g = 121, b = 198 }        # Bright pink
+go = { r = 127, g = 222, b = 255 }         # Bright cyan
+ruby = { r = 255, g = 121, b = 198 }       # Bright pink
+php = { r = 80, g = 250, b = 123 }         # Bright green
+swift = { r = 255, g = 121, b = 198 }      # Bright pink
+kotlin = { r = 80, g = 250, b = 123 }      # Bright green
+nix = { r = 127, g = 222, b = 255 }        # Bright cyan
+
+# Web
+markup = { r = 187, g = 154, b = 247 }     # Soft purple
+style = { r = 127, g = 222, b = 255 }      # Bright cyan
+web_config = { r = 255, g = 184, b = 108 } # Soft orange
+
+# Shell and scripts
+shell = { r = 80, g = 250, b = 123 }   # Bright green
+script = { r = 255, g = 184, b = 108 } # Soft orange
+
+# Documentation
+doc = { r = 220, g = 223, b = 228 } # Soft white
+
+# Media
+image = { r = 187, g = 154, b = 247 } # Soft purple
+video = { r = 187, g = 154, b = 247 } # Soft purple
+audio = { r = 187, g = 154, b = 247 } # Soft purple
+
+# Data and config
+data = { r = 255, g = 184, b = 108 }    # Soft orange
+archive = { r = 255, g = 121, b = 198 } # Bright pink
+
+# Individual extension overrides
+rs = { r = 255, g = 121, b = 198 }   # Bright pink
+py = { r = 80, g = 250, b = 123 }    # Bright green
+js = { r = 255, g = 184, b = 108 }   # Soft orange
+ts = { r = 82, g = 139, b = 255 }    # Vibrant blue
+jsx = { r = 255, g = 184, b = 108 }  # Soft orange
+tsx = { r = 82, g = 139, b = 255 }   # Vibrant blue
+vue = { r = 80, g = 250, b = 123 }   # Bright green
+css = { r = 127, g = 222, b = 255 }  # Bright cyan
+scss = { r = 127, g = 222, b = 255 } # Bright cyan
+html = { r = 187, g = 154, b = 247 } # Soft purple
+md = { r = 220, g = 223, b = 228 }   # Soft white
+json = { r = 255, g = 184, b = 108 } # Soft orange
+yaml = { r = 255, g = 184, b = 108 } # Soft orange
+toml = { r = 255, g = 184, b = 108 } # Soft orange
+sql = { r = 127, g = 222, b = 255 }  # Bright cyan

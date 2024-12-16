@@ -1,0 +1,159 @@
+# lla ayu mirage theme
+name = "ayu_mirage"
+author = "Mohamed Achaq"
+description = "A refined dark theme with muted colors and soft contrasts, based on the Mirage color scheme"
+
+[colors]
+file = "#CCCAC2"
+directory = "#FFCC66"
+symlink = "#73D0FF"
+executable = "#87D96C"
+
+size = "#707A8C"
+date = "#707A8C"
+user = "#F28779"
+group = "#6C7A8B"
+
+permission_dir = "#FFCC66"
+permission_read = "#87D96C"
+permission_write = "#F28779"
+permission_exec = "#FF6666"
+permission_none = "#4A505A"
+
+[special_files]
+[special_files.folders]
+"node_modules" = { h = 0, s = 0, l = 0.15 }
+"target" = "#E7EAED"
+"dist" = "#E7EAED"
+".git" = "#FFCC66"
+"build" = "#E7EAED"
+".cache" = "#E7EAED"
+"*-env" = "#87D96C"
+"venv" = "#87D96C"
+".env" = "#87D96C"
+"*.d" = "#73D0FF"
+"*_cache" = "#E7EAED"
+"*-cache" = "#E7EAED"
+
+[special_files.dotfiles]
+".gitignore" = "#5CCFE6"
+".env" = "#FFCC66"
+".dockerignore" = "#5CCFE6"
+".editorconfig" = "#5CCFE6"
+".prettierrc" = "#5CCFE6"
+".eslintrc" = "#5CCFE6"
+".babelrc" = "#5CCFE6"
+
+[special_files.exact_match]
+"Dockerfile" = "#5CCFE6"
+"docker-compose.yml" = "#5CCFE6"
+"Makefile" = "#FF6666"
+"CMakeLists.txt" = "#FF6666"
+"README.md" = "#FFCC66"
+"LICENSE" = "#FFCC66"
+"package.json" = "#FFCC66"
+"Cargo.toml" = "#FF6666"
+"go.mod" = "#5CCFE6"
+"flake.nix" = "#FFCC66"
+"flake.lock" = "#E7EAED"
+"shell.nix" = "#FFCC66"
+"default.nix" = "#FFCC66"
+
+[special_files.patterns]
+"*rc" = "#5CCFE6"
+"*.min.*" = "#E7EAED"
+"*.test.*" = "#87D96C"
+"*.spec.*" = "#87D96C"
+"*.lock" = "#E7EAED"
+"*.config.*" = "#5CCFE6"
+
+[extensions.groups]
+rust = ["rs", "toml"]
+python = ["py", "pyi", "pyw", "ipynb"]
+javascript = ["js", "mjs", "cjs", "jsx"]
+typescript = ["ts", "tsx", "d.ts"]
+java = ["java", "jar", "class"]
+csharp = ["cs", "csx"]
+cpp = ["cpp", "cc", "cxx", "c++", "hpp", "hxx", "h++"]
+go = ["go"]
+ruby = ["rb", "erb"]
+php = ["php", "phtml"]
+swift = ["swift"]
+kotlin = ["kt", "kts"]
+nix = ["nix"]
+
+markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
+style = ["css", "scss", "sass", "less", "styl"]
+web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
+
+shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
+script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
+
+doc = [
+    "md",
+    "rst",
+    "txt",
+    "org",
+    "wiki",
+    "adoc",
+    "tex",
+    "pdf",
+    "epub",
+    "doc",
+    "docx",
+    "rtf",
+]
+
+image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
+video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
+audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+
+data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
+archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
+
+[extensions.colors]
+rust = "#FF6666"
+python = "#95E6CB"
+javascript = "#FFD173"
+typescript = "#73D0FF"
+java = "#FF6666"
+csharp = "#95E6CB"
+cpp = "#FF6666"
+go = "#73D0FF"
+ruby = "#FF6666"
+php = "#95E6CB"
+swift = "#FF6666"
+kotlin = "#95E6CB"
+nix = "#73D0FF"
+
+markup = "#F28779"
+style = "#95E6CB"
+web_config = "#FFCC66"
+
+shell = "#95E6CB"
+script = "#FFCC66"
+
+doc = "#CCCAC2"
+
+image = "#F29E74"
+video = "#F29E74"
+audio = "#F29E74"
+
+data = "#FFCC66"
+archive = "#FF6666"
+
+rs = "#FF6666"
+py = "#95E6CB"
+js = "#FFD173"
+ts = "#73D0FF"
+jsx = "#FFD173"
+tsx = "#73D0FF"
+vue = "#95E6CB"
+css = "#95E6CB"
+scss = "#95E6CB"
+html = "#F28779"
+md = "#CCCAC2"
+json = "#FFCC66"
+yaml = "#FFCC66"
+toml = "#FFCC66"
+sql = "#73D0FF"

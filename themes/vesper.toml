@@ -1,0 +1,180 @@
+# lla vesper theme
+name = "vesper"
+author = "Mohamed Achaq"
+description = "A minimalist dark theme with warm accents, inspired by the Vesper color scheme"
+
+[colors]
+# Core UI Elements
+file = "#FFFFFF"       # White for files - good contrast
+directory = "#FFC799"  # Warm orange - Directories
+symlink = "#99FFE4"    # Cyan - Symlinks
+executable = "#99FFE4" # Cyan - Executables
+
+# Metadata
+size = "#A0A0A0"  # Gray - File sizes
+date = "#A0A0A0"  # Gray - Dates
+user = "#FFC799"  # Warm orange - User
+group = "#7E7E7E" # Dim gray - Group
+
+# Permissions
+permission_dir = "#FFC799"   # Warm orange - Directory permissions
+permission_read = "#99FFE4"  # Cyan - Read permissions
+permission_write = "#FFC799" # Warm orange - Write permissions
+permission_exec = "#FF8080"  # Red - Execute permissions
+permission_none = "#505050"  # Dark gray - No permissions
+
+[special_files]
+# Special Folders
+[special_files.folders]
+# Development folders
+"node_modules" = { h = 0, s = 0, l = 0.3 } # Dark gray using HSL
+"target" = "#232323"                       # Dark background
+"dist" = "#232323"                         # Dark background
+".git" = "#FFC799"                         # Warm orange
+"build" = "#232323"                        # Dark background
+".cache" = "#232323"                       # Dark background
+"*-env" = "#99FFE4"                        # Cyan
+"venv" = "#99FFE4"                         # Cyan
+".env" = "#99FFE4"                         # Cyan
+"*.d" = "#FFC799"                          # Warm orange - Type definition folders
+"*_cache" = "#232323"                      # Dark background - Cache folders
+"*-cache" = "#232323"                      # Dark background - Cache folders
+
+# Dotfiles
+[special_files.dotfiles]
+".gitignore" = "#99FFE4"    # Cyan
+".env" = "#FFC799"          # Warm orange
+".dockerignore" = "#99FFE4" # Cyan
+".editorconfig" = "#99FFE4" # Cyan
+".prettierrc" = "#99FFE4"   # Cyan
+".eslintrc" = "#99FFE4"     # Cyan
+".babelrc" = "#99FFE4"      # Cyan
+
+# Exact matches
+[special_files.exact_match]
+"Dockerfile" = "#99FFE4"         # Cyan
+"docker-compose.yml" = "#99FFE4" # Cyan
+"Makefile" = "#FF8080"           # Red
+"CMakeLists.txt" = "#FF8080"     # Red
+"README.md" = "#FFC799"          # Warm orange
+"LICENSE" = "#FFC799"            # Warm orange
+"package.json" = "#FFC799"       # Warm orange
+"Cargo.toml" = "#FF8080"         # Red
+"go.mod" = "#99FFE4"             # Cyan
+"flake.nix" = "#FFC799"          # Warm orange
+"flake.lock" = "#232323"         # Dark background
+"shell.nix" = "#FFC799"          # Warm orange
+"default.nix" = "#FFC799"        # Warm orange
+
+# Pattern matches
+[special_files.patterns]
+"*rc" = "#99FFE4"        # Cyan
+"*.min.*" = "#232323"    # Dark background
+"*.test.*" = "#99FFE4"   # Cyan
+"*.spec.*" = "#99FFE4"   # Cyan
+"*.lock" = "#232323"     # Dark background
+"*.config.*" = "#99FFE4" # Cyan
+
+[extensions.groups]
+# Development files
+rust = ["rs", "toml"]
+python = ["py", "pyi", "pyw", "ipynb"]
+javascript = ["js", "mjs", "cjs", "jsx"]
+typescript = ["ts", "tsx", "d.ts"]
+java = ["java", "jar", "class"]
+csharp = ["cs", "csx"]
+cpp = ["cpp", "cc", "cxx", "c++", "hpp", "hxx", "h++"]
+go = ["go"]
+ruby = ["rb", "erb"]
+php = ["php", "phtml"]
+swift = ["swift"]
+kotlin = ["kt", "kts"]
+nix = ["nix"]
+
+# Web files
+markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
+style = ["css", "scss", "sass", "less", "styl"]
+web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
+
+# Shell and scripts
+shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
+script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
+
+# Documentation
+doc = [
+    "md",
+    "rst",
+    "txt",
+    "org",
+    "wiki",
+    "adoc",
+    "tex",
+    "pdf",
+    "epub",
+    "doc",
+    "docx",
+    "rtf",
+]
+
+# Media files
+image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
+video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
+audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+
+# Data and config
+data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
+archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
+
+[extensions.colors]
+# Development
+rust = "#FF8080"       # Red
+python = "#99FFE4"     # Cyan
+javascript = "#FFC799" # Warm orange
+typescript = "#FFC799" # Warm orange
+java = "#FF8080"       # Red
+csharp = "#99FFE4"     # Cyan
+cpp = "#FF8080"        # Red
+go = "#99FFE4"         # Cyan
+ruby = "#FF8080"       # Red
+php = "#99FFE4"        # Cyan
+swift = "#FF8080"      # Red
+kotlin = "#99FFE4"     # Cyan
+nix = "#99FFE4"        # Cyan
+
+# Web
+markup = "#FFFFFF"     # White
+style = "#99FFE4"      # Cyan
+web_config = "#FFC799" # Warm orange
+
+# Shell and scripts
+shell = "#99FFE4"  # Cyan
+script = "#FFC799" # Warm orange
+
+# Documentation
+doc = "#FFFFFF" # White
+
+# Media
+image = "#FFFFFF" # White
+video = "#FFFFFF" # White
+audio = "#FFFFFF" # White
+
+# Data and config
+data = "#FFC799"    # Warm orange
+archive = "#FF8080" # Red
+
+# Individual extension overrides
+rs = "#FF8080"   # Red
+py = "#99FFE4"   # Cyan
+js = "#FFC799"   # Warm orange
+ts = "#FFC799"   # Warm orange
+jsx = "#FFC799"  # Warm orange
+tsx = "#FFC799"  # Warm orange
+vue = "#99FFE4"  # Cyan
+css = "#99FFE4"  # Cyan
+scss = "#99FFE4" # Cyan
+html = "#FFFFFF" # White
+md = "#FFFFFF"   # White
+json = "#FFC799" # Warm orange
+yaml = "#FFC799" # Warm orange
+toml = "#FFC799" # Warm orange
+sql = "#99FFE4"  # Cyan

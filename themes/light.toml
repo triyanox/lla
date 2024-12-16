@@ -1,0 +1,184 @@
+# lla light theme
+name = "light"
+author = "Mohamed Achaq"
+description = "A clean theme optimized for light terminals with carefully selected colors for maximum readability"
+
+[colors]
+# Core UI Elements
+file = { r = 71, g = 85, b = 105 }       # Slate gray for readability
+directory = { r = 30, g = 64, b = 175 }  # Dark blue
+symlink = { r = 2, g = 132, b = 199 }    # Deep blue
+executable = { r = 22, g = 163, b = 74 } # Forest green
+
+# Metadata
+size = { r = 22, g = 163, b = 74 }    # Forest green
+date = { r = 124, g = 58, b = 237 }   # Deep purple
+user = { r = 190, g = 24, b = 93 }    # Deep pink
+group = { r = 100, g = 116, b = 139 } # Cool gray
+
+# Permissions
+permission_dir = { r = 30, g = 64, b = 175 }    # Dark blue
+permission_read = { r = 22, g = 163, b = 74 }   # Forest green
+permission_write = { r = 194, g = 65, b = 12 }  # Burnt orange
+permission_exec = { r = 190, g = 24, b = 93 }   # Deep pink
+permission_none = { r = 148, g = 163, b = 184 } # Light gray
+
+[special_files]
+# Special Folders
+[special_files.folders]
+# Development folders
+"node_modules" = { r = 148, g = 163, b = 184 } # Light gray
+"target" = { r = 148, g = 163, b = 184 }       # Light gray
+"dist" = { r = 148, g = 163, b = 184 }         # Light gray
+".git" = { r = 190, g = 24, b = 93 }           # Deep pink
+"build" = { r = 148, g = 163, b = 184 }        # Light gray
+".cache" = { r = 148, g = 163, b = 184 }       # Light gray
+
+# Environment folders
+"*-env" = { r = 22, g = 163, b = 74 } # Forest green
+"venv" = { r = 22, g = 163, b = 74 }  # Forest green
+".env" = { r = 22, g = 163, b = 74 }  # Forest green
+
+# Pattern matches for folders
+"*.d" = { r = 30, g = 64, b = 175 }       # Dark blue - Type definition folders
+"*_cache" = { r = 148, g = 163, b = 184 } # Light gray - Cache folders
+"*-cache" = { r = 148, g = 163, b = 184 } # Light gray - Cache folders
+
+# Dotfiles
+[special_files.dotfiles]
+".gitignore" = { r = 2, g = 132, b = 199 }    # Deep blue
+".env" = { r = 194, g = 65, b = 12 }          # Burnt orange
+".dockerignore" = { r = 2, g = 132, b = 199 } # Deep blue
+".editorconfig" = { r = 2, g = 132, b = 199 } # Deep blue
+".prettierrc" = { r = 2, g = 132, b = 199 }   # Deep blue
+".eslintrc" = { r = 2, g = 132, b = 199 }     # Deep blue
+".babelrc" = { r = 2, g = 132, b = 199 }      # Deep blue
+
+# Exact matches
+[special_files.exact_match]
+"Dockerfile" = { r = 2, g = 132, b = 199 }         # Deep blue
+"docker-compose.yml" = { r = 2, g = 132, b = 199 } # Deep blue
+"Makefile" = { r = 190, g = 24, b = 93 }           # Deep pink
+"CMakeLists.txt" = { r = 190, g = 24, b = 93 }     # Deep pink
+"README.md" = { r = 194, g = 65, b = 12 }          # Burnt orange
+"LICENSE" = { r = 194, g = 65, b = 12 }            # Burnt orange
+"package.json" = { r = 194, g = 65, b = 12 }       # Burnt orange
+"Cargo.toml" = { r = 190, g = 24, b = 93 }         # Deep pink
+"go.mod" = { r = 2, g = 132, b = 199 }             # Deep blue
+"flake.nix" = { r = 30, g = 64, b = 175 }          # Dark blue
+"flake.lock" = { r = 148, g = 163, b = 184 }       # Light gray
+"shell.nix" = { r = 30, g = 64, b = 175 }          # Dark blue
+"default.nix" = { r = 30, g = 64, b = 175 }        # Dark blue
+
+# Pattern matches
+[special_files.patterns]
+"*rc" = { r = 2, g = 132, b = 199 }        # Deep blue
+"*.min.*" = { r = 148, g = 163, b = 184 }  # Light gray
+"*.test.*" = { r = 22, g = 163, b = 74 }   # Forest green
+"*.spec.*" = { r = 22, g = 163, b = 74 }   # Forest green
+"*.lock" = { r = 148, g = 163, b = 184 }   # Light gray
+"*.config.*" = { r = 2, g = 132, b = 199 } # Deep blue
+
+[extensions.groups]
+# Development files
+rust = ["rs", "toml"]
+python = ["py", "pyi", "pyw", "ipynb"]
+javascript = ["js", "mjs", "cjs", "jsx"]
+typescript = ["ts", "tsx", "d.ts"]
+java = ["java", "jar", "class"]
+csharp = ["cs", "csx"]
+cpp = ["cpp", "cc", "cxx", "c++", "hpp", "hxx", "h++"]
+go = ["go"]
+ruby = ["rb", "erb"]
+php = ["php", "phtml"]
+swift = ["swift"]
+kotlin = ["kt", "kts"]
+nix = ["nix"]
+
+# Web files
+markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
+style = ["css", "scss", "sass", "less", "styl"]
+web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
+
+# Shell and scripts
+shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
+script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
+
+# Documentation
+doc = [
+    "md",
+    "rst",
+    "txt",
+    "org",
+    "wiki",
+    "adoc",
+    "tex",
+    "pdf",
+    "epub",
+    "doc",
+    "docx",
+    "rtf",
+]
+
+# Media files
+image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
+video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
+audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
+
+# Data and config
+data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
+archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
+
+[extensions.colors]
+# Development
+rust = { r = 190, g = 24, b = 93 }       # Deep pink
+python = { r = 22, g = 163, b = 74 }     # Forest green
+javascript = { r = 194, g = 65, b = 12 } # Burnt orange
+typescript = { r = 30, g = 64, b = 175 } # Dark blue
+java = { r = 190, g = 24, b = 93 }       # Deep pink
+csharp = { r = 22, g = 163, b = 74 }     # Forest green
+cpp = { r = 190, g = 24, b = 93 }        # Deep pink
+go = { r = 2, g = 132, b = 199 }         # Deep blue
+ruby = { r = 190, g = 24, b = 93 }       # Deep pink
+php = { r = 22, g = 163, b = 74 }        # Forest green
+swift = { r = 190, g = 24, b = 93 }      # Deep pink
+kotlin = { r = 22, g = 163, b = 74 }     # Forest green
+nix = { r = 30, g = 64, b = 175 }        # Dark blue
+
+# Web
+markup = { r = 124, g = 58, b = 237 }    # Deep purple
+style = { r = 2, g = 132, b = 199 }      # Deep blue
+web_config = { r = 194, g = 65, b = 12 } # Burnt orange
+
+# Shell and scripts
+shell = { r = 22, g = 163, b = 74 }  # Forest green
+script = { r = 194, g = 65, b = 12 } # Burnt orange
+
+# Documentation
+doc = { r = 71, g = 85, b = 105 } # Slate gray
+
+# Media
+image = { r = 124, g = 58, b = 237 } # Deep purple
+video = { r = 124, g = 58, b = 237 } # Deep purple
+audio = { r = 124, g = 58, b = 237 } # Deep purple
+
+# Data and config
+data = { r = 194, g = 65, b = 12 }    # Burnt orange
+archive = { r = 190, g = 24, b = 93 } # Deep pink
+
+# Individual extension overrides
+rs = { r = 190, g = 24, b = 93 }    # Deep pink
+py = { r = 22, g = 163, b = 74 }    # Forest green
+js = { r = 194, g = 65, b = 12 }    # Burnt orange
+ts = { r = 30, g = 64, b = 175 }    # Dark blue
+jsx = { r = 194, g = 65, b = 12 }   # Burnt orange
+tsx = { r = 30, g = 64, b = 175 }   # Dark blue
+vue = { r = 22, g = 163, b = 74 }   # Forest green
+css = { r = 2, g = 132, b = 199 }   # Deep blue
+scss = { r = 2, g = 132, b = 199 }  # Deep blue
+html = { r = 124, g = 58, b = 237 } # Deep purple
+md = { r = 71, g = 85, b = 105 }    # Slate gray
+json = { r = 194, g = 65, b = 12 }  # Burnt orange
+yaml = { r = 194, g = 65, b = 12 }  # Burnt orange
+toml = { r = 194, g = 65, b = 12 }  # Burnt orange
+sql = { r = 2, g = 132, b = 199 }   # Deep blue

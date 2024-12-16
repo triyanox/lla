@@ -1,6 +1,7 @@
 use super::FileFormatter;
 use crate::error::Result;
 use crate::plugin::PluginManager;
+use crate::theme::{self, ColorValue};
 use crate::utils::color::{colorize_file_name, colorize_file_name_with_icon};
 use crate::utils::icons::format_with_icon;
 use colored::*;
@@ -25,7 +26,8 @@ impl TreePart {
     }
 
     fn colored(self) -> ColoredString {
-        self.as_str().bright_black()
+        let color = theme::color_value_to_color(&ColorValue::Named("bright black".to_string()));
+        self.as_str().color(color)
     }
 }
 
