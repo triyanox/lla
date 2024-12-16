@@ -13,13 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New configuration option `theme`
 - An extensive theming preset library
 - Add the `--no-color` flag to disable color output, and works will all listing formats
-- New package managers support:
-
-  - Flatpak
-  - Debian
-  - Scoop
-  - Winget
-
+- New package managers support
 - Include window builds in the releases
 
 ### Fixed
