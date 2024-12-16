@@ -1,0 +1,191 @@
+name: Package Manager Distribution
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  macports:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MacPorts port
+        run: |
+          # Create MacPorts Portfile
+          mkdir -p macports/lla
+          cat > macports/lla/Portfile << EOF
+          # -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+
+          PortSystem          1.0
+          PortGroup           github 1.0
+          PortGroup           cargo 1.0
+
+          github.setup        triyanox lla \${version}
+          categories          devel
+          platforms           darwin
+          license            MIT
+          maintainers        github:triyanox
+          description        A modern and extensible log analysis CLI tool
+          long_description   \${description}
+
+          checksums           \${checksums}
+
+          cargo.crates        \${crates}
+          EOF
+
+      - name: Create Pull Request for MacPorts
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "port lla: update to ${{ github.event.release.tag_name }}"
+          title: "port lla: update to ${{ github.event.release.tag_name }}"
+          body: |
+            Update lla port to version ${{ github.event.release.tag_name }}
+          branch: update-macports
+          base: master
+
+      - name: Create PR in MacPorts
+        run: |
+          gh repo fork macports/macports-ports --clone=false
+          gh pr create --repo macports/macports-ports \
+            --title "port lla: update to ${{ github.event.release.tag_name }}" \
+            --body "Update lla port to version ${{ github.event.release.tag_name }}" \
+            --base master \
+            --head triyanox:update-macports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  scoop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Scoop manifest
+        run: |
+          mkdir -p scoop
+          # Create manifest file
+          cat > scoop/lla.json << EOF
+          {
+              "version": "${{ github.event.release.tag_name }}",
+              "description": "A modern and extensible log analysis CLI tool",
+              "homepage": "https://github.com/triyanox/lla",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "https://github.com/triyanox/lla/releases/download/${{ github.event.release.tag_name }}/lla-windows-amd64.exe",
+                      "bin": "lla-windows-amd64.exe"
+                  }
+              },
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/triyanox/lla/releases/download/v$version/lla-windows-amd64.exe"
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Create Pull Request for Scoop
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "lla: update to ${{ github.event.release.tag_name }}"
+          title: "lla: update to ${{ github.event.release.tag_name }}"
+          body: |
+            Update lla to version ${{ github.event.release.tag_name }}
+          branch: update-scoop
+          base: master
+
+      - name: Create PR in Scoop
+        run: |
+          gh repo fork ScoopInstaller/Main --clone=false
+          gh pr create --repo ScoopInstaller/Main \
+            --title "lla: update to ${{ github.event.release.tag_name }}" \
+            --body "Update lla to version ${{ github.event.release.tag_name }}" \
+            --base master \
+            --head triyanox:update-scoop
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  winget:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Winget manifest
+        run: |
+          mkdir -p winget-manifests/l/lla/lla
+          cat > winget-manifests/l/lla/lla/manifest.yaml << EOF
+          PackageIdentifier: lla.lla
+          PackageVersion: ${{ github.event.release.tag_name }}
+          PackageName: lla
+          Publisher: triyanox
+          License: MIT
+          ShortDescription: A modern and extensible log analysis CLI tool
+          PackageUrl: https://github.com/triyanox/lla
+          Installers:
+            - Architecture: x64
+              InstallerUrl: https://github.com/triyanox/lla/releases/download/${{ github.event.release.tag_name }}/lla-windows-amd64.exe
+              InstallerType: portable
+              InstallerSha256: ${{ github.event.release.assets[0].sha256 }}
+          ManifestType: singleton
+          ManifestVersion: 1.0.0
+          EOF
+
+      - name: Create PR in Winget
+        run: |
+          gh repo fork microsoft/winget-pkgs --clone=false
+          gh pr create --repo microsoft/winget-pkgs \
+            --title "Add lla ${{ github.event.release.tag_name }}" \
+            --body "Add lla version ${{ github.event.release.tag_name }}" \
+            --base master \
+            --head triyanox:add-lla
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix package
+        run: |
+          mkdir -p nixpkgs
+          cat > nixpkgs/default.nix << EOF
+          { lib, rustPlatform, fetchFromGitHub }:
+
+          rustPlatform.buildRustPackage rec {
+            pname = "lla";
+            version = "${{ github.event.release.tag_name }}";
+
+            src = fetchFromGitHub {
+              owner = "triyanox";
+              repo = "lla";
+              rev = "v\${version}";
+              sha256 = "0000000000000000000000000000000000000000000000000000";
+            };
+
+            cargoSha256 = "0000000000000000000000000000000000000000000000000000";
+
+            meta = with lib; {
+              description = "A modern and extensible log analysis CLI tool";
+              homepage = "https://github.com/triyanox/lla";
+              license = licenses.mit;
+              maintainers = with maintainers; [ triyanox ];
+            };
+          }
+          EOF
+
+      - name: Create PR in Nixpkgs
+        run: |
+          gh repo fork NixOS/nixpkgs --clone=false
+          gh pr create --repo NixOS/nixpkgs \
+            --title "lla: init at ${{ github.event.release.tag_name }}" \
+            --body "Add lla package version ${{ github.event.release.tag_name }}" \
+            --base master \
+            --head triyanox:add-lla
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
