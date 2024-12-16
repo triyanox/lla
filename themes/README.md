@@ -1,6 +1,6 @@
 # LLA Themes
 
-LLA (Light List Alternative) provides a powerful and flexible theming system that allows you to customize the appearance of your file listings. Each theme is defined in a TOML file and can customize colors for files, folders, permissions, and more.
+LLA provides a powerful and flexible theming system that allows you to customize the appearance of your file listings. Each theme is defined in a TOML file and can customize colors for files, folders, permissions, and more.
 
 ## Table of Contents
 
@@ -212,10 +212,21 @@ When determining a file's color, LLA follows this priority:
 
 LLA includes several pre-configured themes:
 
-- **default**: Traditional terminal colors
-- **dark**: Modern dark theme optimized for dark terminals
-- **light**: Clean theme optimized for light terminals
-- **poimandres**: Theme inspired by the Poimandres color scheme
+- **default**: Traditional terminal colors with carefully selected colors for optimal visibility
+- **dark**: Modern dark theme with enhanced visibility and rich colors for dark terminals
+- **light**: Clean theme optimized for light terminals with maximum readability
+- **ayu_dark**: Dark theme inspired by the Ayu Dark color scheme, featuring deep backgrounds and vibrant accents
+- **ayu_light**: Light theme with carefully selected colors for optimal readability
+- **ayu_mirage**: Refined dark theme with muted colors and soft contrasts
+- **catppuccin_mocha**: A soothing pastel theme for the high-spirited, featuring warm, cozy colors
+- **dracula**: Classic Dracula color scheme with vibrant colors and high contrast
+- **gruvbox_dark**: Retro groove color scheme with warm, earthy tones and high contrast
+- **material_ocean**: Deep blue theme based on Material Design, featuring oceanic colors
+- **nord**: Arctic, north-bluish color palette with elegant pastel colors
+- **one_dark**: Dark theme inspired by Atom, featuring a perfect balance of cool and warm colors
+- **poimandres**: Deep space aesthetic with vibrant accents
+- **tokyo_night**: Dark theme inspired by the vibrant lights of Tokyo at night
+- **vesper**: Minimalist dark theme with warm accents
 
 ## Usage
 
