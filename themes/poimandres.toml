@@ -1,82 +1,72 @@
-# lla poimandres theme
 name = "poimandres"
 author = "Mohamed Achaq"
 description = "A theme inspired by the Poimandres color scheme, featuring a deep space aesthetic with vibrant accents"
 
 [colors]
-# Core UI Elements
-file = "#A6ACAE"       # foreground - Soft gray for files
-directory = "#89AFFF"  # blue - Directories
-symlink = "#89DBFF"    # cyan - Symlinks
-executable = "#5DE4B3" # green - Executables
+file = "#A6ACAE"
+directory = "#89AFFF"
+symlink = "#89DBFF"
+executable = "#5DE4B3"
 
-# Metadata
-size = "#5DE4B3"  # green - File sizes
-date = "#FCBCFA"  # magenta - Dates
-user = "#D0679D"  # red - User
-group = "#8A9092" # dim-foreground - Group
+size = "#5DE4B3"
+date = "#FCBCFA"
+user = "#D0679D"
+group = "#A6ACAE"
 
-# Permissions
-permission_dir = "#89AFFF"   # blue - Directory permissions
-permission_read = "#5DE4B3"  # green - Read permissions
-permission_write = "#FFFFC2" # yellow - Write permissions
-permission_exec = "#D0679D"  # red - Execute permissions
-permission_none = "#282E30"  # dim-black - No permissions
+permission_dir = "#89AFFF"
+permission_read = "#5DE4B3"
+permission_write = "#FFFFC2"
+permission_exec = "#D0679D"
+permission_none = "#A6ACAE"
 
 [special_files]
-# Special Folders
 [special_files.folders]
-# Development folders
-"node_modules" = { h = 0, s = 0, l = 0.3 } # Dark gray using HSL
-"target" = "#282E30"                       # dim-black
-"dist" = "#282E30"                         # dim-black
-".git" = "#D0679D"                         # red
-"build" = "#282E30"                        # dim-black
-".cache" = "#282E30"                       # dim-black
-"*-env" = "#5DE4B3"                        # green
-"venv" = "#5DE4B3"                         # green
-".env" = "#5DE4B3"                         # green
-"*.d" = "#89AFFF"                          # blue - Type definition folders
-"*_cache" = "#282E30"                      # dim-black - Cache folders
-"*-cache" = "#282E30"                      # dim-black - Cache folders
+"node_modules" = { h = 0, s = 0, l = 0.3 }
+"target" = "#A6ACAE"
+"dist" = "#A6ACAE"
+".git" = "#D0679D"
+"build" = "#A6ACAE"
+".cache" = "#A6ACAE"
+"*-env" = "#5DE4B3"
+"venv" = "#5DE4B3"
+".env" = "#5DE4B3"
+"*.d" = "#89AFFF"
+"*_cache" = "#A6ACAE"
+"*-cache" = "#A6ACAE"
 
-# Dotfiles
 [special_files.dotfiles]
-".gitignore" = "#89DBFF"    # cyan
-".env" = "#FFFFC2"          # yellow
-".dockerignore" = "#89DBFF" # cyan
-".editorconfig" = "#89DBFF" # cyan
-".prettierrc" = "#89DBFF"   # cyan
-".eslintrc" = "#89DBFF"     # cyan
-".babelrc" = "#89DBFF"      # cyan
+".gitignore" = "#89DBFF"
+".env" = "#FFFFC2"
+".dockerignore" = "#89DBFF"
+".editorconfig" = "#89DBFF"
+".prettierrc" = "#89DBFF"
+".eslintrc" = "#89DBFF"
+".babelrc" = "#89DBFF"
 
-# Exact matches
 [special_files.exact_match]
-"Dockerfile" = "#89DBFF"         # cyan
-"docker-compose.yml" = "#89DBFF" # cyan
-"Makefile" = "#D0679D"           # red
-"CMakeLists.txt" = "#D0679D"     # red
-"README.md" = "#FFFFC2"          # yellow
-"LICENSE" = "#FFFFC2"            # yellow
-"package.json" = "#FFFFC2"       # yellow
-"Cargo.toml" = "#D0679D"         # red
-"go.mod" = "#89DBFF"             # cyan
-"flake.nix" = "#89AFFF"          # blue
-"flake.lock" = "#282E30"         # dim-black
-"shell.nix" = "#89AFFF"          # blue
-"default.nix" = "#89AFFF"        # blue
+"Dockerfile" = "#89DBFF"
+"docker-compose.yml" = "#89DBFF"
+"Makefile" = "#D0679D"
+"CMakeLists.txt" = "#D0679D"
+"README.md" = "#FFFFC2"
+"LICENSE" = "#FFFFC2"
+"package.json" = "#FFFFC2"
+"Cargo.toml" = "#D0679D"
+"go.mod" = "#89DBFF"
+"flake.nix" = "#89AFFF"
+"flake.lock" = "#A6ACAE"
+"shell.nix" = "#89AFFF"
+"default.nix" = "#89AFFF"
 
-# Pattern matches
 [special_files.patterns]
-"*rc" = "#89DBFF"        # cyan
-"*.min.*" = "#282E30"    # dim-black
-"*.test.*" = "#5DE4B3"   # green
-"*.spec.*" = "#5DE4B3"   # green
-"*.lock" = "#282E30"     # dim-black
-"*.config.*" = "#89DBFF" # cyan
+"*rc" = "#89DBFF"
+"*.min.*" = "#A6ACAE"
+"*.test.*" = "#5DE4B3"
+"*.spec.*" = "#5DE4B3"
+"*.lock" = "#A6ACAE"
+"*.config.*" = "#89DBFF"
 
 [extensions.groups]
-# Development files
 rust = ["rs", "toml"]
 python = ["py", "pyi", "pyw", "ipynb"]
 javascript = ["js", "mjs", "cjs", "jsx"]
@@ -91,16 +81,13 @@ swift = ["swift"]
 kotlin = ["kt", "kts"]
 nix = ["nix"]
 
-# Web files
 markup = ["html", "htm", "xhtml", "xml", "svg", "vue", "wasm", "ejs"]
 style = ["css", "scss", "sass", "less", "styl"]
 web_config = ["json", "json5", "yaml", "yml", "toml", "ini", "conf", "config"]
 
-# Shell and scripts
 shell = ["sh", "bash", "zsh", "fish", "ps1", "psm1", "psd1"]
 script = ["pl", "pm", "t", "tcl", "lua", "vim", "vimrc", "r"]
 
-# Documentation
 doc = [
     "md",
     "rst",
@@ -116,65 +103,56 @@ doc = [
     "rtf",
 ]
 
-# Media files
 image = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "ico", "heic"]
 video = ["mp4", "webm", "mov", "avi", "mkv", "flv", "wmv", "m4v", "3gp"]
 audio = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"]
 
-# Data and config
 data = ["csv", "tsv", "sql", "sqlite", "db", "json", "xml", "yaml", "yml"]
 archive = ["zip", "tar", "gz", "bz2", "xz", "7z", "rar", "iso", "dmg"]
 
 [extensions.colors]
-# Development
-rust = "#D0679D"       # red
-python = "#5DE4B3"     # green
-javascript = "#FFFFC2" # yellow
-typescript = "#89AFFF" # blue
-java = "#D0679D"       # red
-csharp = "#5DE4B3"     # green
-cpp = "#D0679D"        # red
-go = "#89DBFF"         # cyan
-ruby = "#D0679D"       # red
-php = "#5DE4B3"        # green
-swift = "#D0679D"      # red
-kotlin = "#5DE4B3"     # green
-nix = "#89DBFF"        # cyan
+rust = "#D0679D"
+python = "#5DE4B3"
+javascript = "#FFFFC2"
+typescript = "#89AFFF"
+java = "#D0679D"
+csharp = "#5DE4B3"
+cpp = "#D0679D"
+go = "#89DBFF"
+ruby = "#D0679D"
+php = "#5DE4B3"
+swift = "#D0679D"
+kotlin = "#5DE4B3"
+nix = "#89DBFF"
 
-# Web
-markup = "#FCBCFA"     # magenta
-style = "#89DBFF"      # cyan
-web_config = "#FFFFC2" # yellow
+markup = "#FCBCFA"
+style = "#89DBFF"
+web_config = "#FFFFC2"
 
-# Shell and scripts
-shell = "#5DE4B3"  # green
-script = "#FFFFC2" # yellow
+shell = "#5DE4B3"
+script = "#FFFFC2"
 
-# Documentation
-doc = "#A6ACAE" # foreground
+doc = "#A6ACAE"
 
-# Media
-image = "#FCBCFA" # magenta
-video = "#FCBCFA" # magenta
-audio = "#FCBCFA" # magenta
+image = "#FCBCFA"
+video = "#FCBCFA"
+audio = "#FCBCFA"
 
-# Data and config
-data = "#FFFFC2"    # yellow
-archive = "#D0679D" # red
+data = "#FFFFC2"
+archive = "#D0679D"
 
-# Individual extension overrides
-rs = "#D0679D"   # red
-py = "#5DE4B3"   # green
-js = "#FFFFC2"   # yellow
-ts = "#89AFFF"   # blue
-jsx = "#FFFFC2"  # yellow
-tsx = "#89AFFF"  # blue
-vue = "#5DE4B3"  # green
-css = "#89DBFF"  # cyan
-scss = "#89DBFF" # cyan
-html = "#FCBCFA" # magenta
-md = "#A6ACAE"   # foreground
-json = "#FFFFC2" # yellow
-yaml = "#FFFFC2" # yellow
-toml = "#FFFFC2" # yellow
-sql = "#89DBFF"  # cyan
+rs = "#D0679D"
+py = "#5DE4B3"
+js = "#FFFFC2"
+ts = "#89AFFF"
+jsx = "#FFFFC2"
+tsx = "#89AFFF"
+vue = "#5DE4B3"
+css = "#89DBFF"
+scss = "#89DBFF"
+html = "#FCBCFA"
+md = "#A6ACAE"
+json = "#FFFFC2"
+yaml = "#FFFFC2"
+toml = "#FFFFC2"
+sql = "#89DBFF"

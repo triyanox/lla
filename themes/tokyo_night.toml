@@ -17,22 +17,22 @@ permission_dir = "#7AA2F7"
 permission_read = "#9ECE6A"
 permission_write = "#F7768E"
 permission_exec = "#F7768E"
-permission_none = "#1A1B26"
+permission_none = "#565F89"
 
 [special_files]
 [special_files.folders]
 "node_modules" = { h = 0, s = 0, l = 0.15 }
-"target" = "#1A1B26"
-"dist" = "#1A1B26"
+"target" = "#565F89"
+"dist" = "#565F89"
 ".git" = "#7AA2F7"
-"build" = "#1A1B26"
-".cache" = "#1A1B26"
+"build" = "#565F89"
+".cache" = "#565F89"
 "*-env" = "#9ECE6A"
 "venv" = "#9ECE6A"
 ".env" = "#9ECE6A"
 "*.d" = "#BB9AF7"
-"*_cache" = "#1A1B26"
-"*-cache" = "#1A1B26"
+"*_cache" = "#565F89"
+"*-cache" = "#565F89"
 
 [special_files.dotfiles]
 ".gitignore" = "#2AC3DE"
@@ -54,16 +54,16 @@ permission_none = "#1A1B26"
 "Cargo.toml" = "#F7768E"
 "go.mod" = "#2AC3DE"
 "flake.nix" = "#7AA2F7"
-"flake.lock" = "#1A1B26"
+"flake.lock" = "#565F89"
 "shell.nix" = "#7AA2F7"
 "default.nix" = "#7AA2F7"
 
 [special_files.patterns]
 "*rc" = "#2AC3DE"
-"*.min.*" = "#1A1B26"
+"*.min.*" = "#565F89"
 "*.test.*" = "#9ECE6A"
 "*.spec.*" = "#9ECE6A"
-"*.lock" = "#1A1B26"
+"*.lock" = "#565F89"
 "*.config.*" = "#2AC3DE"
 
 [extensions.groups]
