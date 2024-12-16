@@ -473,36 +473,6 @@ lla config --set default_format long
 
 LLA includes a powerful theming system that allows you to customize the appearance of your file listings. Themes are defined in TOML files and stored in `~/.config/lla/themes/`.
 
-**Built-in Themes:**
-
-- **default**: Traditional terminal colors with carefully selected colors for optimal visibility
-- **dark**: Modern dark theme with enhanced visibility and rich colors for dark terminals
-- **light**: Clean theme optimized for light terminals with maximum readability
-- **ayu_dark**: Dark theme inspired by the Ayu Dark color scheme, featuring deep backgrounds and vibrant accents
-- **ayu_light**: Light theme with carefully selected colors for optimal readability
-- **ayu_mirage**: Refined dark theme with muted colors and soft contrasts
-- **catppuccin_mocha**: A soothing pastel theme for the high-spirited, featuring warm, cozy colors
-- **dracula**: Classic Dracula color scheme with vibrant colors and high contrast
-- **gruvbox_dark**: Retro groove color scheme with warm, earthy tones and high contrast
-- **material_ocean**: Deep blue theme based on Material Design, featuring oceanic colors
-- **nord**: Arctic, north-bluish color palette with elegant pastel colors
-- **one_dark**: Dark theme inspired by Atom, featuring a perfect balance of cool and warm colors
-- **poimandres**: Deep space aesthetic with vibrant accents
-- **tokyo_night**: Dark theme inspired by the vibrant lights of Tokyo at night
-- **vesper**: Minimalist dark theme with warm accents
-
-**Using Themes:**
-
-```bash
-# Set theme in config
-lla config --set theme dark
-
-# Disable colors
-lla config --set theme none
-# Or use --no-colors flag
-lla --no-colors
-```
-
 **Theme Structure:**
 
 ```toml
@@ -519,18 +489,56 @@ symlink = "#89DBFF"     # Symbolic links
 executable = "#5DE4B3"  # Executable files
 
 # Special files
-[special_files.folders]
-"node_modules" = "#666666"
-".git" = "#FF6B6B"
-
-[special_files.dotfiles]
-".gitignore" = "#89DBFF"
-".env" = "#FFFFC2"
+[special_files]
+folders."node_modules" = "#666666"
+dotfiles.".env" = "#FFFFC2"
+exact_match."README.md" = "#FFFFC2"
+patterns."*.min.*" = "#282E30"
 
 # Extension-based colors
 [extensions.groups]
 rust = ["rs", "toml"]
 web = ["html", "css", "js"]
+
+[extensions.colors]
+rust = "#FF5733"
+web = "#61AFEF"
+```
+
+**Built-in Themes:**
+
+- **default**: Traditional terminal colors optimized for visibility
+- **dark**: Modern dark theme with enhanced visibility
+- **light**: Clean theme optimized for light terminals
+- **ayu_dark**, **ayu_light**, **ayu_mirage**: Inspired by the Ayu color scheme
+- **catppuccin_mocha**: Soothing pastel theme with warm colors
+- **dracula**: Classic Dracula scheme with vibrant colors
+- **gruvbox_dark**: Retro groove theme with earthy tones
+- **material_ocean**: Deep blue Material Design theme
+- **nord**: Arctic, north-bluish color palette
+- **one_dark**: Atom-inspired balanced dark theme
+- **poimandres**: Deep space aesthetic theme
+- **tokyo_night**: Vibrant dark theme inspired by Tokyo nights
+- **vesper**: Minimalist dark theme with warm accents
+
+**Using Themes:**
+
+Copy the theme you want to use to your `~/.config/lla/themes/` directory.
+
+and then set the theme in your config or use the command line:
+
+```bash
+# Set theme in config
+lla config --set theme dark
+
+# Disable colors
+lla config --set theme none
+```
+
+also you can disable colors all together by using the `--no-colors` flag:
+
+```bash
+lla --no-colors # works with all listing commands
 ```
 
 For more detailed information about theming, see the [themes documentation](themes/README.md).
@@ -548,6 +556,10 @@ Develop custom plugins using the `Plugin` trait from [lla_plugin_interface](http
 3. Commit your changes (`git commit -m 'Add some new-feature'`)
 4. Push to the branch (`git push origin feature/new-feature`)
 5. Open a Pull Request
+
+If you want to add a new theme, please add it to the `themes/` directory.
+
+If you want to add a new plugin, please add it to the `plugins/` directory or you can use your own repo to host it.
 
 ## License
 
