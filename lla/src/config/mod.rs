@@ -147,6 +147,7 @@ default_sort = "{}"
 #   - "default": Quick and clean directory listing
 #   - "long": Detailed file information with metadata
 #   - "tree": Hierarchical directory visualization
+#   - "fuzzy": Interactive fuzzy search
 #   - "grid": Organized grid layout for better readability
 #   - "git": Git-aware view with repository status
 #   - "timeline": Group files by time periods
@@ -344,7 +345,7 @@ max_entries = {}"#,
         }
 
         let valid_formats = [
-            "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table",
+            "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table", "fuzzy",
         ];
         if !valid_formats.contains(&self.default_format.as_str()) {
             return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
@@ -460,6 +461,7 @@ max_entries = {}"#,
             ["default_format"] => {
                 let valid_formats = [
                     "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table",
+                    "fuzzy",
                 ];
                 if !valid_formats.contains(&value) {
                     return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
