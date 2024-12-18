@@ -12,6 +12,7 @@ pub struct Args {
     pub sizemap_format: bool,
     pub timeline_format: bool,
     pub git_format: bool,
+    pub fuzzy_format: bool,
     pub show_icons: bool,
     pub no_color: bool,
     pub sort_by: String,
@@ -73,6 +74,7 @@ impl Args {
                     sizemap_format: config.default_format == "sizemap",
                     timeline_format: config.default_format == "timeline",
                     git_format: config.default_format == "git",
+                    fuzzy_format: false,
                     show_icons: config.show_icons,
                     no_color: false,
                     sort_by: config.default_sort.clone(),
@@ -150,6 +152,12 @@ impl Args {
                     .short('G')
                     .long("git")
                     .help("Show git status and information (overrides config format)"),
+            )
+            .arg(
+                Arg::with_name("fuzzy")
+                    .short('F')
+                    .long("fuzzy")
+                    .help("Use interactive fuzzy finder"),
             )
             .arg(
                 Arg::with_name("icons")
@@ -423,6 +431,7 @@ impl Args {
             sizemap_format: matches.is_present("sizemap") || config.default_format == "sizemap",
             timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
             git_format: matches.is_present("git") || config.default_format == "git",
+            fuzzy_format: matches.is_present("fuzzy"),
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
             no_color: matches.is_present("no-color"),

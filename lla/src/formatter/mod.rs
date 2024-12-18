@@ -12,6 +12,7 @@ pub trait FileFormatter {
 }
 
 mod default;
+mod fuzzy;
 mod git;
 mod grid;
 mod long;
@@ -21,6 +22,7 @@ mod timeline;
 mod tree;
 
 pub use default::DefaultFormatter;
+pub use fuzzy::FuzzyFormatter;
 pub use git::GitFormatter;
 pub use grid::GridFormatter;
 pub use long::LongFormatter;

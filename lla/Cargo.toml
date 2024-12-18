@@ -41,3 +41,7 @@ prost = "0.12"
 bytes = "1.5"
 regex.workspace = true
 glob.workspace = true
+fuzzy-matcher = "0.3"
+ignore = "0.4"
+crossterm = "0.27"
+crossbeam-channel = "0.5.14"

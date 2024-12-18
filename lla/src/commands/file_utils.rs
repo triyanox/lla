@@ -6,10 +6,10 @@ use crate::filter::{
     GlobFilter, PatternFilter, RegexFilter,
 };
 use crate::formatter::{
-    DefaultFormatter, FileFormatter, GitFormatter, GridFormatter, LongFormatter, SizeMapFormatter,
-    TableFormatter, TimelineFormatter, TreeFormatter,
+    DefaultFormatter, FileFormatter, FuzzyFormatter, GitFormatter, GridFormatter, LongFormatter,
+    SizeMapFormatter, TableFormatter, TimelineFormatter, TreeFormatter,
 };
-use crate::lister::{BasicLister, FileLister, RecursiveLister};
+use crate::lister::{BasicLister, FileLister, FuzzyLister, RecursiveLister};
 use crate::plugin::PluginManager;
 use crate::sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter, SortOptions};
 use lla_plugin_interface::proto::{DecoratedEntry, EntryMetadata};
@@ -60,7 +60,9 @@ pub fn list_directory(
 }
 
 pub fn get_format(args: &Args) -> &'static str {
-    if args.long_format {
+    if args.fuzzy_format {
+        "fuzzy"
+    } else if args.long_format {
         "long"
     } else if args.tree_format {
         "tree"
@@ -163,7 +165,9 @@ pub fn sort_files(
 }
 
 pub fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
-    if args.tree_format {
+    if args.fuzzy_format {
+        Arc::new(FuzzyLister::new())
+    } else if args.tree_format {
         let config = Config::load(&Config::get_config_path()).unwrap_or_default();
         Arc::new(RecursiveLister::new(config))
     } else {
@@ -232,7 +236,9 @@ fn create_base_filter(pattern: &str, case_insensitive: bool) -> Box<dyn FileFilt
 }
 
 pub fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
-    if args.long_format {
+    if args.fuzzy_format {
+        Box::new(FuzzyFormatter::new(args.show_icons))
+    } else if args.long_format {
         Box::new(LongFormatter::new(args.show_icons))
     } else if args.tree_format {
         Box::new(TreeFormatter::new(args.show_icons))
