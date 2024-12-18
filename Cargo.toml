@@ -11,6 +11,7 @@ repository = "https://github.com/triyanox/lla"
 
 [workspace.dependencies]
 clap = "3.2.25"
+clap_complete = "3.2.5"
 serde = { version = "1.0.207", features = ["derive"] }
 toml = "0.8.19"
 dirs = "5.0.1"

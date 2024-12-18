@@ -32,6 +32,7 @@ pub enum LlaError {
     Config(ConfigErrorKind),
     Plugin(String),
     Filter(String),
+    Other(String),
 }
 
 impl fmt::Display for LlaError {
@@ -42,6 +43,7 @@ impl fmt::Display for LlaError {
             LlaError::Config(kind) => write!(f, "{}", kind),
             LlaError::Plugin(msg) => write!(f, "{}", msg),
             LlaError::Filter(msg) => write!(f, "{}", msg),
+            LlaError::Other(msg) => write!(f, "{}", msg),
         }
     }
 }

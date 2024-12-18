@@ -6,7 +6,92 @@ use crate::error::{LlaError, Result};
 use crate::installer::PluginInstaller;
 use crate::plugin::PluginManager;
 use crate::utils::color::ColorState;
+use clap_complete;
 use colored::*;
+use std::fs::{self, create_dir_all};
+use std::path::PathBuf;
+
+fn install_completion(
+    shell: clap_complete::Shell,
+    app: &mut clap::App,
+    color_state: &ColorState,
+    custom_path: Option<&str>,
+) -> Result<()> {
+    let mut buf = Vec::new();
+    clap_complete::generate(shell, app, env!("CARGO_PKG_NAME"), &mut buf);
+
+    let (install_path, post_install_msg) = if let Some(path) = custom_path {
+        (PathBuf::from(path), "Restart your shell to apply changes")
+    } else {
+        match shell {
+            clap_complete::Shell::Bash => {
+                let path = dirs::home_dir()
+                    .map(|h| h.join(".local/share/bash-completion/completions"))
+                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
+                (
+                    path.join("lla"),
+                    "Restart your shell or run 'source ~/.bashrc'",
+                )
+            }
+            clap_complete::Shell::Fish => {
+                let path = dirs::home_dir()
+                    .map(|h| h.join(".config/fish/completions"))
+                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
+                (
+                    path.join("lla.fish"),
+                    "Restart your shell or run 'source ~/.config/fish/config.fish'",
+                )
+            }
+            clap_complete::Shell::Zsh => {
+                let path = dirs::home_dir()
+                    .map(|h| h.join(".zsh/completions"))
+                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
+                (
+                    path.join("_lla"),
+                    "Add 'fpath=(~/.zsh/completions $fpath)' to ~/.zshrc and restart your shell",
+                )
+            }
+            clap_complete::Shell::PowerShell => {
+                let path = dirs::home_dir()
+                    .map(|h| h.join("Documents/WindowsPowerShell"))
+                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
+                (
+                    path.join("lla.ps1"),
+                    "Restart PowerShell or reload your profile",
+                )
+            }
+            clap_complete::Shell::Elvish => {
+                let path = dirs::home_dir()
+                    .map(|h| h.join(".elvish/lib"))
+                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
+                (path.join("lla.elv"), "Restart your shell")
+            }
+            _ => return Err(LlaError::Other(format!("Unsupported shell: {:?}", shell))),
+        }
+    };
+
+    if let Some(parent) = install_path.parent() {
+        create_dir_all(parent)?;
+    }
+    fs::write(&install_path, buf)?;
+    if color_state.is_enabled() {
+        println!(
+            "✓ {} shell completion installed to {}",
+            format!("{:?}", shell).green(),
+            install_path.display().to_string().cyan()
+        );
+        println!("ℹ {}", post_install_msg.cyan());
+    } else {
+        println!(
+            "✓ {:?} shell completion installed to {}",
+            shell,
+            install_path.display()
+        );
+        println!("ℹ {}", post_install_msg);
+    }
+
+    Ok(())
+}
 
 pub fn handle_command(
     args: &Args,
@@ -17,6 +102,10 @@ pub fn handle_command(
     let color_state = ColorState::new(args);
 
     match &args.command {
+        Some(Command::GenerateCompletion(shell, custom_path)) => {
+            let mut app = Args::get_cli(config);
+            install_completion(*shell, &mut app, &color_state, custom_path.as_deref())
+        }
         Some(Command::Shortcut(action)) => handle_shortcut_action(action, config, &color_state),
         Some(Command::Install(source)) => handle_install(source, args),
         Some(Command::Update(plugin_name)) => {
