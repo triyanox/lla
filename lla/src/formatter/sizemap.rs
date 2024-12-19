@@ -60,13 +60,16 @@ impl SizeMapFormatter {
         (name_width, size_width, bar_width)
     }
 
-    fn create_bar(percentage: f64, width: usize) -> String {
+    fn create_bar(percentage: f64, width: usize, is_dir: bool) -> String {
         let theme = color::get_theme();
         let percent_width = 6;
         let bar_width = width.saturating_sub(percent_width);
         let filled_width = ((percentage / 100.0) * bar_width as f64) as usize;
 
-        let (bar_char, partial_char) = if percentage > 75.0 {
+        let (bar_char, partial_char) = if is_dir {
+            let color = theme::color_value_to_color(&theme.colors.directory);
+            ("█".color(color), "▓".color(color))
+        } else if percentage > 75.0 {
             let color = theme::color_value_to_color(&theme.colors.permission_write);
             ("█".color(color), "▓".color(color))
         } else if percentage > 50.0 {
@@ -76,7 +79,7 @@ impl SizeMapFormatter {
             let color = theme::color_value_to_color(&theme.colors.symlink);
             ("█".color(color), "▓".color(color))
         } else {
-            let color = theme::color_value_to_color(&theme.colors.directory);
+            let color = theme::color_value_to_color(&theme.colors.file);
             ("█".color(color), "▓".color(color))
         };
 
@@ -199,7 +202,8 @@ impl FileFormatter for SizeMapFormatter {
             let path = Path::new(&file.path);
             let colored_name = colorize_file_name(path).to_string();
             let name = format_with_icon(path, colored_name, self.show_icons);
-            let size = file.metadata.as_ref().map_or(0, |m| m.size);
+            let metadata = file.metadata.as_ref().unwrap();
+            let size = metadata.size;
             let size_str = format_size(size);
             let percentage = if total_size > 0 {
                 (size as f64 / total_size as f64) * 100.0
@@ -207,7 +211,7 @@ impl FileFormatter for SizeMapFormatter {
                 0.0
             };
 
-            let bar = Self::create_bar(percentage, bar_width);
+            let bar = Self::create_bar(percentage, bar_width, metadata.is_dir);
 
             let plugin_fields = plugin_manager.format_fields(file, "sizemap").join(" ");
             let plugin_suffix = if plugin_fields.is_empty() {

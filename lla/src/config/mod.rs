@@ -34,10 +34,21 @@ impl Default for TreeFormatterConfig {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SizeMapConfig {}
+
+impl Default for SizeMapConfig {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FormatterConfig {
     #[serde(default)]
     pub tree: TreeFormatterConfig,
+    #[serde(default)]
+    pub sizemap: SizeMapConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -107,6 +118,8 @@ pub struct Config {
     pub default_depth: Option<usize>,
     #[serde(default)]
     pub show_icons: bool,
+    #[serde(default)]
+    pub include_dirs: bool,
     #[serde(default)]
     pub sort: SortConfig,
     #[serde(default)]
@@ -186,6 +199,12 @@ default_format = "{}"
 # Default: false
 show_icons = {}
 
+# Whether to include directory sizes in file listings
+# When true, directory sizes will be calculated recursively
+# This may impact performance for large directories
+# Default: false
+include_dirs = {}
+
 # The theme to use for coloring
 # Place custom themes in ~/.config/lla/themes/
 # Default: "default"
@@ -257,6 +276,7 @@ ignore_patterns = {}"#,
             self.default_sort,
             self.default_format,
             self.show_icons,
+            self.include_dirs,
             self.theme,
             serde_json::to_string(&self.enabled_plugins).unwrap(),
             self.plugins_dir.to_string_lossy(),
@@ -516,6 +536,14 @@ ignore_patterns = {}"#,
                     ))
                 })?;
             }
+            ["include_dirs"] => {
+                self.include_dirs = value.parse().map_err(|_| {
+                    LlaError::Config(ConfigErrorKind::InvalidValue(
+                        key.to_string(),
+                        "must be true or false".to_string(),
+                    ))
+                })?;
+            }
             ["default_depth"] => {
                 if value.to_lowercase() == "null" {
                     self.default_depth = None;
@@ -582,6 +610,7 @@ ignore_patterns = {}"#,
                 }
                 self.formatters.tree.max_lines = Some(max_lines);
             }
+
             ["listers", "recursive", "max_entries"] => {
                 let max_entries = value.parse().map_err(|_| {
                     LlaError::Config(ConfigErrorKind::InvalidValue(
@@ -640,12 +669,14 @@ impl Default for Config {
             plugins_dir: default_plugins_dir,
             default_depth: Some(3),
             show_icons: false,
+            include_dirs: false,
             sort: SortConfig::default(),
             filter: FilterConfig::default(),
             formatters: FormatterConfig {
                 tree: TreeFormatterConfig {
                     max_lines: Some(20_000),
                 },
+                sizemap: SizeMapConfig::default(),
             },
             listers: ListerConfig {
                 recursive: RecursiveConfig {

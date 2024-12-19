@@ -27,6 +27,7 @@ pub struct Args {
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
+    pub include_dirs: bool,
     pub command: Option<Command>,
 }
 
@@ -211,6 +212,11 @@ impl Args {
                     .long("recursive")
                     .help("Use recursive listing format"),
             )
+            .arg(
+                Arg::with_name("include-dirs")
+                    .long("include-dirs")
+                    .help("Include directory sizes in sizemap visualization"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -383,6 +389,7 @@ impl Args {
                     enable_plugin: Vec::new(),
                     disable_plugin: Vec::new(),
                     plugins_dir: config.plugins_dir.clone(),
+                    include_dirs: false,
                     command: Some(Command::Shortcut(ShortcutAction::Run(
                         potential_shortcut.clone(),
                         args[2..].to_vec(),
@@ -519,6 +526,7 @@ impl Args {
                 .value_of("plugins-dir")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
+            include_dirs: matches.is_present("include-dirs") || config.include_dirs,
             command,
         }
     }

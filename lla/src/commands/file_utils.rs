@@ -101,6 +101,22 @@ pub fn convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
     }
 }
 
+fn calculate_dir_size(path: &std::path::Path) -> std::io::Result<u64> {
+    let mut total_size = 0;
+    if path.is_dir() {
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                total_size += calculate_dir_size(&path)?;
+            } else {
+                total_size += entry.metadata()?.len();
+            }
+        }
+    }
+    Ok(total_size)
+}
+
 pub fn list_and_decorate_files(
     args: &Args,
     lister: &Arc<dyn FileLister + Send + Sync>,
@@ -117,6 +133,13 @@ pub fn list_and_decorate_files(
         .into_par_iter()
         .filter_map(|path| {
             let fs_metadata = path.metadata().ok()?;
+            let mut metadata = convert_metadata(&fs_metadata);
+
+            if args.include_dirs && metadata.is_dir {
+                if let Ok(dir_size) = calculate_dir_size(&path) {
+                    metadata.size = dir_size;
+                }
+            }
 
             if !filter
                 .filter_files(std::slice::from_ref(&path))
@@ -128,7 +151,7 @@ pub fn list_and_decorate_files(
 
             Some(DecoratedEntry {
                 path: path.to_string_lossy().into_owned(),
-                metadata: Some(convert_metadata(&fs_metadata)),
+                metadata: Some(metadata),
                 custom_fields: Default::default(),
             })
         })
