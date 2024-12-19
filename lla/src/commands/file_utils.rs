@@ -7,7 +7,7 @@ use crate::filter::{
 };
 use crate::formatter::{
     DefaultFormatter, FileFormatter, FuzzyFormatter, GitFormatter, GridFormatter, LongFormatter,
-    SizeMapFormatter, TableFormatter, TimelineFormatter, TreeFormatter,
+    RecursiveFormatter, SizeMapFormatter, TableFormatter, TimelineFormatter, TreeFormatter,
 };
 use crate::lister::{BasicLister, FileLister, FuzzyLister, RecursiveLister};
 use crate::plugin::PluginManager;
@@ -47,7 +47,7 @@ pub fn list_directory(
 
     let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
 
-    let decorated_files = if !args.tree_format {
+    let decorated_files = if !args.tree_format && !args.recursive_format {
         sort_files(decorated_files, &sorter, args)?
     } else {
         decorated_files
@@ -70,6 +70,8 @@ pub fn get_format(args: &Args) -> &'static str {
         "table"
     } else if args.grid_format {
         "grid"
+    } else if args.recursive_format {
+        "recursive"
     } else {
         "default"
     }
@@ -107,7 +109,11 @@ pub fn list_and_decorate_files(
     format: &str,
 ) -> Result<Vec<DecoratedEntry>> {
     let mut entries: Vec<DecoratedEntry> = lister
-        .list_files(&args.directory, args.tree_format, args.depth)?
+        .list_files(
+            &args.directory,
+            args.tree_format || args.recursive_format,
+            args.depth,
+        )?
         .into_par_iter()
         .filter_map(|path| {
             let fs_metadata = path.metadata().ok()?;
@@ -168,7 +174,7 @@ pub fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
     if args.fuzzy_format {
         let config = Config::load(&Config::get_config_path()).unwrap_or_default();
         Arc::new(FuzzyLister::new(config))
-    } else if args.tree_format {
+    } else if args.tree_format || args.recursive_format {
         let config = Config::load(&Config::get_config_path()).unwrap_or_default();
         Arc::new(RecursiveLister::new(config))
     } else {
@@ -253,6 +259,8 @@ pub fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
         Box::new(TimelineFormatter::new(args.show_icons))
     } else if args.git_format {
         Box::new(GitFormatter::new(args.show_icons))
+    } else if args.recursive_format {
+        Box::new(RecursiveFormatter::new(args.show_icons))
     } else {
         Box::new(DefaultFormatter::new(args.show_icons))
     }

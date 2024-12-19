@@ -14,6 +14,7 @@ pub struct Args {
     pub timeline_format: bool,
     pub git_format: bool,
     pub fuzzy_format: bool,
+    pub recursive_format: bool,
     pub show_icons: bool,
     pub no_color: bool,
     pub sort_by: String,
@@ -204,6 +205,12 @@ impl Args {
                     .takes_value(true)
                     .help("Specify the plugins directory"),
             )
+            .arg(
+                Arg::with_name("recursive")
+                    .short('R')
+                    .long("recursive")
+                    .help("Use recursive listing format"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -363,6 +370,7 @@ impl Args {
                     timeline_format: config.default_format == "timeline",
                     git_format: config.default_format == "git",
                     fuzzy_format: false,
+                    recursive_format: false,
                     show_icons: config.show_icons,
                     no_color: false,
                     sort_by: config.default_sort.clone(),
@@ -483,6 +491,8 @@ impl Args {
             timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
             git_format: matches.is_present("git") || config.default_format == "git",
             fuzzy_format: matches.is_present("fuzzy"),
+            recursive_format: matches.is_present("recursive")
+                || config.default_format == "recursive",
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
             no_color: matches.is_present("no-color"),
