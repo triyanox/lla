@@ -419,7 +419,7 @@ enabled_plugins = []
 
 # Directory where plugins are stored
 # Default: ~/.config/lla/plugins
-plugins_dir = "/Users/mohamedachaq/.config/lla/plugins"
+plugins_dir = "~/.config/lla/plugins"
 
 # Maximum depth for recursive directory traversal
 # Controls how deep lla will go when showing directory contents
