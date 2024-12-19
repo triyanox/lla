@@ -28,7 +28,7 @@ walkdir.workspace = true
 tempfile.workspace = true
 users.workspace = true
 parking_lot.workspace = true
-lla_plugin_interface = { version = "0.3.5", path = "../lla_plugin_interface" }
+lla_plugin_interface = { version = "0.3.6", path = "../lla_plugin_interface" }
 once_cell.workspace = true
 dashmap.workspace = true
 unicode-width.workspace = true
@@ -39,7 +39,6 @@ atty.workspace = true
 indicatif.workspace = true
 console.workspace = true
 prost = "0.12"
-bytes = "1.5"
 regex.workspace = true
 glob.workspace = true
 ignore = "0.4"
