@@ -32,6 +32,7 @@
   - [Plugin System](#plugin-system)
 - [Configuration](#configuration)
 - [Theming](#theming)
+- [Completion](#completion)
 - [Development](#development)
   - [Plugin Development](#plugin-development)
   - [Contributing](#contributing)
@@ -53,7 +54,7 @@ paru -S lla
 pkgin install lla
 
 # Manual - Example is for amd64 GNU, replaces the file names if downloading for a different arch.
-wget -c https://github.com/triyanox/lla/releases/download/v0.3.4/lla-linux-amd64 -O lla
+wget -c https://github.com/triyanox/lla/releases/download/v0.3.6/lla-linux-amd64 -O lla
 sudo chmod +x lla
 sudo chown root:root lla
 sudo mv lla /usr/local/bin/lla
@@ -153,6 +154,26 @@ lla -S
 
 ![sizemap](https://github.com/user-attachments/assets/9efc39a6-f21d-4b78-bad1-eb957beae6e9)
 
+#### Fuzzy Search (Experimental)
+
+Search for files using fuzzy matching
+
+```bash
+lla --fuzzy
+```
+
+![fuzzy](https://github.com/user-attachments/assets/9efc39a6-f21d-4b78-bad1-eb957beae6e9)
+
+#### Recursive Format
+
+List all files in a directory recursively
+
+```bash
+lla -R # use -d to control the depth
+```
+
+![recursive](https://github.com/user-attachments/assets/9efc39a6-f21d-4b78-bad1-eb957beae6e9)
+
 #### Icons support
 
 Icons are supported in all formats simply by using the `--icons` flag.
@@ -174,7 +195,12 @@ lla --icons
 - Size map (`-S`, `--sizemap`): Visual representation of file sizes
 - Timeline view (`--timeline`): Group files by time periods
 - Git-aware view (`-G`, `--git`): Repository status and information
+- Fuzzy search (`--fuzzy`): Search for files using fuzzy matching (Experimental)
+- Recursive format (`-R`, `--recursive`): List all files in a directory recursively
 - Icons (`--icons`): Show icons for files and directories
+- No colors (`--no-colors`): Disable colors in all listing commands
+- No icons (`--no-icons`): Disable icons in all listing commands
+- Include directories (`--include-dirs`): Include the size of directories in the metadata, it will recursively calculate the size of all directories, works with all listing commands
 
 **Organization & Sorting**
 
@@ -222,9 +248,11 @@ lla -t                 # Tree view
 lla -T                 # Table view
 lla -g                 # Grid view
 lla -G                 # Git-aware view
-lla -S                 # Size map view
+lla -S                 # Size map view - you can also use the `include_dirs` flag to include the size of directories
 lla --timeline         # Timeline view
 lla --icons           # Show file/directory icons
+lla --fuzzy            # Fuzzy search (Experimental)
+lla -R                 # Recursive format - use -d to control the depth
 ```
 
 **Sorting & Organization**
@@ -367,6 +395,7 @@ default_sort = "name"
 #   - "default": Quick and clean directory listing
 #   - "long": Detailed file information with metadata
 #   - "tree": Hierarchical directory visualization
+#   - "fuzzy": Interactive fuzzy search
 #   - "grid": Organized grid layout for better readability
 #   - "git": Git-aware view with repository status
 #   - "timeline": Group files by time periods
@@ -377,7 +406,18 @@ default_format = "default"
 # Whether to show icons by default
 # When true, file and directory icons will be displayed in all views
 # Default: false
-show_icons = false
+show_icons = true
+
+# Whether to include directory sizes in file listings
+# When true, directory sizes will be calculated recursively
+# This may impact performance for large directories
+# Default: false
+include_dirs = false
+
+# The theme to use for coloring
+# Place custom themes in ~/.config/lla/themes/
+# Default: "default"
+theme = "default"
 
 # List of enabled plugins
 # Each plugin provides additional functionality
@@ -389,7 +429,7 @@ enabled_plugins = []
 
 # Directory where plugins are stored
 # Default: ~/.config/lla/plugins
-plugins_dir = "~/.config/lla/plugins"
+plugins_dir = "/Users/mohamedachaq/.config/lla/plugins"
 
 # Maximum depth for recursive directory traversal
 # Controls how deep lla will go when showing directory contents
@@ -433,10 +473,15 @@ max_lines = 20000
 # Default: 20000 entries
 max_entries = 20000
 
-# Command shortcuts
-# Define custom shortcuts for frequently used plugin commands
-[shortcuts]
-extract={ plugin_name = "code_snippet_extractor", action = "extract", description = "Extract code snippets"}
+# Fuzzy lister configuration
+[listers.fuzzy]
+# Patterns to ignore when listing files in fuzzy mode
+# Can be:
+#  - Simple substring match: "node_modules"
+#  - Glob pattern: "glob:*.min.js"
+#  - Regular expression: "regex:.*\\.pyc$"
+# Default: ["node_modules", "target", ".git", ".idea", ".vscode"]
+ignore_patterns = ["node_modules","target",".git",".idea",".vscode"]
 ```
 
 **Configuration Commands:**
@@ -472,6 +517,12 @@ lla config --set default_format long
 ## Theming
 
 LLA includes a powerful theming system that allows you to customize the appearance of your file listings. Themes are defined in TOML files and stored in `~/.config/lla/themes/`.
+
+You can use the interactive theme manager to switch themes using the `lla theme` command:
+
+```bash
+lla theme
+```
 
 **Theme Structure:**
 
@@ -542,6 +593,25 @@ lla --no-colors # works with all listing commands
 ```
 
 For more detailed information about theming, see the [themes documentation](themes/README.md).
+
+## Completion
+
+LLA supports shell completion for bash, zsh, fish, and elvish.
+
+```bash
+lla completion bash # for bash
+lla completion zsh # for zsh
+lla completion fish # for fish
+lla completion elvish # for elvish
+```
+
+You can also generate completions in a specific directory by running the following command:
+
+```bash
+lla completion <shell> --output /path/to/completion
+```
+
+All completions are included [here](https://github.com/triyanox/lla/tree/main/completions).
 
 ## Development
 

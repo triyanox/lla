@@ -9,22 +9,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Interactive fuzzy file search functionality with the `--fuzzy` flag, this will be improved in future releases to handle very large directories
-- New `FuzzyFormatter [unstable]` and `FuzzyLister [unstable]` components for fuzzy search support, this will be improved in future releases to handle very large directories
-- Shell completion support for various shells like `bash`, `zsh`, `fish`, and `elvish`
-- Configuration option `listers.fuzzy.ignore_patterns` to customize which files and directories to ignore during fuzzy search. Supports simple substring matches, glob patterns, and regular expressions
-- Interactive theme selector with `lla theme` command for easy theme switching
+- Interactive fuzzy file search (Experimental - Might be unstable)
+
+  - Enabled via the new `--fuzzy` flag
+  - Designed for quick file lookups in standard-sized directories
+  - Future updates will optimize performance for large-scale directory structures
+
+- Directory size integration
+
+  - New option to include directory sizes in all listing formats
+  - Compatible with default, sizemap, grid, and tree visualizations
+  - Recursive directory size calculation with `calculate_dir_size`
+  - Configurable through the `include_dirs` setting in configuration files
+  - Enhanced size bar visualization for both directories and files
+
+- Enhanced shell integration
+
+  - Added comprehensive shell completion support for bash, zsh, fish, and elvish
+  - Generate completions using `lla completion <shell> [path]`
+
+- Customizable fuzzy search configuration
+
+  - New `listers.fuzzy.ignore_patterns` setting
+  - Supports multiple pattern types:
+    - Simple substring matching
+    - Glob patterns
+    - Regular expressions
+
+- Interactive theme management
+
+  - New `lla theme` command for interactive theme switching
+
+- Advanced directory visualization
+
+  - New `--recursive` flag for hierarchical directory display
+  - Implemented `RecursiveFormatter` for structured output
+  - Flexible tree and recursive format options
 
 ### Changed
 
-- Updated `Args` struct with new completion command and fuzzy_format option, now you can generate completions for your own shell using `lla completion <shell> <path[optional]>`
-- Enhanced command handling to support shell completion functionality
-- Refactored file listing and formatting logic to support fuzzy search
-- Modified dependencies to include `clap_complete`
-- Updated `Cargo.lock` to specify versions for `hermit-abi` and added `num_cpus` as a new dependency
-- Enhanced `FuzzyConfig` struct for customizable ignore patterns in fuzzy search
-- Updated `FuzzyLister` and `SearchIndex` to utilize the new configuration, allowing users to specify patterns to ignore during file searches
-- Refactored `create_lister` function to load configuration for fuzzy searching, improving the overall user experience
+- Architecture improvements
+
+  - Redesigned `Args` struct to accommodate shell completion, fuzzy format, and directory size features
+  - Enhanced command handler for improved shell integration
+  - Optimized file listing and formatting logic
+
+- Dependency updates
+
+  - Added `clap_complete` for shell completion functionality
+  - Updated `hermit-abi` version specifications
+  - Integrated `num_cpus` for improved performance
+
+- Search functionality enhancements
+
+  - Implemented configurable `FuzzyConfig` structure
+  - Enhanced `FuzzyLister` and `SearchIndex` components
+  - Improved pattern matching and file filtering capabilities
+
+- Core system refinements
+  - Optimized `create_lister` function
+  - Enhanced configuration loading for fuzzy search and directory size inclusion
+  - Improved recursive listing implementation
+  - Updated `SizeMapFormatter` for better directory and file size visualization
 
 ## [0.3.5] - 2024-12-16
 
