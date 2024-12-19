@@ -35,13 +35,9 @@ impl Default for TreeFormatterConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default)]
 pub struct SizeMapConfig {}
 
-impl Default for SizeMapConfig {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FormatterConfig {
@@ -697,7 +693,7 @@ pub fn initialize_config() -> Result<()> {
     let config_dir = config_path.parent().unwrap();
     let themes_dir = config_dir.join("themes");
 
-    fs::create_dir_all(&config_dir)?;
+    fs::create_dir_all(config_dir)?;
     fs::create_dir_all(&themes_dir)?;
     let default_theme_path = themes_dir.join("default.toml");
     if !default_theme_path.exists() {

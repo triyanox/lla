@@ -218,7 +218,7 @@ impl FuzzyMatcher {
 
                     score = dp[i - 1][j - 1] + SCORE_MATCH;
                     if consec > 1 {
-                        score += BONUS_CONSECUTIVE * (consec - 1) as i32;
+                        score += BONUS_CONSECUTIVE * (consec - 1);
                     }
                     score += bonus;
 

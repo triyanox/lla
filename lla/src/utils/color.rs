@@ -38,7 +38,7 @@ pub fn colorize_file_name(path: &Path) -> ColoredString {
         if let Some(color) = get_file_color(path) {
             format!("{}/", name).color(color).bold()
         } else {
-            format!("{}", name)
+            name.to_string()
                 .color(get_color(&theme.colors.directory))
                 .bold()
         }

@@ -64,7 +64,7 @@ pub enum ConfigAction {
 }
 
 impl Args {
-    fn build_cli<'a>(config: &'a Config) -> App<'a> {
+    fn build_cli(config: &Config) -> App<'_> {
         App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -150,7 +150,7 @@ impl Args {
                     .long("sort")
                     .help("Sort files by name, size, or date")
                     .takes_value(true)
-                    .possible_values(&["name", "size", "date"])
+                    .possible_values(["name", "size", "date"])
                     .default_value(&config.default_sort),
             )
             .arg(
@@ -340,7 +340,7 @@ impl Args {
                         Arg::with_name("shell")
                             .help("Target shell")
                             .required(true)
-                            .possible_values(&["bash", "fish", "zsh", "powershell", "elvish"])
+                            .possible_values(["bash", "fish", "zsh", "powershell", "elvish"])
                             .index(1),
                     )
                     .arg(
@@ -403,7 +403,7 @@ impl Args {
         Self::from_matches(&matches, config)
     }
 
-    pub fn get_cli<'a>(config: &'a Config) -> App<'a> {
+    pub fn get_cli(config: &Config) -> App<'_> {
         Self::build_cli(config)
     }
 

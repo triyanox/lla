@@ -201,12 +201,10 @@ fn handle_shortcut_action(
                 } else {
                     println!("✓ Removed shortcut '{}'", name);
                 }
+            } else if color_state.is_enabled() {
+                println!("✗ Shortcut '{}' not found", name.red());
             } else {
-                if color_state.is_enabled() {
-                    println!("✗ Shortcut '{}' not found", name.red());
-                } else {
-                    println!("✗ Shortcut '{}' not found", name);
-                }
+                println!("✗ Shortcut '{}' not found", name);
             }
             Ok(())
         }
