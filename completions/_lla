@@ -1,0 +1,305 @@
+#compdef lla
+
+autoload -U is-at-least
+
+_lla() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" \
+'-d+[Set the depth for tree listing (default from config)]: : ' \
+'--depth=[Set the depth for tree listing (default from config)]: : ' \
+'-s+[Sort files by name, size, or date]: :(name size date)' \
+'--sort=[Sort files by name, size, or date]: :(name size date)' \
+'-f+[Filter files by name or extension]: : ' \
+'--filter=[Filter files by name or extension]: : ' \
+'*--enable-plugin=[Enable specific plugins]: : ' \
+'*--disable-plugin=[Disable specific plugins]: : ' \
+'--plugins-dir=[Specify the plugins directory]: : ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+'-V[Print version information]' \
+'--version[Print version information]' \
+'-l[Use long listing format (overrides config format)]' \
+'--long[Use long listing format (overrides config format)]' \
+'-t[Use tree listing format (overrides config format)]' \
+'--tree[Use tree listing format (overrides config format)]' \
+'-T[Use table listing format (overrides config format)]' \
+'--table[Use table listing format (overrides config format)]' \
+'-g[Use grid listing format (overrides config format)]' \
+'--grid[Use grid listing format (overrides config format)]' \
+'-S[Show visual representation of file sizes (overrides config format)]' \
+'--sizemap[Show visual representation of file sizes (overrides config format)]' \
+'--timeline[Group files by time periods (overrides config format)]' \
+'-G[Show git status and information (overrides config format)]' \
+'--git[Show git status and information (overrides config format)]' \
+'-F[Use interactive fuzzy finder]' \
+'--fuzzy[Use interactive fuzzy finder]' \
+'--icons[Show icons for files and directories (overrides config setting)]' \
+'--no-icons[Hide icons for files and directories (overrides config setting)]' \
+'--no-color[Disable all colors in the output]' \
+'-r[Reverse the sort order]' \
+'--sort-reverse[Reverse the sort order]' \
+'--sort-dirs-first[List directories before files (overrides config setting)]' \
+'--sort-case-sensitive[Enable case-sensitive sorting (overrides config setting)]' \
+'--sort-natural[Use natural sorting for numbers (overrides config setting)]' \
+'-c[Enable case-sensitive filtering (overrides config setting)]' \
+'--case-sensitive[Enable case-sensitive filtering (overrides config setting)]' \
+'-R[Use recursive listing format]' \
+'--recursive[Use recursive listing format]' \
+'--include-dirs[Include directory sizes in the metadata]' \
+'::directory -- The directory to list:' \
+":: :_lla_commands" \
+"*::: :->lla" \
+&& ret=0
+    case $state in
+    (lla)
+        words=($line[2] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lla-command-$line[2]:"
+        case $line[2] in
+            (install)
+_arguments "${_arguments_options[@]}" \
+'--git=[Install a plugin from a GitHub repository URL]: : ' \
+'--dir=[Install a plugin from a local directory]: : ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(plugin)
+_arguments "${_arguments_options[@]}" \
+'-n+[Name of the plugin]: : ' \
+'--name=[Name of the plugin]: : ' \
+'-a+[Action to perform]: : ' \
+'--action=[Action to perform]: : ' \
+'*-r+[Arguments for the plugin action]: : ' \
+'*--args=[Arguments for the plugin action]: : ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(list-plugins)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(use)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(init)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(config)
+_arguments "${_arguments_options[@]}" \
+'--set=[Set a configuration value (e.g., --set plugins_dir /new/path)]:KEY: :KEY: ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+'::name -- Name of the plugin to update (updates all if not specified):' \
+&& ret=0
+;;
+(clean)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(shortcut)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+":: :_lla__shortcut_commands" \
+"*::: :->shortcut" \
+&& ret=0
+
+    case $state in
+    (shortcut)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lla-shortcut-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" \
+'-d+[Optional description of the shortcut]: : ' \
+'--description=[Optional description of the shortcut]: : ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+':name -- Name of the shortcut:' \
+':plugin -- Plugin name:' \
+':action -- Plugin action:' \
+&& ret=0
+;;
+(remove)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+':name -- Name of the shortcut to remove:' \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+'*::subcommand -- The subcommand whose help message to display:' \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(completion)
+_arguments "${_arguments_options[@]}" \
+'-p+[Custom installation path for the completion script]: : ' \
+'--path=[Custom installation path for the completion script]: : ' \
+'-o+[Output path for the completion script (prints to stdout if not specified)]: : ' \
+'--output=[Output path for the completion script (prints to stdout if not specified)]: : ' \
+'-h[Print help information]' \
+'--help[Print help information]' \
+':shell -- Target shell:(bash fish zsh powershell elvish)' \
+&& ret=0
+;;
+(theme)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help information]' \
+'--help[Print help information]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+'*::subcommand -- The subcommand whose help message to display:' \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+}
+
+(( $+functions[_lla_commands] )) ||
+_lla_commands() {
+    local commands; commands=(
+'install:Install a plugin' \
+'plugin:Run a plugin action' \
+'list-plugins:List all available plugins' \
+'use:Interactive plugin manager' \
+'init:Initialize the configuration file' \
+'config:View or modify configuration' \
+'update:Update installed plugins' \
+'clean:This command will clean up invalid plugins' \
+'shortcut:Manage command shortcuts' \
+'completion:Generate shell completion scripts' \
+'theme:Interactive theme manager' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lla commands' commands "$@"
+}
+(( $+functions[_lla__shortcut__add_commands] )) ||
+_lla__shortcut__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla shortcut add commands' commands "$@"
+}
+(( $+functions[_lla__clean_commands] )) ||
+_lla__clean_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla clean commands' commands "$@"
+}
+(( $+functions[_lla__completion_commands] )) ||
+_lla__completion_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla completion commands' commands "$@"
+}
+(( $+functions[_lla__config_commands] )) ||
+_lla__config_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla config commands' commands "$@"
+}
+(( $+functions[_lla__help_commands] )) ||
+_lla__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla help commands' commands "$@"
+}
+(( $+functions[_lla__shortcut__help_commands] )) ||
+_lla__shortcut__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla shortcut help commands' commands "$@"
+}
+(( $+functions[_lla__init_commands] )) ||
+_lla__init_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla init commands' commands "$@"
+}
+(( $+functions[_lla__install_commands] )) ||
+_lla__install_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla install commands' commands "$@"
+}
+(( $+functions[_lla__shortcut__list_commands] )) ||
+_lla__shortcut__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla shortcut list commands' commands "$@"
+}
+(( $+functions[_lla__list-plugins_commands] )) ||
+_lla__list-plugins_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla list-plugins commands' commands "$@"
+}
+(( $+functions[_lla__plugin_commands] )) ||
+_lla__plugin_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla plugin commands' commands "$@"
+}
+(( $+functions[_lla__shortcut__remove_commands] )) ||
+_lla__shortcut__remove_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla shortcut remove commands' commands "$@"
+}
+(( $+functions[_lla__shortcut_commands] )) ||
+_lla__shortcut_commands() {
+    local commands; commands=(
+'add:Add a new shortcut' \
+'remove:Remove a shortcut' \
+'list:List all shortcuts' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lla shortcut commands' commands "$@"
+}
+(( $+functions[_lla__theme_commands] )) ||
+_lla__theme_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla theme commands' commands "$@"
+}
+(( $+functions[_lla__update_commands] )) ||
+_lla__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla update commands' commands "$@"
+}
+(( $+functions[_lla__use_commands] )) ||
+_lla__use_commands() {
+    local commands; commands=()
+    _describe -t commands 'lla use commands' commands "$@"
+}
+
+_lla "$@"
