@@ -4,14 +4,15 @@ fn main() -> Result<()> {
     #[cfg(feature = "regenerate-protobuf")]
     {
         use std::path::PathBuf;
+        use std::process::Command;
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
         println!("cargo:rerun-if-changed=src/plugin.proto");
 
         if std::env::var("PROTOC").is_ok()
-            || which::which("protoc").is_ok()
-            || which::which("protoc-gen-rust").is_ok()
-            || which::which("protoc-gen-rust-macos").is_ok()
-            || which::which("protoc-gen-rust-linux").is_ok()
+            || Command::new("protoc").output().is_ok()
+            || Command::new("protoc-gen-rust").output().is_ok()
+            || Command::new("protoc-gen-rust-macos").output().is_ok()
+            || Command::new("protoc-gen-rust-linux").output().is_ok()
         {
             if let Err(e) = prost_build::Config::new()
                 .out_dir(&out_dir)
