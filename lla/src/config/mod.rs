@@ -34,10 +34,8 @@ impl Default for TreeFormatterConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[derive(Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SizeMapConfig {}
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FormatterConfig {
