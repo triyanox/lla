@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `FuzzyFormatter [unstable]` and `FuzzyLister [unstable]` components for fuzzy search support, this will be improved in future releases to handle very large directories
 - Shell completion support for various shells like `bash`, `zsh`, `fish`, and `elvish`
 - Configuration option `listers.fuzzy.ignore_patterns` to customize which files and directories to ignore during fuzzy search. Supports simple substring matches, glob patterns, and regular expressions
+- Interactive theme selector with `lla theme` command for easy theme switching
 
 ### Changed
 

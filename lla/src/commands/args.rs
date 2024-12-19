@@ -40,6 +40,7 @@ pub enum Command {
     Clean,
     Shortcut(ShortcutAction),
     GenerateCompletion(Shell, Option<String>),
+    Theme,
 }
 
 pub enum InstallSource {
@@ -336,6 +337,7 @@ impl Args {
                             .takes_value(true),
                     ),
             )
+            .subcommand(SubCommand::with_name("theme").about("Interactive theme manager"))
     }
 
     pub fn parse(config: &Config) -> Self {
@@ -396,6 +398,8 @@ impl Args {
                 shell,
                 completion_matches.value_of("path").map(String::from),
             ))
+        } else if matches.subcommand_matches("theme").is_some() {
+            Some(Command::Theme)
         } else if let Some(matches) = matches.subcommand_matches("shortcut") {
             if let Some(add_matches) = matches.subcommand_matches("add") {
                 Some(Command::Shortcut(ShortcutAction::Add(

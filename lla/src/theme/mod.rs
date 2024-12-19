@@ -1,4 +1,8 @@
+use crate::config::Config;
+use crate::error::Result;
 use colored::Color;
+use colored::*;
+use dialoguer::{theme::ColorfulTheme, Select};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -424,4 +428,68 @@ fn pattern_matches(pattern: &str, filename: &str) -> bool {
 fn get_theme() -> Option<&'static Theme> {
     use crate::utils::color::get_theme;
     Some(get_theme())
+}
+
+pub fn select_theme(config: &mut Config) -> Result<()> {
+    if !atty::is(atty::Stream::Stdout) {
+        println!("Available themes:");
+        for theme in list_themes()? {
+            let current = if theme == config.theme {
+                " (current)"
+            } else {
+                ""
+            };
+            println!("{}{}", theme, current);
+        }
+        return Ok(());
+    }
+
+    let themes = list_themes()?;
+    let current_index = themes.iter().position(|t| t == &config.theme).unwrap_or(0);
+
+    let theme_items: Vec<String> = themes
+        .iter()
+        .map(|name| {
+            if name == &config.theme {
+                format!("{} {}", name.cyan(), "(current)".bright_black())
+            } else {
+                name.to_string()
+            }
+        })
+        .collect();
+
+    let theme = ColorfulTheme {
+        active_item_style: dialoguer::console::Style::new().cyan().bold(),
+        active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string())
+            .for_stderr()
+            .cyan(),
+        prompt_prefix: dialoguer::console::style("│ ".to_string())
+            .for_stderr()
+            .cyan(),
+        prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
+        success_prefix: dialoguer::console::style("│ ".to_string())
+            .for_stderr()
+            .cyan(),
+        ..ColorfulTheme::default()
+    };
+
+    println!("\n{}", "Theme Manager".cyan().bold());
+    println!(
+        "{}\n",
+        "Arrow keys to navigate, Enter to select".bright_black()
+    );
+
+    let selection = Select::with_theme(&theme)
+        .with_prompt("Select theme")
+        .items(&theme_items)
+        .default(current_index)
+        .interact()?;
+
+    let selected_theme = &themes[selection];
+    if selected_theme != &config.theme {
+        config.set_value("theme", selected_theme)?;
+        println!("✓ {} theme activated", selected_theme.green());
+    }
+
+    Ok(())
 }

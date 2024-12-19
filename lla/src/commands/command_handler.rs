@@ -106,6 +106,7 @@ pub fn handle_command(
             let mut app = Args::get_cli(config);
             install_completion(*shell, &mut app, &color_state, custom_path.as_deref())
         }
+        Some(Command::Theme) => crate::theme::select_theme(config),
         Some(Command::Shortcut(action)) => handle_shortcut_action(action, config, &color_state),
         Some(Command::Install(source)) => handle_install(source, args),
         Some(Command::Update(plugin_name)) => {
