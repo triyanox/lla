@@ -1,9 +1,11 @@
 .DS_Store
 target/
-# Shell completions (except those in the repo)
-/completions/
-!/completions/*.bash
-!/completions/*.fish
-!/completions/_lla
-!/completions/*.ps1
-!/completions/*.elv
+
+# First ignore everything in completions
+completions/*
+# Then explicitly allow the shell completion files
+!completions/*.bash
+!completions/*.fish
+!completions/_lla
+!completions/*.ps1
+!completions/*.elv
