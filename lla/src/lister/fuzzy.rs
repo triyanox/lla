@@ -3,7 +3,7 @@ use crate::utils::color::*;
 use crate::utils::icons::format_with_icon;
 use crate::{error::Result, theme::color_value_to_color};
 use colored::*;
-use crossbeam_channel::{bounded, Receiver as CReceiver};
+use crossbeam_channel::bounded;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyModifiers},
@@ -11,29 +11,683 @@ use crossterm::{
     style::{self},
     terminal::{self, ClearType},
 };
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use ignore::WalkBuilder;
+use parking_lot::RwLock;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::fs;
+use std::collections::HashMap;
+use std::fs::Permissions;
 use std::io::{self, stdout, Write};
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    mpsc::{self, Receiver},
-    Arc, RwLock,
+    atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering},
+    Arc,
 };
 use std::thread;
 use std::time::{Duration, SystemTime};
+use unicode_normalization::UnicodeNormalization;
 
-fn truncate_to_terminal_width(text: &str, max_width: usize) -> String {
-    if text.len() <= max_width {
-        text.to_string()
-    } else {
-        let mut truncated = text[..max_width.saturating_sub(3)].to_string();
-        truncated.push_str("...");
-        truncated
+const WORKER_THREADS: usize = 8;
+const CHUNK_SIZE: usize = 1000;
+const SCORE_MATCH: i32 = 16;
+const SCORE_GAP_START: i32 = -3;
+const SCORE_GAP_EXTENSION: i32 = -1;
+const BONUS_BOUNDARY: i32 = SCORE_MATCH / 2;
+const BONUS_NON_WORD: i32 = SCORE_MATCH / 2;
+const BONUS_CAMEL: i32 = BONUS_BOUNDARY + SCORE_GAP_EXTENSION;
+const BONUS_CONSECUTIVE: i32 = -(SCORE_GAP_START + SCORE_GAP_EXTENSION);
+const BONUS_FIRST_CHAR_MULTIPLIER: i32 = 2;
+const BONUS_BOUNDARY_WHITE: i32 = BONUS_BOUNDARY + 2;
+const BONUS_BOUNDARY_DELIMITER: i32 = BONUS_BOUNDARY + 1;
+
+#[allow(dead_code)]
+#[derive(Clone)]
+struct FileEntry {
+    path: PathBuf,
+    path_str: String,
+    name_str: String,
+    modified: SystemTime,
+    normalized_path: String,
+    score_cache: Arc<RwLock<HashMap<String, (i32, Vec<usize>)>>>,
+}
+
+impl FileEntry {
+    fn new(path: PathBuf) -> Self {
+        let path_str = path.to_string_lossy().into_owned();
+        let name_str = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let normalized_path = path_str.nfkd().collect::<String>().to_lowercase();
+
+        Self {
+            path_str,
+            name_str,
+            normalized_path,
+            modified: path
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or_else(|_| SystemTime::now()),
+            path,
+            score_cache: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct MatchResult {
+    score: i32,
+    positions: Vec<usize>,
+    entry: FileEntry,
+}
+
+#[derive(Clone)]
+struct FuzzyMatcher {
+    case_sensitive: bool,
+    pattern_cache: Arc<RwLock<HashMap<String, Vec<char>>>>,
+    bonus_cache: Arc<RwLock<HashMap<(char, char), i32>>>,
+}
+
+impl FuzzyMatcher {
+    fn new(case_sensitive: bool) -> Self {
+        Self {
+            case_sensitive,
+            pattern_cache: Arc::new(RwLock::new(HashMap::new())),
+            bonus_cache: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    fn get_cached_pattern(&self, pattern: &str) -> Vec<char> {
+        if let Some(cached) = self.pattern_cache.read().get(pattern) {
+            return cached.clone();
+        }
+
+        let normalized = if !self.case_sensitive {
+            pattern.to_lowercase()
+        } else {
+            pattern.to_string()
+        };
+
+        let chars: Vec<char> = normalized.chars().collect();
+        self.pattern_cache
+            .write()
+            .insert(pattern.to_string(), chars.clone());
+        chars
+    }
+
+    fn compute_bonus(&self, prev_class: char, curr_class: char) -> i32 {
+        if let Some(&bonus) = self.bonus_cache.read().get(&(prev_class, curr_class)) {
+            return bonus;
+        }
+
+        let bonus = match (prev_class, curr_class) {
+            (' ', c) if c.is_alphanumeric() => BONUS_BOUNDARY_WHITE,
+            ('/', c) | ('\\', c) | ('_', c) | ('-', c) | ('.', c) => {
+                if c.is_alphanumeric() {
+                    BONUS_BOUNDARY_DELIMITER
+                } else {
+                    BONUS_NON_WORD
+                }
+            }
+            (p, c) if !p.is_alphanumeric() && c.is_alphanumeric() => BONUS_BOUNDARY,
+            (p, c) if p.is_lowercase() && c.is_uppercase() => BONUS_CAMEL,
+            (p, c) if !p.is_numeric() && c.is_numeric() => BONUS_CAMEL,
+            (_, c) if !c.is_alphanumeric() => BONUS_NON_WORD,
+            _ => 0,
+        };
+
+        self.bonus_cache
+            .write()
+            .insert((prev_class, curr_class), bonus);
+        bonus
+    }
+
+    fn fuzzy_match(&self, text: &str, pattern: &str) -> Option<(i32, Vec<usize>)> {
+        if pattern.is_empty() {
+            return Some((0, vec![]));
+        }
+
+        let text = if !self.case_sensitive {
+            text.to_lowercase()
+        } else {
+            text.to_string()
+        };
+
+        let text_chars: Vec<char> = text.chars().collect();
+        let pattern_chars = self.get_cached_pattern(pattern);
+
+        let m = pattern_chars.len();
+        let n = text_chars.len();
+
+        if m > n {
+            return None;
+        }
+
+        let first_char = pattern_chars[0];
+        if !text_chars.contains(&first_char) {
+            return None;
+        }
+
+        let mut dp = vec![vec![0; n]; m];
+        let mut pos = vec![vec![0; n]; m];
+        let mut matches = vec![false; n];
+        let mut consecutive = vec![0; n];
+
+        let mut found_first = false;
+        for (j, &tc) in text_chars.iter().enumerate() {
+            if tc == first_char {
+                let bonus = if j == 0 {
+                    BONUS_BOUNDARY_WHITE
+                } else {
+                    self.compute_bonus(text_chars[j - 1], tc)
+                };
+                dp[0][j] = SCORE_MATCH + bonus * BONUS_FIRST_CHAR_MULTIPLIER;
+                matches[j] = true;
+                consecutive[j] = 1;
+                found_first = true;
+            } else if found_first {
+                dp[0][j] = dp[0][j - 1] + SCORE_GAP_EXTENSION;
+            }
+        }
+
+        if !found_first {
+            return None;
+        }
+
+        for i in 1..m {
+            let mut prev_score = 0;
+            let mut prev_j = 0;
+            let curr_char = pattern_chars[i];
+
+            for j in i..n {
+                #[allow(unused_assignments)]
+                let mut score = 0;
+                if text_chars[j] == curr_char {
+                    let bonus = if j == 0 {
+                        BONUS_BOUNDARY_WHITE
+                    } else {
+                        self.compute_bonus(text_chars[j - 1], text_chars[j])
+                    };
+
+                    let consec = if j > 0 && matches[j - 1] {
+                        consecutive[j - 1] + 1
+                    } else {
+                        1
+                    };
+                    consecutive[j] = consec;
+
+                    score = dp[i - 1][j - 1] + SCORE_MATCH;
+                    if consec > 1 {
+                        score += BONUS_CONSECUTIVE * (consec - 1) as i32;
+                    }
+                    score += bonus;
+
+                    matches[j] = true;
+                    prev_j = j;
+                } else {
+                    score = prev_score + SCORE_GAP_EXTENSION;
+                    consecutive[j] = 0;
+                }
+
+                dp[i][j] = score;
+                pos[i][j] = if matches[j] { j } else { prev_j };
+                prev_score = score;
+            }
+        }
+
+        let mut positions = Vec::with_capacity(m);
+        let mut j = n - 1;
+        for _i in (0..m).rev() {
+            while j > 0 && !matches[j] {
+                j -= 1;
+            }
+            if matches[j] {
+                positions.push(j);
+                j -= 1;
+            }
+        }
+        positions.reverse();
+
+        Some((dp[m - 1][n - 1], positions))
+    }
+}
+
+#[derive(Clone)]
+struct SearchIndex {
+    entries: Arc<RwLock<Vec<FileEntry>>>,
+    matcher: FuzzyMatcher,
+    last_query: Arc<RwLock<String>>,
+    last_results: Arc<RwLock<Vec<MatchResult>>>,
+}
+
+impl SearchIndex {
+    fn new() -> Self {
+        Self {
+            entries: Arc::new(RwLock::new(Vec::new())),
+            matcher: FuzzyMatcher::new(false),
+            last_query: Arc::new(RwLock::new(String::new())),
+            last_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    fn add_entries(&self, new_entries: Vec<FileEntry>) {
+        let mut entries = self.entries.write();
+        entries.extend(new_entries);
+    }
+
+    fn search(&self, query: &str, max_results: usize) -> Vec<MatchResult> {
+        if query.is_empty() {
+            let entries = self.entries.read();
+            let mut results: Vec<_> = entries
+                .iter()
+                .map(|entry| MatchResult {
+                    score: 0,
+                    positions: vec![],
+                    entry: entry.clone(),
+                })
+                .collect();
+
+            results.par_sort_unstable_by(|a, b| {
+                a.entry
+                    .name_str
+                    .len()
+                    .cmp(&b.entry.name_str.len())
+                    .then_with(|| a.entry.name_str.cmp(&b.entry.name_str))
+            });
+            results.truncate(max_results);
+            return results;
+        }
+
+        {
+            let last_query = self.last_query.read();
+            if query.starts_with(&*last_query) {
+                let cached_results = self.last_results.read();
+                if !cached_results.is_empty() {
+                    let filtered: Vec<_> = cached_results
+                        .iter()
+                        .filter_map(|result| {
+                            self.matcher
+                                .fuzzy_match(&result.entry.normalized_path, query)
+                                .map(|(score, positions)| MatchResult {
+                                    score,
+                                    positions,
+                                    entry: result.entry.clone(),
+                                })
+                        })
+                        .collect();
+
+                    if !filtered.is_empty() {
+                        let mut results = filtered;
+                        results.par_sort_unstable_by(|a, b| {
+                            b.score
+                                .cmp(&a.score)
+                                .then_with(|| a.entry.path_str.len().cmp(&b.entry.path_str.len()))
+                        });
+                        results.truncate(max_results);
+                        return results;
+                    }
+                }
+            }
+        }
+
+        let entries = self.entries.read();
+        let chunk_size = (entries.len() / WORKER_THREADS).max(CHUNK_SIZE);
+
+        let results: Vec<_> = entries
+            .par_chunks(chunk_size)
+            .flat_map(|chunk| {
+                chunk
+                    .iter()
+                    .filter_map(|entry| {
+                        if let Some((score, positions)) = entry.score_cache.read().get(query) {
+                            return Some(MatchResult {
+                                score: *score,
+                                positions: positions.clone(),
+                                entry: entry.clone(),
+                            });
+                        }
+
+                        if let Some((score, positions)) =
+                            self.matcher.fuzzy_match(&entry.normalized_path, query)
+                        {
+                            entry
+                                .score_cache
+                                .write()
+                                .insert(query.to_string(), (score, positions.clone()));
+                            Some(MatchResult {
+                                score,
+                                positions,
+                                entry: entry.clone(),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let mut results = results;
+        results.par_sort_unstable_by(|a, b| {
+            b.score
+                .cmp(&a.score)
+                .then_with(|| a.entry.path_str.len().cmp(&b.entry.path_str.len()))
+        });
+        results.truncate(max_results);
+
+        *self.last_query.write() = query.to_string();
+        *self.last_results.write() = results.clone();
+
+        results
+    }
+}
+
+pub struct FuzzyLister {
+    index: SearchIndex,
+}
+
+impl FuzzyLister {
+    pub fn new() -> Self {
+        Self {
+            index: SearchIndex::new(),
+        }
+    }
+
+    fn render_ui(&self, search_bar: &SearchBar, result_list: &ResultList) -> io::Result<()> {
+        let mut stdout = stdout();
+        let (width, height) = terminal::size()?;
+        let available_height = height.saturating_sub(4) as usize;
+
+        static mut LAST_SEARCH_BAR: Option<String> = None;
+        let search_bar_rendered = search_bar.render(width);
+        let should_render_search = unsafe {
+            if LAST_SEARCH_BAR.as_ref() != Some(&search_bar_rendered) {
+                LAST_SEARCH_BAR = Some(search_bar_rendered.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_search {
+            execute!(
+                stdout,
+                cursor::MoveTo(0, 0),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print(&search_bar_rendered),
+                cursor::MoveTo(0, 1),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print("─".repeat(width as usize).bright_black())
+            )?;
+        }
+
+        static mut LAST_RESULTS: Option<Vec<String>> = None;
+        let result_lines = result_list.render(width);
+
+        let should_render_full = unsafe {
+            if LAST_RESULTS.as_ref().map_or(true, |last| {
+                last.len() != result_lines.len()
+                    || last.iter().zip(result_lines.iter()).any(|(a, b)| a != b)
+            }) {
+                LAST_RESULTS = Some(result_lines.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_full {
+            for i in 2..height.saturating_sub(1) {
+                execute!(
+                    stdout,
+                    cursor::MoveTo(0, i),
+                    terminal::Clear(ClearType::CurrentLine)
+                )?;
+            }
+
+            for (i, line) in result_lines.iter().take(available_height).enumerate() {
+                execute!(
+                    stdout,
+                    cursor::MoveTo(0, (i + 2) as u16),
+                    style::Print(line)
+                )?;
+            }
+        }
+
+        static mut LAST_STATUS: Option<String> = None;
+        let status_line = format!(
+            "{}{}{}",
+            " Total: ".bold(),
+            result_list.results.len().to_string().yellow(),
+            format!(
+                " (showing {}-{} of {})",
+                result_list.window_start + 1,
+                (result_list.window_start + available_height).min(result_list.results.len()),
+                result_list.total_indexed
+            )
+            .bright_black()
+        );
+
+        let should_render_status = unsafe {
+            if LAST_STATUS.as_ref() != Some(&status_line) {
+                LAST_STATUS = Some(status_line.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_status {
+            execute!(
+                stdout,
+                cursor::MoveTo(0, height - 1),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print(&status_line)
+            )?;
+        }
+
+        execute!(
+            stdout,
+            cursor::MoveTo((search_bar.cursor_pos + 4) as u16, 0)
+        )?;
+
+        stdout.flush()
+    }
+
+    fn run_interactive(
+        &self,
+        directory: &str,
+        _recursive: bool,
+        _depth: Option<usize>,
+    ) -> Result<Vec<PathBuf>> {
+        let mut stdout = stdout();
+        terminal::enable_raw_mode()?;
+        execute!(
+            stdout,
+            terminal::EnterAlternateScreen,
+            cursor::Hide,
+            terminal::Clear(ClearType::All)
+        )?;
+
+        let mut search_bar = SearchBar::new();
+        let mut result_list = ResultList::new(terminal::size()?.1.saturating_sub(4) as usize);
+        let mut selected_paths = Vec::new();
+
+        let (sender, receiver) = bounded(50000);
+        let total_indexed = Arc::new(AtomicUsize::new(0));
+        let indexing_complete = Arc::new(AtomicBool::new(false));
+
+        let index = Arc::new(self.index.clone());
+        let total_indexed_clone = Arc::clone(&total_indexed);
+        let indexing_complete_clone = Arc::clone(&indexing_complete);
+        let directory = directory.to_string();
+
+        thread::spawn(move || {
+            let walker = WalkBuilder::new(&directory)
+                .hidden(false)
+                .git_ignore(false)
+                .ignore(false)
+                .build_parallel();
+
+            let (tx, rx) = std::sync::mpsc::channel();
+
+            walker.run(|| {
+                let tx = tx.clone();
+                Box::new(move |entry| {
+                    if let Ok(entry) = entry {
+                        if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                            let _ = tx.send(FileEntry::new(entry.into_path()));
+                        }
+                    }
+                    ignore::WalkState::Continue
+                })
+            });
+
+            let mut batch = Vec::with_capacity(1000);
+            while let Ok(entry) = rx.recv() {
+                batch.push(entry);
+                if batch.len() >= 1000 {
+                    total_indexed_clone.fetch_add(batch.len(), AtomicOrdering::SeqCst);
+                    let _ = sender.send(batch);
+                    batch = Vec::with_capacity(1000);
+                }
+            }
+
+            if !batch.is_empty() {
+                total_indexed_clone.fetch_add(batch.len(), AtomicOrdering::SeqCst);
+                let _ = sender.send(batch);
+            }
+
+            indexing_complete_clone.store(true, AtomicOrdering::SeqCst);
+        });
+
+        let mut last_query = String::new();
+        let mut last_update = std::time::Instant::now();
+        let mut last_render = std::time::Instant::now();
+        let mut last_status_update = std::time::Instant::now();
+        let mut needs_render = true;
+        let mut initial_load_done = false;
+
+        let update_interval = Duration::from_millis(150);
+        let render_interval = Duration::from_millis(33);
+        let status_update_interval = Duration::from_millis(100);
+
+        loop {
+            let now = std::time::Instant::now();
+
+            while let Ok(batch) = receiver.try_recv() {
+                index.add_entries(batch);
+                let current_indexed = total_indexed.load(AtomicOrdering::SeqCst);
+
+                if now.duration_since(last_status_update) >= status_update_interval {
+                    result_list.total_indexed = current_indexed;
+                    self.render_status_bar(&result_list)?;
+                    last_status_update = now;
+                }
+
+                if !initial_load_done && current_indexed > 100 {
+                    let results = index.search("", 1000);
+                    result_list.update_results(results);
+                    initial_load_done = true;
+                    needs_render = true;
+                }
+            }
+
+            if event::poll(Duration::from_millis(1))? {
+                if let Event::Key(key) = event::read()? {
+                    match (key.code, key.modifiers) {
+                        (KeyCode::Char('c'), KeyModifiers::CONTROL)
+                        | (KeyCode::Esc, KeyModifiers::NONE) => break,
+                        (KeyCode::Enter, KeyModifiers::NONE) => {
+                            if let Some(result) = result_list.get_selected() {
+                                selected_paths.push(result.entry.path.clone());
+                                break;
+                            }
+                        }
+                        (KeyCode::Up, KeyModifiers::NONE) => {
+                            result_list.move_selection(-1);
+                            needs_render = true;
+                        }
+                        (KeyCode::Down, KeyModifiers::NONE) => {
+                            result_list.move_selection(1);
+                            needs_render = true;
+                        }
+                        _ => {
+                            if search_bar.handle_input(key.code, key.modifiers) {
+                                last_query = search_bar.query.clone();
+                                result_list.selected_idx = 0;
+                                result_list.window_start = 0;
+
+                                let results = index.search(&last_query, 1000);
+                                result_list.update_results(results);
+                                needs_render = true;
+                                last_update = now;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !last_query.is_empty() && now.duration_since(last_update) >= update_interval {
+                let results = index.search(&last_query, 1000);
+                if result_list.update_results(results) {
+                    needs_render = true;
+                }
+                last_update = now;
+            }
+
+            if needs_render && now.duration_since(last_render) >= render_interval {
+                self.render_ui(&search_bar, &result_list)?;
+                last_render = now;
+                needs_render = false;
+            }
+
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        execute!(stdout, terminal::LeaveAlternateScreen, cursor::Show)?;
+        terminal::disable_raw_mode()?;
+
+        Ok(selected_paths)
+    }
+
+    fn render_status_bar(&self, result_list: &ResultList) -> io::Result<()> {
+        let mut stdout = stdout();
+        let (_, height) = terminal::size()?;
+        let available_height = height.saturating_sub(4) as usize;
+
+        let status_line = format!(
+            "{}{}{}",
+            " Total: ".bold(),
+            result_list.results.len().to_string().yellow(),
+            format!(
+                " (showing {}-{} of {})",
+                result_list.window_start + 1,
+                (result_list.window_start + available_height).min(result_list.results.len()),
+                result_list.total_indexed
+            )
+            .bright_black()
+        );
+
+        execute!(
+            stdout,
+            cursor::MoveTo(0, height - 1),
+            terminal::Clear(ClearType::CurrentLine),
+            style::Print(&status_line)
+        )?;
+
+        stdout.flush()
+    }
+}
+
+impl FileLister for FuzzyLister {
+    fn list_files(
+        &self,
+        directory: &str,
+        recursive: bool,
+        depth: Option<usize>,
+    ) -> Result<Vec<PathBuf>> {
+        self.run_interactive(directory, recursive, depth)
     }
 }
 
@@ -50,25 +704,41 @@ impl SearchBar {
         }
     }
 
-    fn render(&self, terminal_width: u16) -> String {
+    fn render(&self, width: u16) -> String {
         let theme = get_theme();
-        let prompt = "  🔍 ".to_string();
-        let input_field = format!("{}", self.query);
-        let cursor = if self.cursor_pos == self.query.len() {
-            "█"
+        let prompt = "    ".to_string();
+        let input = if self.query.is_empty() {
+            "Type to search...".to_string().bright_black().to_string()
         } else {
-            " "
+            self.query.clone()
         };
-        let content_len = prompt.len() + input_field.len() + cursor.len() + 4;
-        let padding = " ".repeat((terminal_width as usize).saturating_sub(content_len));
+
+        let cursor = if !self.query.is_empty() && self.cursor_pos == self.query.len() {
+            "▎"
+                .color(color_value_to_color(&theme.colors.permission_exec))
+                .to_string()
+        } else {
+            " ".to_string()
+        };
+
+        let content_len = prompt.len() + input.len() + cursor.len() + 4;
+        let padding = " ".repeat((width as usize).saturating_sub(content_len));
+
+        let border_color = color_value_to_color(&theme.colors.permission_none);
+        let input_color = if self.query.is_empty() {
+            input
+        } else {
+            input
+                .color(color_value_to_color(&theme.colors.file))
+                .bold()
+                .to_string()
+        };
 
         format!(
             "{}{}{}{}",
-            prompt.color(color_value_to_color(&theme.colors.permission_none)),
-            input_field
-                .color(color_value_to_color(&theme.colors.file))
-                .bold(),
-            cursor.color(color_value_to_color(&theme.colors.permission_exec)),
+            prompt.color(border_color),
+            input_color,
+            cursor,
             padding
         )
     }
@@ -111,7 +781,7 @@ impl SearchBar {
 }
 
 struct ResultList {
-    results: Vec<(i64, PathBuf)>,
+    results: Vec<MatchResult>,
     selected_idx: usize,
     window_start: usize,
     max_visible: usize,
@@ -129,10 +799,29 @@ impl ResultList {
         }
     }
 
-    fn update_results(&mut self, results: Vec<(i64, PathBuf)>) {
-        self.results = results;
-        self.selected_idx = self.selected_idx.min(self.results.len().saturating_sub(1));
-        self.update_window();
+    fn get_selected(&self) -> Option<&MatchResult> {
+        self.results.get(self.selected_idx)
+    }
+
+    fn update_results(&mut self, results: Vec<MatchResult>) -> bool {
+        if self.results.len() != results.len() {
+            self.results = results;
+            self.selected_idx = self.selected_idx.min(self.results.len().saturating_sub(1));
+            self.update_window();
+            return true;
+        }
+
+        let changed = self.results.iter().zip(results.iter()).any(|(a, b)| {
+            a.score != b.score || a.positions != b.positions || a.entry.path != b.entry.path
+        });
+
+        if changed {
+            self.results = results;
+            self.selected_idx = self.selected_idx.min(self.results.len().saturating_sub(1));
+            self.update_window();
+        }
+
+        changed
     }
 
     fn update_window(&mut self) {
@@ -151,67 +840,21 @@ impl ResultList {
         }
     }
 
-    fn format_path_display(&self, path: &Path, is_selected: bool) -> (String, String) {
+    fn render(&self, width: u16) -> Vec<String> {
         let theme = get_theme();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-        let file_display = if is_selected {
-            format_with_icon(
-                path,
-                file_name
-                    .color(color_value_to_color(&theme.colors.directory))
-                    .bold()
-                    .underline()
-                    .to_string(),
-                true,
-            )
-        } else {
-            format_with_icon(
-                path,
-                file_name
-                    .color(color_value_to_color(&theme.colors.file))
-                    .to_string(),
-                true,
-            )
-        };
-
-        let path_display = format!(
-            "  {}",
-            path.display()
-                .to_string()
-                .color(color_value_to_color(&theme.colors.permission_none))
-        );
-
-        (file_display, path_display)
-    }
-
-    fn render(&self, terminal_width: u16, indexing: bool) -> Vec<String> {
-        let theme = get_theme();
-        let max_width = terminal_width as usize;
+        let max_width = width as usize;
 
         if self.results.is_empty() {
-            if indexing {
-                return vec![truncate_to_terminal_width(
-                    &format!(
-                        "  {} Indexing files ({} found)...",
-                        "📂".color(color_value_to_color(&theme.colors.directory)),
-                        self.total_indexed
-                    )
-                    .color(color_value_to_color(&theme.colors.permission_none))
-                    .to_string(),
-                    max_width,
-                )];
-            } else {
-                return vec![truncate_to_terminal_width(
-                    &format!(
-                        "  {} No matches found.",
-                        "🔍".color(color_value_to_color(&theme.colors.permission_none))
-                    )
-                    .color(color_value_to_color(&theme.colors.permission_none))
-                    .to_string(),
-                    max_width,
-                )];
-            }
+            return vec![format!(
+                "  {} {}",
+                "".color(color_value_to_color(&theme.colors.directory)),
+                if self.total_indexed == 0 {
+                    "Indexing files...".to_string()
+                } else {
+                    format!("No matches found (indexed {} files)", self.total_indexed)
+                }
+                .color(color_value_to_color(&theme.colors.permission_none))
+            )];
         }
 
         self.results
@@ -219,9 +862,46 @@ impl ResultList {
             .skip(self.window_start)
             .take(self.max_visible)
             .enumerate()
-            .map(|(idx, (_, path))| {
+            .map(|(idx, result)| {
                 let is_selected = idx + self.window_start == self.selected_idx;
+                let path = &result.entry.path;
                 let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let metadata = path.metadata().ok();
+                let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                let modified = metadata
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .unwrap_or_else(SystemTime::now);
+
+                let path_str = path.to_string_lossy();
+                let truncated_path = if path_str.len() > max_width.saturating_sub(60) {
+                    let components: Vec<_> = path.components().collect();
+                    if components.len() <= 2 {
+                        path_str.to_string()
+                    } else {
+                        let prefix = components[0..components.len() - 2]
+                            .iter()
+                            .map(|c| c.as_os_str().to_string_lossy())
+                            .collect::<Vec<_>>();
+
+                        if prefix.len() > 1 {
+                            let first = prefix[0].to_string();
+                            let last = if prefix.len() > 2 {
+                                prefix.last().unwrap().to_string()
+                            } else {
+                                prefix[1].to_string()
+                            };
+                            format!("{}/.../{}", first, last)
+                        } else {
+                            prefix.join("/")
+                        }
+                        .chars()
+                        .take(max_width.saturating_sub(30))
+                        .collect::<String>()
+                    }
+                } else {
+                    path_str.to_string()
+                };
 
                 let name_display = if is_selected {
                     format_with_icon(
@@ -237,27 +917,22 @@ impl ResultList {
                     format_with_icon(path, colorize_file_name(path).to_string(), true)
                 };
 
-                let metadata = path.metadata().ok();
-                let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
-
                 let prefix = if is_selected {
-                    "→"
-                        .color(color_value_to_color(&theme.colors.directory))
-                        .bold()
+                    "→".bold()
                 } else {
                     " ".normal()
                 };
 
-                let path_str = path.display().to_string();
-                let size_str = format!("{:>3}K", size / 1024);
-                let date_str = chrono::Local::now().format("%b %d %H:%M").to_string();
+                let perms = metadata
+                    .as_ref()
+                    .map(|m| m.permissions())
+                    .unwrap_or_else(|| Permissions::from_mode(0o644));
+                let perms_display = colorize_permissions(&perms);
+                let size_display = colorize_size(size);
+                let date_display = colorize_date(&modified);
 
-                let fixed_elements = 10 + size_str.len() + date_str.len();
-                let max_path_width = max_width.saturating_sub(fixed_elements);
-                let truncated_path = truncate_to_terminal_width(&path_str, max_path_width);
-
-                let line = format!(
-                    "  {} {}  {}  {}  {}",
+                format!(
+                    "  {} {}  {}  {} {} {}",
                     prefix,
                     name_display,
                     truncated_path.color(if is_selected {
@@ -265,676 +940,11 @@ impl ResultList {
                     } else {
                         color_value_to_color(&theme.colors.permission_none)
                     }),
-                    if is_selected {
-                        colorize_size(size).bold()
-                    } else {
-                        colorize_size(size)
-                    },
-                    if is_selected {
-                        colorize_date(&std::time::SystemTime::now()).bold()
-                    } else {
-                        colorize_date(&std::time::SystemTime::now())
-                    }
-                );
-
-                truncate_to_terminal_width(&line, max_width)
+                    perms_display,
+                    size_display,
+                    date_display
+                )
             })
             .collect()
-    }
-}
-
-struct StatusBar {
-    indexing_complete: bool,
-    total_results: usize,
-    visible_range: (usize, usize),
-}
-
-impl StatusBar {
-    fn new() -> Self {
-        Self {
-            indexing_complete: false,
-            total_results: 0,
-            visible_range: (0, 0),
-        }
-    }
-
-    fn render(&self, terminal_width: u16, total_indexed: usize) -> String {
-        let theme = get_theme();
-        let status = if !self.indexing_complete {
-            format!("Indexing... {}", total_indexed)
-                .color(color_value_to_color(&theme.colors.executable))
-        } else {
-            format!("{} files indexed", total_indexed)
-                .color(color_value_to_color(&theme.colors.directory))
-        };
-
-        let results_info = if self.total_results > 0 {
-            if self.visible_range.1 > 0 {
-                format!(
-                    "{}-{} of {} matches",
-                    self.visible_range.0 + 1,
-                    self.visible_range.1,
-                    self.total_results
-                )
-                .color(color_value_to_color(&theme.colors.permission_none))
-            } else {
-                format!("{} matches", self.total_results)
-                    .color(color_value_to_color(&theme.colors.permission_none))
-            }
-        } else {
-            "No matches".color(color_value_to_color(&theme.colors.permission_none))
-        };
-
-        let padding = " ".repeat(
-            terminal_width as usize - status.to_string().len() - results_info.to_string().len() - 4,
-        );
-
-        format!("  {}{}  {}", status, padding, results_info)
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct FileEntry {
-    path: PathBuf,
-    path_str: String,
-    name_str: String,
-    modified: SystemTime,
-}
-
-impl FileEntry {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            path_str: path.to_string_lossy().into_owned(),
-            name_str: path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-            modified: path
-                .metadata()
-                .and_then(|m| m.modified())
-                .unwrap_or_else(|_| SystemTime::now()),
-            path,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct DirectoryIndex {
-    entries: Vec<FileEntry>,
-    last_updated: SystemTime,
-    last_indexed_path: Option<PathBuf>,
-    total_files: usize,
-}
-
-impl DirectoryIndex {
-    fn new(entries: Vec<FileEntry>, last_indexed_path: Option<PathBuf>) -> Self {
-        let total_files = entries.len();
-        Self {
-            entries,
-            last_updated: SystemTime::now(),
-            last_indexed_path,
-            total_files,
-        }
-    }
-
-    fn needs_update(&self, path: &Path) -> bool {
-        if let Ok(metadata) = path.metadata() {
-            if let Ok(modified) = metadata.modified() {
-                return modified > self.last_updated;
-            }
-        }
-        true
-    }
-
-    fn validate_entries(&mut self) {
-        self.entries.retain(|entry| {
-            entry.path.exists()
-                && entry.path.metadata().map_or(false, |m| {
-                    m.modified()
-                        .map_or(false, |modified| modified <= entry.modified)
-                })
-        });
-        self.total_files = self.entries.len();
-    }
-}
-
-#[derive(Clone)]
-struct SearchIndex {
-    entries: Arc<RwLock<Vec<FileEntry>>>,
-    total_files: Arc<AtomicUsize>,
-    indexing_complete: Arc<AtomicBool>,
-    index_path: PathBuf,
-}
-
-impl SearchIndex {
-    fn new() -> Self {
-        let config_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("lla")
-            .join("indexes");
-        fs::create_dir_all(&config_dir).unwrap_or_default();
-
-        Self {
-            entries: Arc::new(RwLock::new(Vec::with_capacity(10000))),
-            total_files: Arc::new(AtomicUsize::new(0)),
-            indexing_complete: Arc::new(AtomicBool::new(false)),
-            index_path: config_dir,
-        }
-    }
-
-    fn get_index_path(&self, directory: &Path) -> PathBuf {
-        let dir_hash = {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasher::new();
-            directory.to_string_lossy().hash(&mut hasher);
-            hasher.finish()
-        };
-        self.index_path.join(format!("{:x}.index", dir_hash))
-    }
-
-    fn load_index(&self, directory: &Path) -> Option<DirectoryIndex> {
-        let index_path = self.get_index_path(directory);
-        if index_path.exists() {
-            if let Ok(content) = fs::read_to_string(&index_path) {
-                if let Ok(index) = serde_json::from_str::<DirectoryIndex>(&content) {
-                    if !index.needs_update(directory) {
-                        return Some(index);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn save_index(
-        &self,
-        directory: &Path,
-        entries: &[FileEntry],
-        last_indexed_path: Option<PathBuf>,
-    ) {
-        let index = DirectoryIndex::new(entries.to_vec(), last_indexed_path);
-        let index_path = self.get_index_path(directory);
-        if let Ok(content) = serde_json::to_string(&index) {
-            fs::write(index_path, content).unwrap_or_default();
-        }
-    }
-
-    fn add_entries(
-        &self,
-        directory: &Path,
-        new_entries: Vec<FileEntry>,
-        last_path: Option<PathBuf>,
-    ) {
-        if let Ok(mut entries) = self.entries.write() {
-            entries.extend(new_entries);
-            self.total_files.store(entries.len(), Ordering::SeqCst);
-            self.save_index(directory, &entries, last_path);
-        }
-    }
-
-    fn search(&self, query: &str, max_results: usize) -> Vec<(i64, PathBuf)> {
-        let entries_guard = match self.entries.read() {
-            Ok(guard) => guard,
-            Err(_) => return Vec::new(),
-        };
-
-        if query.is_empty() {
-            let mut recent_entries: Vec<_> = entries_guard
-                .iter()
-                .map(|entry| (entry.modified, entry.path.clone()))
-                .collect();
-            recent_entries.sort_by(|(a, _), (b, _)| b.cmp(a));
-            return recent_entries
-                .into_iter()
-                .take(max_results)
-                .map(|(_, path)| (0, path))
-                .collect();
-        }
-
-        let query_lower = query.to_lowercase();
-        let query_chars: Vec<char> = query_lower.chars().collect();
-        let query_first = query_chars.first().copied();
-
-        let filtered: Vec<_> = entries_guard
-            .par_iter()
-            .filter(|entry| {
-                if let Some(first) = query_first {
-                    let entry_lower = entry.path_str.to_lowercase();
-                    entry_lower.contains(first) && entry_lower.contains(&query_lower)
-                } else {
-                    true
-                }
-            })
-            .collect();
-
-        let chunk_size = (filtered.len() / rayon::current_num_threads())
-            .max(100)
-            .min(1000);
-
-        let mut scored: Vec<_> = filtered
-            .par_chunks(chunk_size)
-            .flat_map(|chunk| {
-                let matcher = SkimMatcherV2::default().ignore_case();
-                chunk
-                    .iter()
-                    .filter_map(|entry| {
-                        let name_lower = entry.name_str.to_lowercase();
-                        if name_lower.contains(&query_lower) {
-                            Some((i64::MAX, entry.path.clone()))
-                        } else if let Some(score) = matcher.fuzzy_match(&entry.path_str, query) {
-                            Some((score, entry.path.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        scored.par_sort_unstable_by(|(a, _), (b, _)| b.cmp(a));
-        scored.truncate(max_results);
-        scored
-    }
-
-    fn start_indexing(&self, directory: PathBuf) -> (CReceiver<usize>, Receiver<PathBuf>) {
-        let entries = Arc::clone(&self.entries);
-        let total_files = Arc::clone(&self.total_files);
-        let indexing_complete = Arc::clone(&self.indexing_complete);
-        let (progress_tx, progress_rx) = bounded(1000);
-        let (path_tx, path_rx) = mpsc::channel();
-
-        indexing_complete.store(false, Ordering::SeqCst);
-
-        if let Some(mut index) = self.load_index(&directory) {
-            index.validate_entries();
-
-            if let Ok(mut entries_guard) = entries.write() {
-                entries_guard.clear();
-                entries_guard.extend(index.entries);
-                total_files.store(entries_guard.len(), Ordering::SeqCst);
-                let _ = progress_tx.send(entries_guard.len());
-
-                let start_path = index.last_indexed_path;
-                indexing_complete.store(false, Ordering::SeqCst);
-                self.resume_index_in_background(
-                    directory.clone(),
-                    entries.clone(),
-                    total_files.clone(),
-                    path_tx.clone(),
-                    start_path,
-                );
-                return (progress_rx, path_rx);
-            }
-        }
-
-        if let Ok(mut entries_guard) = entries.write() {
-            entries_guard.clear();
-        }
-
-        let index = Arc::new(self.clone());
-        let directory_clone = directory.clone();
-
-        thread::spawn(move || {
-            let (sender, receiver) = bounded(10000);
-            let progress_tx = progress_tx.clone();
-
-            thread::spawn(move || {
-                let walker = WalkBuilder::new(&directory)
-                    .hidden(false)
-                    .git_ignore(false)
-                    .ignore(false)
-                    .parents(false)
-                    .max_depth(None)
-                    .follow_links(true)
-                    .same_file_system(false)
-                    .build_parallel();
-
-                walker.run(|| {
-                    let sender = sender.clone();
-                    Box::new(move |entry| {
-                        if let Ok(entry) = entry {
-                            if entry.file_type().map_or(false, |ft| ft.is_file()) {
-                                if sender.send(entry.into_path()).is_err() {
-                                    return ignore::WalkState::Quit;
-                                }
-                            }
-                        }
-                        ignore::WalkState::Continue
-                    })
-                });
-            });
-
-            let mut batch = Vec::with_capacity(1000);
-            let mut current_path = None;
-
-            while let Ok(path) = receiver.recv_timeout(Duration::from_secs(1)) {
-                batch.push(FileEntry::new(path.clone()));
-                current_path = Some(path.clone());
-                let _ = path_tx.send(path);
-
-                if batch.len() >= 1000 {
-                    index.add_entries(&directory_clone, batch, current_path);
-                    let _ = progress_tx.send(total_files.load(Ordering::SeqCst));
-                    batch = Vec::with_capacity(1000);
-                    current_path = None;
-                }
-            }
-
-            if !batch.is_empty() {
-                index.add_entries(&directory_clone, batch, current_path);
-                let _ = progress_tx.send(total_files.load(Ordering::SeqCst));
-            }
-
-            indexing_complete.store(true, Ordering::SeqCst);
-        });
-
-        (progress_rx, path_rx)
-    }
-
-    fn resume_index_in_background(
-        &self,
-        directory: PathBuf,
-        entries: Arc<RwLock<Vec<FileEntry>>>,
-        total_files: Arc<AtomicUsize>,
-        path_tx: mpsc::Sender<PathBuf>,
-        start_path: Option<PathBuf>,
-    ) {
-        thread::spawn(move || {
-            let mut walker = WalkBuilder::new(&directory)
-                .hidden(false)
-                .git_ignore(false)
-                .ignore(false)
-                .build_parallel();
-
-            if let Some(ref start) = start_path {
-                if let Some(parent) = start.parent() {
-                    walker = WalkBuilder::new(parent)
-                        .hidden(false)
-                        .git_ignore(false)
-                        .ignore(false)
-                        .build_parallel();
-                }
-            }
-
-            let (sender, receiver) = bounded(10000);
-            let mut started = start_path.is_none();
-
-            walker.run(|| {
-                let sender = sender.clone();
-                let start_path = start_path.clone();
-                Box::new(move |entry| {
-                    if let Ok(entry) = entry {
-                        if !started {
-                            if let Some(ref start) = start_path {
-                                if entry.path() >= start {
-                                    started = true;
-                                } else {
-                                    return ignore::WalkState::Continue;
-                                }
-                            }
-                        }
-                        if entry.file_type().map_or(false, |ft| ft.is_file()) {
-                            if sender.send(entry.into_path()).is_err() {
-                                return ignore::WalkState::Quit;
-                            }
-                        }
-                    }
-                    ignore::WalkState::Continue
-                })
-            });
-
-            let mut new_entries = Vec::new();
-
-            while let Ok(path) = receiver.recv_timeout(Duration::from_secs(1)) {
-                new_entries.push(FileEntry::new(path.clone()));
-                let _ = path_tx.send(path);
-
-                if new_entries.len() >= 1000 {
-                    if let Ok(mut entries_guard) = entries.write() {
-                        entries_guard.extend(new_entries);
-                        total_files.store(entries_guard.len(), Ordering::SeqCst);
-                    }
-                    new_entries = Vec::new();
-                }
-            }
-
-            if !new_entries.is_empty() {
-                if let Ok(mut entries_guard) = entries.write() {
-                    entries_guard.extend(new_entries);
-                    total_files.store(entries_guard.len(), Ordering::SeqCst);
-                }
-            }
-        });
-    }
-}
-
-pub struct FuzzyLister {
-    index: SearchIndex,
-}
-
-impl FuzzyLister {
-    pub fn new() -> Self {
-        Self {
-            index: SearchIndex::new(),
-        }
-    }
-
-    fn run_interactive(
-        &self,
-        directory: &str,
-        _recursive: bool,
-        _depth: Option<usize>,
-    ) -> Result<Vec<PathBuf>> {
-        let mut stdout = stdout();
-        terminal::enable_raw_mode()?;
-        execute!(
-            stdout,
-            terminal::EnterAlternateScreen,
-            cursor::Hide,
-            terminal::Clear(ClearType::All)
-        )?;
-
-        let mut search_bar = SearchBar::new();
-        let mut result_list = ResultList::new(terminal::size()?.1.saturating_sub(4) as usize);
-        let mut status_bar = StatusBar::new();
-        let mut last_render = std::time::Instant::now();
-
-        let (_progress_rx, path_rx) = self.index.start_indexing(PathBuf::from(directory));
-
-        let initial_results = self.index.search("", 1000);
-        result_list.update_results(initial_results);
-        status_bar.total_results = result_list.results.len();
-        status_bar.indexing_complete = !self.index.indexing_complete.load(Ordering::SeqCst);
-        status_bar.visible_range = (0, result_list.max_visible.min(result_list.results.len()));
-
-        let mut selected_paths = Vec::new();
-        let mut last_update = std::time::Instant::now();
-        let mut last_index_update = std::time::Instant::now();
-        let search_update_interval = Duration::from_millis(100);
-        let index_update_interval = Duration::from_millis(500);
-        let render_interval = Duration::from_millis(33);
-        let mut last_query = String::new();
-        let max_results = 1000;
-
-        self.render_ui(&search_bar, &result_list, &status_bar)?;
-
-        loop {
-            let now = std::time::Instant::now();
-            let mut should_render = false;
-
-            if now.duration_since(last_index_update) >= index_update_interval {
-                let mut new_paths = 0;
-                while let Ok(_) = path_rx.try_recv() {
-                    new_paths += 1;
-                    if new_paths >= 1000 {
-                        break;
-                    }
-                }
-                if new_paths > 0 {
-                    result_list.total_indexed = self.index.total_files.load(Ordering::SeqCst);
-                    if search_bar.query.is_empty() {
-                        let results = self.index.search("", max_results);
-                        result_list.update_results(results);
-                        status_bar.total_results = result_list.results.len();
-                    }
-                    last_index_update = now;
-                    should_render = true;
-                }
-            }
-
-            let query = &search_bar.query;
-            if !query.is_empty()
-                && (query != &last_query
-                    || now.duration_since(last_update) >= search_update_interval)
-            {
-                let results = self.index.search(query, max_results);
-                result_list.update_results(results);
-                last_query = query.clone();
-                last_update = now;
-                should_render = true;
-
-                status_bar.indexing_complete = !self.index.indexing_complete.load(Ordering::SeqCst);
-                status_bar.total_results = result_list.results.len();
-                status_bar.visible_range = (
-                    result_list.window_start,
-                    (result_list.window_start + result_list.max_visible)
-                        .min(result_list.results.len()),
-                );
-            }
-
-            if should_render && now.duration_since(last_render) >= render_interval {
-                self.render_ui(&search_bar, &result_list, &status_bar)?;
-                last_render = now;
-            }
-
-            if event::poll(Duration::from_millis(1))? {
-                if let Event::Key(key) = event::read()? {
-                    match (key.code, key.modifiers) {
-                        (KeyCode::Char('c'), KeyModifiers::CONTROL)
-                        | (KeyCode::Esc, KeyModifiers::NONE) => {
-                            break;
-                        }
-                        (KeyCode::Up, KeyModifiers::NONE) => {
-                            result_list.move_selection(-1);
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        (KeyCode::Down, KeyModifiers::NONE) => {
-                            result_list.move_selection(1);
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        (KeyCode::Enter, KeyModifiers::NONE) => {
-                            if let Some((_, path)) =
-                                result_list.results.get(result_list.selected_idx)
-                            {
-                                execute!(
-                                    stdout,
-                                    terminal::Clear(ClearType::All),
-                                    cursor::MoveTo(0, 0)
-                                )?;
-                                let (file_display, path_display) =
-                                    result_list.format_path_display(path, true);
-                                println!("\n  Selected: {}{}\n", file_display, path_display);
-                                selected_paths.push(path.clone());
-                                break;
-                            }
-                        }
-                        (KeyCode::PageUp, KeyModifiers::NONE) => {
-                            result_list.move_selection(-(result_list.max_visible as i32));
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        (KeyCode::PageDown, KeyModifiers::NONE) => {
-                            result_list.move_selection(result_list.max_visible as i32);
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        (KeyCode::Home, KeyModifiers::NONE) => {
-                            result_list.selected_idx = 0;
-                            result_list.update_window();
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        (KeyCode::End, KeyModifiers::NONE) => {
-                            result_list.selected_idx = result_list.results.len().saturating_sub(1);
-                            result_list.update_window();
-                            self.render_ui(&search_bar, &result_list, &status_bar)?;
-                        }
-                        _ => {
-                            if search_bar.handle_input(key.code, key.modifiers) {
-                                result_list.selected_idx = 0;
-                                result_list.window_start = 0;
-                                last_update = now - search_update_interval;
-                                self.render_ui(&search_bar, &result_list, &status_bar)?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        execute!(stdout, terminal::LeaveAlternateScreen, cursor::Show)?;
-        terminal::disable_raw_mode()?;
-
-        Ok(selected_paths)
-    }
-
-    fn render_ui(
-        &self,
-        search_bar: &SearchBar,
-        result_list: &ResultList,
-        status_bar: &StatusBar,
-    ) -> io::Result<()> {
-        let mut stdout = stdout();
-        let (width, height) = terminal::size()?;
-
-        let search_bar_content = search_bar.render(width);
-        let separator = "─".repeat(width as usize).bright_black();
-        let available_height = height.saturating_sub(4) as usize;
-        let result_lines =
-            result_list.render(width, !self.index.indexing_complete.load(Ordering::SeqCst));
-        let status_bar_content =
-            status_bar.render(width, self.index.total_files.load(Ordering::SeqCst));
-
-        execute!(
-            stdout,
-            cursor::SavePosition,
-            terminal::Clear(ClearType::All),
-            cursor::MoveTo(0, 0),
-            style::Print(format!("{}\n{}\n", search_bar_content, separator))
-        )?;
-
-        for (i, line) in result_lines.iter().take(available_height).enumerate() {
-            execute!(
-                stdout,
-                cursor::MoveTo(0, (i + 2) as u16),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(line),
-                style::Print("\n")
-            )?;
-        }
-
-        execute!(
-            stdout,
-            cursor::MoveTo(0, height - 1),
-            terminal::Clear(ClearType::CurrentLine),
-            style::Print(status_bar_content)
-        )?;
-
-        execute!(
-            stdout,
-            cursor::MoveTo((search_bar.cursor_pos + 4) as u16, 0)
-        )?;
-
-        stdout.flush()?;
-        Ok(())
-    }
-}
-
-impl FileLister for FuzzyLister {
-    fn list_files(
-        &self,
-        directory: &str,
-        recursive: bool,
-        depth: Option<usize>,
-    ) -> Result<Vec<PathBuf>> {
-        self.run_interactive(directory, recursive, depth)
     }
 }

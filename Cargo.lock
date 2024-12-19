@@ -505,15 +505,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuzzy-matcher"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54614a3312934d066701a80f20f15fa3b56d67ac7722b39eea5b4c9dd1d66c94"
-dependencies = [
- "thread_local",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,7 +771,6 @@ dependencies = [
  "dashmap",
  "dialoguer",
  "dirs 5.0.1",
- "fuzzy-matcher",
  "glob",
  "ignore",
  "indicatif",
@@ -797,6 +787,7 @@ dependencies = [
  "tempfile",
  "terminal_size",
  "toml",
+ "unicode-normalization",
  "unicode-width 0.1.14",
  "users",
  "walkdir",
@@ -1384,14 +1375,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread_local"
-version = "1.1.8"
+name = "tinyvec"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9ef9bad013ada3808854ceac7b46812a6465ba368859a37e2100283d2d719c"
+checksum = "445e881f4f6d382d5f27c034e25eb92edd7c784ceab92a0937db7f2e9471b938"
 dependencies = [
- "cfg-if",
- "once_cell",
+ "tinyvec_macros",
 ]
+
+[[package]]
+name = "tinyvec_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"
@@ -1438,6 +1434,15 @@ name = "unicode-ident"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5033c97c4262335cded6d6fc3e5c18ab755e1a3dc96376350f3d8e9f009ad956"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-width"
