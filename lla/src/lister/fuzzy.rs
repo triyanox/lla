@@ -243,7 +243,13 @@ impl FuzzyMatcher {
             }
             if matches[j] {
                 positions.push(j);
-                j -= 1;
+                if j > 0 {
+                    j -= 1;
+                } else {
+                    break;
+                }
+            } else {
+                break;
             }
         }
         positions.reverse();
