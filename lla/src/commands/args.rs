@@ -148,6 +148,7 @@ impl Args {
                 Arg::with_name("sort")
                     .short('s')
                     .long("sort")
+                    .help("Sort files by name, size, or date")
                     .takes_value(true)
                     .possible_values(&["name", "size", "date"])
                     .default_value(&config.default_sort),
@@ -215,7 +216,7 @@ impl Args {
             .arg(
                 Arg::with_name("include-dirs")
                     .long("include-dirs")
-                    .help("Include directory sizes in sizemap visualization"),
+                    .help("Include directory sizes in the metadata"),
             )
             .subcommand(
                 SubCommand::with_name("install")
