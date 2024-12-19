@@ -40,10 +40,36 @@ pub struct FormatterConfig {
     pub tree: TreeFormatterConfig,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FuzzyConfig {
+    #[serde(default = "default_ignore_patterns")]
+    pub ignore_patterns: Vec<String>,
+}
+
+impl Default for FuzzyConfig {
+    fn default() -> Self {
+        Self {
+            ignore_patterns: default_ignore_patterns(),
+        }
+    }
+}
+
+fn default_ignore_patterns() -> Vec<String> {
+    vec![
+        String::from("node_modules"),
+        String::from("target"),
+        String::from(".git"),
+        String::from(".idea"),
+        String::from(".vscode"),
+    ]
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ListerConfig {
     #[serde(default)]
     pub recursive: RecursiveConfig,
+    #[serde(default)]
+    pub fuzzy: FuzzyConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -217,7 +243,17 @@ max_lines = {}
 # Controls memory usage and performance for deep directory structures
 # Set to 0 to process all entries (may impact performance)
 # Default: 20000 entries
-max_entries = {}"#,
+max_entries = {}
+
+# Fuzzy lister configuration
+[listers.fuzzy]
+# Patterns to ignore when listing files in fuzzy mode
+# Can be:
+#  - Simple substring match: "node_modules"
+#  - Glob pattern: "glob:*.min.js"
+#  - Regular expression: "regex:.*\\.pyc$"
+# Default: ["node_modules", "target", ".git", ".idea", ".vscode"]
+ignore_patterns = {}"#,
             self.default_sort,
             self.default_format,
             self.show_icons,
@@ -234,6 +270,7 @@ max_entries = {}"#,
             self.filter.case_sensitive,
             self.formatters.tree.max_lines.unwrap_or(0),
             self.listers.recursive.max_entries.unwrap_or(0),
+            serde_json::to_string(&self.listers.fuzzy.ignore_patterns).unwrap(),
         );
 
         if !self.shortcuts.is_empty() {
@@ -613,6 +650,9 @@ impl Default for Config {
             listers: ListerConfig {
                 recursive: RecursiveConfig {
                     max_entries: Some(20_000),
+                },
+                fuzzy: FuzzyConfig {
+                    ignore_patterns: default_ignore_patterns(),
                 },
             },
             shortcuts: HashMap::new(),

@@ -166,7 +166,8 @@ pub fn sort_files(
 
 pub fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
     if args.fuzzy_format {
-        Arc::new(FuzzyLister::new())
+        let config = Config::load(&Config::get_config_path()).unwrap_or_default();
+        Arc::new(FuzzyLister::new(config))
     } else if args.tree_format {
         let config = Config::load(&Config::get_config_path()).unwrap_or_default();
         Arc::new(RecursiveLister::new(config))

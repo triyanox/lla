@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Shell completion support for various shells like `bash`, `zsh`, `fish`, and `elvish`
 - Interactive fuzzy file search functionality with the `--fuzzy` flag
-- New `FuzzyFormatter` and `FuzzyLister` components for fuzzy search support
+- New `FuzzyFormatter [unstable]` and `FuzzyLister [unstable]` components for fuzzy search support, this will be improved in future releases to handle very large directories
 
 ### Changed
 

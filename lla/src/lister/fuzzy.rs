@@ -258,21 +258,53 @@ struct SearchIndex {
     matcher: FuzzyMatcher,
     last_query: Arc<RwLock<String>>,
     last_results: Arc<RwLock<Vec<MatchResult>>>,
+    config: crate::config::Config,
 }
 
 impl SearchIndex {
-    fn new() -> Self {
+    fn new(config: crate::config::Config) -> Self {
         Self {
             entries: Arc::new(RwLock::new(Vec::new())),
             matcher: FuzzyMatcher::new(false),
             last_query: Arc::new(RwLock::new(String::new())),
             last_results: Arc::new(RwLock::new(Vec::new())),
+            config,
         }
+    }
+
+    fn should_ignore_path(&self, path: &std::path::Path) -> bool {
+        let path_str = path.to_string_lossy();
+        self.config
+            .listers
+            .fuzzy
+            .ignore_patterns
+            .iter()
+            .any(|pattern| {
+                if pattern.starts_with("regex:") {
+                    if let Ok(re) = regex::Regex::new(&pattern[6..]) {
+                        re.is_match(&path_str)
+                    } else {
+                        false
+                    }
+                } else if pattern.starts_with("glob:") {
+                    if let Ok(glob) = glob::Pattern::new(&pattern[5..]) {
+                        glob.matches(&path_str)
+                    } else {
+                        false
+                    }
+                } else {
+                    path_str.contains(pattern)
+                }
+            })
     }
 
     fn add_entries(&self, new_entries: Vec<FileEntry>) {
         let mut entries = self.entries.write();
-        entries.extend(new_entries);
+        entries.extend(
+            new_entries
+                .into_iter()
+                .filter(|entry| !self.should_ignore_path(&entry.path)),
+        );
     }
 
     fn search(&self, query: &str, max_results: usize) -> Vec<MatchResult> {
@@ -382,116 +414,18 @@ impl SearchIndex {
     }
 }
 
+#[derive(Clone)]
 pub struct FuzzyLister {
     index: SearchIndex,
+    config: crate::config::Config,
 }
 
 impl FuzzyLister {
-    pub fn new() -> Self {
+    pub fn new(config: crate::config::Config) -> Self {
         Self {
-            index: SearchIndex::new(),
+            index: SearchIndex::new(config.clone()),
+            config,
         }
-    }
-
-    fn render_ui(&self, search_bar: &SearchBar, result_list: &ResultList) -> io::Result<()> {
-        let mut stdout = stdout();
-        let (width, height) = terminal::size()?;
-        let available_height = height.saturating_sub(4) as usize;
-
-        static mut LAST_SEARCH_BAR: Option<String> = None;
-        let search_bar_rendered = search_bar.render(width);
-        let should_render_search = unsafe {
-            if LAST_SEARCH_BAR.as_ref() != Some(&search_bar_rendered) {
-                LAST_SEARCH_BAR = Some(search_bar_rendered.clone());
-                true
-            } else {
-                false
-            }
-        };
-
-        if should_render_search {
-            execute!(
-                stdout,
-                cursor::MoveTo(0, 0),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(&search_bar_rendered),
-                cursor::MoveTo(0, 1),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print("─".repeat(width as usize).bright_black())
-            )?;
-        }
-
-        static mut LAST_RESULTS: Option<Vec<String>> = None;
-        let result_lines = result_list.render(width);
-
-        let should_render_full = unsafe {
-            if LAST_RESULTS.as_ref().map_or(true, |last| {
-                last.len() != result_lines.len()
-                    || last.iter().zip(result_lines.iter()).any(|(a, b)| a != b)
-            }) {
-                LAST_RESULTS = Some(result_lines.clone());
-                true
-            } else {
-                false
-            }
-        };
-
-        if should_render_full {
-            for i in 2..height.saturating_sub(1) {
-                execute!(
-                    stdout,
-                    cursor::MoveTo(0, i),
-                    terminal::Clear(ClearType::CurrentLine)
-                )?;
-            }
-
-            for (i, line) in result_lines.iter().take(available_height).enumerate() {
-                execute!(
-                    stdout,
-                    cursor::MoveTo(0, (i + 2) as u16),
-                    style::Print(line)
-                )?;
-            }
-        }
-
-        static mut LAST_STATUS: Option<String> = None;
-        let status_line = format!(
-            "{}{}{}",
-            " Total: ".bold(),
-            result_list.results.len().to_string().yellow(),
-            format!(
-                " (showing {}-{} of {})",
-                result_list.window_start + 1,
-                (result_list.window_start + available_height).min(result_list.results.len()),
-                result_list.total_indexed
-            )
-            .bright_black()
-        );
-
-        let should_render_status = unsafe {
-            if LAST_STATUS.as_ref() != Some(&status_line) {
-                LAST_STATUS = Some(status_line.clone());
-                true
-            } else {
-                false
-            }
-        };
-
-        if should_render_status {
-            execute!(
-                stdout,
-                cursor::MoveTo(0, height - 1),
-                terminal::Clear(ClearType::CurrentLine),
-                style::Print(&status_line)
-            )?;
-        }
-
-        execute!(
-            stdout,
-            cursor::MoveTo((search_bar.cursor_pos + 4) as u16, 0)
-        )?;
-
-        stdout.flush()
     }
 
     fn run_interactive(
@@ -527,6 +461,9 @@ impl FuzzyLister {
                 .hidden(false)
                 .git_ignore(false)
                 .ignore(false)
+                .follow_links(true)
+                .same_file_system(false)
+                .threads(num_cpus::get())
                 .build_parallel();
 
             let (tx, rx) = std::sync::mpsc::channel();
@@ -649,6 +586,107 @@ impl FuzzyLister {
         terminal::disable_raw_mode()?;
 
         Ok(selected_paths)
+    }
+
+    fn render_ui(&self, search_bar: &SearchBar, result_list: &ResultList) -> io::Result<()> {
+        let mut stdout = stdout();
+        let (width, height) = terminal::size()?;
+        let available_height = height.saturating_sub(4) as usize;
+
+        static mut LAST_SEARCH_BAR: Option<String> = None;
+        let search_bar_rendered = search_bar.render(width);
+        let should_render_search = unsafe {
+            if LAST_SEARCH_BAR.as_ref() != Some(&search_bar_rendered) {
+                LAST_SEARCH_BAR = Some(search_bar_rendered.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_search {
+            execute!(
+                stdout,
+                cursor::MoveTo(0, 0),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print(&search_bar_rendered),
+                cursor::MoveTo(0, 1),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print("─".repeat(width as usize).bright_black())
+            )?;
+        }
+
+        static mut LAST_RESULTS: Option<Vec<String>> = None;
+        let result_lines = result_list.render(width);
+
+        let should_render_full = unsafe {
+            if LAST_RESULTS.as_ref().map_or(true, |last| {
+                last.len() != result_lines.len()
+                    || last.iter().zip(result_lines.iter()).any(|(a, b)| a != b)
+            }) {
+                LAST_RESULTS = Some(result_lines.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_full {
+            for i in 2..height.saturating_sub(1) {
+                execute!(
+                    stdout,
+                    cursor::MoveTo(0, i),
+                    terminal::Clear(ClearType::CurrentLine)
+                )?;
+            }
+
+            for (i, line) in result_lines.iter().take(available_height).enumerate() {
+                execute!(
+                    stdout,
+                    cursor::MoveTo(0, (i + 2) as u16),
+                    style::Print(line)
+                )?;
+            }
+        }
+
+        static mut LAST_STATUS: Option<String> = None;
+        let status_line = format!(
+            "{}{}{}",
+            " Total: ".bold(),
+            result_list.results.len().to_string().yellow(),
+            format!(
+                " (showing {}-{} of {})",
+                result_list.window_start + 1,
+                (result_list.window_start + available_height).min(result_list.results.len()),
+                result_list.total_indexed
+            )
+            .bright_black()
+        );
+
+        let should_render_status = unsafe {
+            if LAST_STATUS.as_ref() != Some(&status_line) {
+                LAST_STATUS = Some(status_line.clone());
+                true
+            } else {
+                false
+            }
+        };
+
+        if should_render_status {
+            execute!(
+                stdout,
+                cursor::MoveTo(0, height - 1),
+                terminal::Clear(ClearType::CurrentLine),
+                style::Print(&status_line)
+            )?;
+        }
+
+        execute!(
+            stdout,
+            cursor::MoveTo((search_bar.cursor_pos + 4) as u16, 0)
+        )?;
+
+        stdout.flush()
     }
 
     fn render_status_bar(&self, result_list: &ResultList) -> io::Result<()> {
