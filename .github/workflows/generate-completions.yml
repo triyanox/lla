@@ -1,0 +1,66 @@
+name: Generate Shell Completions
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "lla/src/commands/args.rs"
+    branches:
+      - main
+
+jobs:
+  generate-completions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.71.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build lla
+        run: cargo build
+
+      - name: Create completions directory
+        run: mkdir -p completions
+
+      - name: Generate completions
+        run: |
+          # Generate completions for each supported shell
+          cargo run -- completion bash --output completions/lla.bash
+          cargo run -- completion fish --output completions/lla.fish
+          cargo run -- completion zsh --output completions/_lla
+          cargo run -- completion powershell --output completions/lla.ps1
+          cargo run -- completion elvish --output completions/lla.elv
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: update shell completions"
+          title: "chore: update shell completions"
+          body: |
+            This PR updates the shell completions for all supported shells:
+            - Bash
+            - Fish
+            - Zsh
+            - PowerShell
+            - Elvish
+
+            These completions were automatically generated from the latest CLI arguments definition.
+          branch: update-shell-completions
+          delete-branch: true
+          labels: |
+            automation
+            shell-completions

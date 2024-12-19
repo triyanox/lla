@@ -39,7 +39,7 @@ pub enum Command {
     Update(Option<String>),
     Clean,
     Shortcut(ShortcutAction),
-    GenerateCompletion(Shell, Option<String>),
+    GenerateCompletion(Shell, Option<String>, Option<String>),
     Theme,
 }
 
@@ -335,6 +335,13 @@ impl Args {
                             .short('p')
                             .help("Custom installation path for the completion script")
                             .takes_value(true),
+                    )
+                    .arg(
+                        Arg::with_name("output")
+                            .long("output")
+                            .short('o')
+                            .help("Output path for the completion script (prints to stdout if not specified)")
+                            .takes_value(true),
                     ),
             )
             .subcommand(SubCommand::with_name("theme").about("Interactive theme manager"))
@@ -397,6 +404,7 @@ impl Args {
             Some(Command::GenerateCompletion(
                 shell,
                 completion_matches.value_of("path").map(String::from),
+                completion_matches.value_of("output").map(String::from),
             ))
         } else if matches.subcommand_matches("theme").is_some() {
             Some(Command::Theme)

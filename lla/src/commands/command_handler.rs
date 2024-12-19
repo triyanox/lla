@@ -8,89 +8,125 @@ use crate::plugin::PluginManager;
 use crate::utils::color::ColorState;
 use clap_complete;
 use colored::*;
-use std::fs::{self, create_dir_all};
-use std::path::PathBuf;
+use std::fs::{self, create_dir_all, File};
+use std::io::Write;
 
 fn install_completion(
     shell: clap_complete::Shell,
     app: &mut clap::App,
     color_state: &ColorState,
     custom_path: Option<&str>,
+    output_path: Option<&str>,
 ) -> Result<()> {
     let mut buf = Vec::new();
     clap_complete::generate(shell, app, env!("CARGO_PKG_NAME"), &mut buf);
 
-    let (install_path, post_install_msg) = if let Some(path) = custom_path {
-        (PathBuf::from(path), "Restart your shell to apply changes")
-    } else {
-        match shell {
-            clap_complete::Shell::Bash => {
-                let path = dirs::home_dir()
-                    .map(|h| h.join(".local/share/bash-completion/completions"))
-                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
-                (
-                    path.join("lla"),
-                    "Restart your shell or run 'source ~/.bashrc'",
-                )
+    match output_path {
+        Some(path) => {
+            if let Some(parent) = std::path::Path::new(path).parent() {
+                create_dir_all(parent)?;
             }
-            clap_complete::Shell::Fish => {
-                let path = dirs::home_dir()
-                    .map(|h| h.join(".config/fish/completions"))
-                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
-                (
-                    path.join("lla.fish"),
-                    "Restart your shell or run 'source ~/.config/fish/config.fish'",
-                )
+            let mut file = File::create(path)?;
+            file.write_all(&buf)?;
+            if color_state.is_enabled() {
+                println!(
+                    "✓ Generated {} shell completion to {}",
+                    format!("{:?}", shell).green(),
+                    path.cyan()
+                );
+            } else {
+                println!("✓ Generated {:?} shell completion to {}", shell, path);
             }
-            clap_complete::Shell::Zsh => {
-                let path = dirs::home_dir()
-                    .map(|h| h.join(".zsh/completions"))
-                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
-                (
-                    path.join("_lla"),
-                    "Add 'fpath=(~/.zsh/completions $fpath)' to ~/.zshrc and restart your shell",
-                )
-            }
-            clap_complete::Shell::PowerShell => {
-                let path = dirs::home_dir()
-                    .map(|h| h.join("Documents/WindowsPowerShell"))
-                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
-                (
-                    path.join("lla.ps1"),
-                    "Restart PowerShell or reload your profile",
-                )
-            }
-            clap_complete::Shell::Elvish => {
-                let path = dirs::home_dir()
-                    .map(|h| h.join(".elvish/lib"))
-                    .ok_or_else(|| LlaError::Other("Could not determine home directory".into()))?;
-                (path.join("lla.elv"), "Restart your shell")
-            }
-            _ => return Err(LlaError::Other(format!("Unsupported shell: {:?}", shell))),
+            Ok(())
         }
-    };
+        None => {
+            let (install_path, post_install_msg) = if let Some(path) = custom_path {
+                (
+                    std::path::PathBuf::from(path),
+                    "Restart your shell to apply changes",
+                )
+            } else {
+                match shell {
+                    clap_complete::Shell::Bash => {
+                        let path = dirs::home_dir()
+                            .map(|h| h.join(".local/share/bash-completion/completions"))
+                            .ok_or_else(|| {
+                                LlaError::Other("Could not determine home directory".into())
+                            })?;
+                        (
+                            path.join("lla"),
+                            "Restart your shell or run 'source ~/.bashrc'",
+                        )
+                    }
+                    clap_complete::Shell::Fish => {
+                        let path = dirs::home_dir()
+                            .map(|h| h.join(".config/fish/completions"))
+                            .ok_or_else(|| {
+                                LlaError::Other("Could not determine home directory".into())
+                            })?;
+                        (
+                            path.join("lla.fish"),
+                            "Restart your shell or run 'source ~/.config/fish/config.fish'",
+                        )
+                    }
+                    clap_complete::Shell::Zsh => {
+                        let path = dirs::home_dir()
+                            .map(|h| h.join(".zsh/completions"))
+                            .ok_or_else(|| {
+                                LlaError::Other("Could not determine home directory".into())
+                            })?;
+                        (
+                            path.join("_lla"),
+                            "Add 'fpath=(~/.zsh/completions $fpath)' to ~/.zshrc and restart your shell",
+                        )
+                    }
+                    clap_complete::Shell::PowerShell => {
+                        let path = dirs::home_dir()
+                            .map(|h| h.join("Documents/WindowsPowerShell"))
+                            .ok_or_else(|| {
+                                LlaError::Other("Could not determine home directory".into())
+                            })?;
+                        (
+                            path.join("lla.ps1"),
+                            "Restart PowerShell or reload your profile",
+                        )
+                    }
+                    clap_complete::Shell::Elvish => {
+                        let path =
+                            dirs::home_dir()
+                                .map(|h| h.join(".elvish/lib"))
+                                .ok_or_else(|| {
+                                    LlaError::Other("Could not determine home directory".into())
+                                })?;
+                        (path.join("lla.elv"), "Restart your shell")
+                    }
+                    _ => return Err(LlaError::Other(format!("Unsupported shell: {:?}", shell))),
+                }
+            };
 
-    if let Some(parent) = install_path.parent() {
-        create_dir_all(parent)?;
-    }
-    fs::write(&install_path, buf)?;
-    if color_state.is_enabled() {
-        println!(
-            "✓ {} shell completion installed to {}",
-            format!("{:?}", shell).green(),
-            install_path.display().to_string().cyan()
-        );
-        println!("ℹ {}", post_install_msg.cyan());
-    } else {
-        println!(
-            "✓ {:?} shell completion installed to {}",
-            shell,
-            install_path.display()
-        );
-        println!("ℹ {}", post_install_msg);
-    }
+            if let Some(parent) = install_path.parent() {
+                create_dir_all(parent)?;
+            }
+            fs::write(&install_path, buf)?;
 
-    Ok(())
+            if color_state.is_enabled() {
+                println!(
+                    "✓ {} shell completion installed to {}",
+                    format!("{:?}", shell).green(),
+                    install_path.display().to_string().cyan()
+                );
+                println!("ℹ {}", post_install_msg.cyan());
+            } else {
+                println!(
+                    "✓ {:?} shell completion installed to {}",
+                    shell,
+                    install_path.display()
+                );
+                println!("ℹ {}", post_install_msg);
+            }
+            Ok(())
+        }
+    }
 }
 
 pub fn handle_command(
@@ -102,9 +138,15 @@ pub fn handle_command(
     let color_state = ColorState::new(args);
 
     match &args.command {
-        Some(Command::GenerateCompletion(shell, custom_path)) => {
+        Some(Command::GenerateCompletion(shell, custom_path, output_path)) => {
             let mut app = Args::get_cli(config);
-            install_completion(*shell, &mut app, &color_state, custom_path.as_deref())
+            install_completion(
+                *shell,
+                &mut app,
+                &color_state,
+                custom_path.as_deref(),
+                output_path.as_deref(),
+            )
         }
         Some(Command::Theme) => crate::theme::select_theme(config),
         Some(Command::Shortcut(action)) => handle_shortcut_action(action, config, &color_state),
