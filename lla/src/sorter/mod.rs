@@ -10,7 +10,11 @@ pub struct SortOptions {
 }
 
 pub trait FileSorter: Send + Sync {
-    fn sort_files(&self, files: &mut [PathBuf], options: SortOptions) -> Result<()>;
+    fn sort_files_with_metadata(
+        &self,
+        entries: &mut [(PathBuf, &DecoratedEntry)],
+        options: SortOptions,
+    ) -> Result<()>;
 }
 
 mod alphabetical;
@@ -19,6 +23,7 @@ mod size;
 
 pub use alphabetical::AlphabeticalSorter;
 pub use date::DateSorter;
+use lla_plugin_interface::proto::DecoratedEntry;
 pub use size::SizeSorter;
 
 pub(crate) fn compare_dirs_first(a: &PathBuf, b: &PathBuf, dirs_first: bool) -> std::cmp::Ordering {

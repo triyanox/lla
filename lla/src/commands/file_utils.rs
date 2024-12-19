@@ -165,13 +165,13 @@ pub fn list_and_decorate_files(
 }
 
 pub fn sort_files(
-    mut files: Vec<DecoratedEntry>,
+    files: Vec<DecoratedEntry>,
     sorter: &Arc<dyn FileSorter + Send + Sync>,
     args: &Args,
 ) -> Result<Vec<DecoratedEntry>> {
-    let mut paths: Vec<PathBuf> = files
+    let mut entries_with_paths: Vec<(PathBuf, &DecoratedEntry)> = files
         .iter()
-        .map(|entry| PathBuf::from(&entry.path))
+        .map(|entry| (PathBuf::from(&entry.path), entry))
         .collect();
 
     let options = SortOptions {
@@ -181,16 +181,15 @@ pub fn sort_files(
         natural: args.sort_natural,
     };
 
-    sorter.sort_files(&mut paths, options)?;
+    sorter.sort_files_with_metadata(&mut entries_with_paths, options)?;
 
-    files.sort_by_key(|entry| {
-        paths
-            .iter()
-            .position(|p| p == &PathBuf::from(&entry.path))
-            .unwrap_or(usize::MAX)
-    });
+    let sorted_files = entries_with_paths
+        .into_iter()
+        .map(|(_, entry)| entry)
+        .cloned()
+        .collect();
 
-    Ok(files)
+    Ok(sorted_files)
 }
 
 pub fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
