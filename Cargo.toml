@@ -3,14 +3,18 @@ resolver = "2"
 members = ["lla", "lla_plugin_interface", "plugins/*"]
 
 [workspace.package]
-version = "0.3.5"
-edition = "2021"
+description = "Blazing Fast and highly customizable ls Replacement with Superpowers"
 authors = ["Achaq <hi@achaq.dev>"]
+version = "0.3.6"
+categories = ["utilities", "file-system", "cli", "file-management"]
+edition = "2021"
 license = "MIT"
+keywords = ["ls", "file-system", "cli", "file-management"]
 repository = "https://github.com/triyanox/lla"
 
 [workspace.dependencies]
 clap = "3.2.25"
+clap_complete = "3.2.5"
 serde = { version = "1.0.207", features = ["derive"] }
 toml = "0.8.19"
 dirs = "5.0.1"

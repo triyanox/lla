@@ -12,18 +12,22 @@ pub trait FileFormatter {
 }
 
 mod default;
+mod fuzzy;
 mod git;
 mod grid;
 mod long;
+mod recursive;
 mod sizemap;
 mod table;
 mod timeline;
 mod tree;
 
 pub use default::DefaultFormatter;
+pub use fuzzy::FuzzyFormatter;
 pub use git::GitFormatter;
 pub use grid::GridFormatter;
 pub use long::LongFormatter;
+pub use recursive::RecursiveFormatter;
 pub use sizemap::SizeMapFormatter;
 pub use table::TableFormatter;
 pub use timeline::TimelineFormatter;

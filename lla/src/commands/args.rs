@@ -1,5 +1,6 @@
 use crate::config::{Config, ShortcutCommand};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use clap_complete::Shell;
 use std::path::PathBuf;
 
 pub struct Args {
@@ -12,6 +13,8 @@ pub struct Args {
     pub sizemap_format: bool,
     pub timeline_format: bool,
     pub git_format: bool,
+    pub fuzzy_format: bool,
+    pub recursive_format: bool,
     pub show_icons: bool,
     pub no_color: bool,
     pub sort_by: String,
@@ -24,6 +27,7 @@ pub struct Args {
     pub enable_plugin: Vec<String>,
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
+    pub include_dirs: bool,
     pub command: Option<Command>,
 }
 
@@ -37,6 +41,8 @@ pub enum Command {
     Update(Option<String>),
     Clean,
     Shortcut(ShortcutAction),
+    GenerateCompletion(Shell, Option<String>, Option<String>),
+    Theme,
 }
 
 pub enum InstallSource {
@@ -58,42 +64,8 @@ pub enum ConfigAction {
 }
 
 impl Args {
-    pub fn parse(config: &Config) -> Self {
-        let args: Vec<String> = std::env::args().collect();
-        if args.len() > 1 {
-            let potential_shortcut = &args[1];
-            if config.get_shortcut(potential_shortcut).is_some() {
-                return Self {
-                    directory: ".".to_string(),
-                    depth: config.default_depth,
-                    long_format: config.default_format == "long",
-                    tree_format: config.default_format == "tree",
-                    table_format: config.default_format == "table",
-                    grid_format: config.default_format == "grid",
-                    sizemap_format: config.default_format == "sizemap",
-                    timeline_format: config.default_format == "timeline",
-                    git_format: config.default_format == "git",
-                    show_icons: config.show_icons,
-                    no_color: false,
-                    sort_by: config.default_sort.clone(),
-                    sort_reverse: false,
-                    sort_dirs_first: config.sort.dirs_first,
-                    sort_case_sensitive: config.sort.case_sensitive,
-                    sort_natural: config.sort.natural,
-                    filter: None,
-                    case_sensitive: config.filter.case_sensitive,
-                    enable_plugin: Vec::new(),
-                    disable_plugin: Vec::new(),
-                    plugins_dir: config.plugins_dir.clone(),
-                    command: Some(Command::Shortcut(ShortcutAction::Run(
-                        potential_shortcut.clone(),
-                        args[2..].to_vec(),
-                    ))),
-                };
-            }
-        }
-
-        let matches = App::new(env!("CARGO_PKG_NAME"))
+    fn build_cli(config: &Config) -> App<'_> {
+        App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
             .about(env!("CARGO_PKG_DESCRIPTION"))
@@ -152,6 +124,12 @@ impl Args {
                     .help("Show git status and information (overrides config format)"),
             )
             .arg(
+                Arg::with_name("fuzzy")
+                    .short('F')
+                    .long("fuzzy")
+                    .help("Use interactive fuzzy finder"),
+            )
+            .arg(
                 Arg::with_name("icons")
                     .long("icons")
                     .help("Show icons for files and directories (overrides config setting)"),
@@ -170,6 +148,7 @@ impl Args {
                 Arg::with_name("sort")
                     .short('s')
                     .long("sort")
+                    .help("Sort files by name, size, or date")
                     .takes_value(true)
                     .possible_values(["name", "size", "date"])
                     .default_value(&config.default_sort),
@@ -228,6 +207,17 @@ impl Args {
                     .takes_value(true)
                     .help("Specify the plugins directory"),
             )
+            .arg(
+                Arg::with_name("recursive")
+                    .short('R')
+                    .long("recursive")
+                    .help("Use recursive listing format"),
+            )
+            .arg(
+                Arg::with_name("include-dirs")
+                    .long("include-dirs")
+                    .help("Include directory sizes in the metadata"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -273,6 +263,7 @@ impl Args {
                     ),
             )
             .subcommand(SubCommand::with_name("list-plugins").about("List all available plugins"))
+            .subcommand(SubCommand::with_name("use").about("Interactive plugin manager"))
             .subcommand(SubCommand::with_name("init").about("Initialize the configuration file"))
             .subcommand(
                 SubCommand::with_name("config")
@@ -286,7 +277,6 @@ impl Args {
                             .help("Set a configuration value (e.g., --set plugins_dir /new/path)"),
                     ),
             )
-            .subcommand(SubCommand::with_name("use").about("Interactive plugin manager"))
             .subcommand(
                 SubCommand::with_name("update")
                     .about("Update installed plugins")
@@ -343,13 +333,98 @@ impl Args {
                     )
                     .subcommand(SubCommand::with_name("list").about("List all shortcuts")),
             )
-            .get_matches();
+            .subcommand(
+                SubCommand::with_name("completion")
+                    .about("Generate shell completion scripts")
+                    .arg(
+                        Arg::with_name("shell")
+                            .help("Target shell")
+                            .required(true)
+                            .possible_values(["bash", "fish", "zsh", "powershell", "elvish"])
+                            .index(1),
+                    )
+                    .arg(
+                        Arg::with_name("path")
+                            .long("path")
+                            .short('p')
+                            .help("Custom installation path for the completion script")
+                            .takes_value(true),
+                    )
+                    .arg(
+                        Arg::with_name("output")
+                            .long("output")
+                            .short('o')
+                            .help("Output path for the completion script (prints to stdout if not specified)")
+                            .takes_value(true),
+                    ),
+            )
+            .subcommand(SubCommand::with_name("theme").about("Interactive theme manager"))
+    }
 
+    pub fn parse(config: &Config) -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        if args.len() > 1 {
+            let potential_shortcut = &args[1];
+            if config.get_shortcut(potential_shortcut).is_some() {
+                return Self {
+                    directory: ".".to_string(),
+                    depth: config.default_depth,
+                    long_format: config.default_format == "long",
+                    tree_format: config.default_format == "tree",
+                    table_format: config.default_format == "table",
+                    grid_format: config.default_format == "grid",
+                    sizemap_format: config.default_format == "sizemap",
+                    timeline_format: config.default_format == "timeline",
+                    git_format: config.default_format == "git",
+                    fuzzy_format: false,
+                    recursive_format: false,
+                    show_icons: config.show_icons,
+                    no_color: false,
+                    sort_by: config.default_sort.clone(),
+                    sort_reverse: false,
+                    sort_dirs_first: config.sort.dirs_first,
+                    sort_case_sensitive: config.sort.case_sensitive,
+                    sort_natural: config.sort.natural,
+                    filter: None,
+                    case_sensitive: config.filter.case_sensitive,
+                    enable_plugin: Vec::new(),
+                    disable_plugin: Vec::new(),
+                    plugins_dir: config.plugins_dir.clone(),
+                    include_dirs: false,
+                    command: Some(Command::Shortcut(ShortcutAction::Run(
+                        potential_shortcut.clone(),
+                        args[2..].to_vec(),
+                    ))),
+                };
+            }
+        }
+
+        let matches = Self::build_cli(config).get_matches();
         Self::from_matches(&matches, config)
     }
 
+    pub fn get_cli(config: &Config) -> App<'_> {
+        Self::build_cli(config)
+    }
+
     fn from_matches(matches: &ArgMatches, config: &Config) -> Self {
-        let command = if let Some(matches) = matches.subcommand_matches("shortcut") {
+        let command = if let Some(completion_matches) = matches.subcommand_matches("completion") {
+            let shell = match completion_matches.value_of("shell").unwrap() {
+                "bash" => Shell::Bash,
+                "fish" => Shell::Fish,
+                "zsh" => Shell::Zsh,
+                "powershell" => Shell::PowerShell,
+                "elvish" => Shell::Elvish,
+                _ => unreachable!(),
+            };
+            Some(Command::GenerateCompletion(
+                shell,
+                completion_matches.value_of("path").map(String::from),
+                completion_matches.value_of("output").map(String::from),
+            ))
+        } else if matches.subcommand_matches("theme").is_some() {
+            Some(Command::Theme)
+        } else if let Some(matches) = matches.subcommand_matches("shortcut") {
             if let Some(add_matches) = matches.subcommand_matches("add") {
                 Some(Command::Shortcut(ShortcutAction::Add(
                     add_matches.value_of("name").unwrap().to_string(),
@@ -423,6 +498,9 @@ impl Args {
             sizemap_format: matches.is_present("sizemap") || config.default_format == "sizemap",
             timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
             git_format: matches.is_present("git") || config.default_format == "git",
+            fuzzy_format: matches.is_present("fuzzy"),
+            recursive_format: matches.is_present("recursive")
+                || config.default_format == "recursive",
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
             no_color: matches.is_present("no-color"),
@@ -449,6 +527,7 @@ impl Args {
                 .value_of("plugins-dir")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
+            include_dirs: matches.is_present("include-dirs") || config.include_dirs,
             command,
         }
     }

@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 colored = "2.0.0"
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
-flate2 = "1.0.20"
 prost = "0.12"
 bytes = "1.5"
 

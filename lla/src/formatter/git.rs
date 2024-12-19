@@ -81,24 +81,24 @@ impl GitFormatter {
         let untracked_color = Self::get_theme_color(&ColorValue::Named("bright black".to_string()));
 
         let status_str = match status {
-            "M." => format!("[staged]").color(staged_color),
-            "A." => format!("[added]").color(staged_color),
-            "D." => format!("[deleted]").color(deleted_color),
-            "R." => format!("[renamed]").color(renamed_color),
-            "C." => format!("[copied]").color(renamed_color),
+            "M." => "[staged]".to_string().color(staged_color),
+            "A." => "[added]".to_string().color(staged_color),
+            "D." => "[deleted]".to_string().color(deleted_color),
+            "R." => "[renamed]".to_string().color(renamed_color),
+            "C." => "[copied]".to_string().color(renamed_color),
 
-            ".M" => format!("[modified]").color(modified_color),
-            ".D" => format!("[deleted]").color(deleted_color),
+            ".M" => "[modified]".to_string().color(modified_color),
+            ".D" => "[deleted]".to_string().color(deleted_color),
 
-            "MM" => format!("[modified*]").color(modified_color),
-            "AM" => format!("[added+]").color(staged_color),
-            "DM" => format!("[deleted*]").color(deleted_color),
+            "MM" => "[modified*]".to_string().color(modified_color),
+            "AM" => "[added+]".to_string().color(staged_color),
+            "DM" => "[deleted*]".to_string().color(deleted_color),
 
-            "UU" => format!("[conflict]").color(deleted_color),
+            "UU" => "[conflict]".to_string().color(deleted_color),
 
-            "??" => format!("[untracked]").color(untracked_color),
-            "!!" => format!("[ignored]").color(untracked_color),
-            "." => format!("[unchanged]").normal(),
+            "??" => "[untracked]".to_string().color(untracked_color),
+            "!!" => "[ignored]".to_string().color(untracked_color),
+            "." => "[unchanged]".to_string().normal(),
 
             s if s.starts_with('M') => format!("[modified+{}]", &s[1..]).color(modified_color),
             s if s.starts_with('A') => format!("[added+{}]", &s[1..]).color(staged_color),

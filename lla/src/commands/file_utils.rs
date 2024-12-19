@@ -6,10 +6,10 @@ use crate::filter::{
     GlobFilter, PatternFilter, RegexFilter,
 };
 use crate::formatter::{
-    DefaultFormatter, FileFormatter, GitFormatter, GridFormatter, LongFormatter, SizeMapFormatter,
-    TableFormatter, TimelineFormatter, TreeFormatter,
+    DefaultFormatter, FileFormatter, FuzzyFormatter, GitFormatter, GridFormatter, LongFormatter,
+    RecursiveFormatter, SizeMapFormatter, TableFormatter, TimelineFormatter, TreeFormatter,
 };
-use crate::lister::{BasicLister, FileLister, RecursiveLister};
+use crate::lister::{BasicLister, FileLister, FuzzyLister, RecursiveLister};
 use crate::plugin::PluginManager;
 use crate::sorter::{AlphabeticalSorter, DateSorter, FileSorter, SizeSorter, SortOptions};
 use lla_plugin_interface::proto::{DecoratedEntry, EntryMetadata};
@@ -47,7 +47,7 @@ pub fn list_directory(
 
     let decorated_files = list_and_decorate_files(args, &lister, &filter, plugin_manager, format)?;
 
-    let decorated_files = if !args.tree_format {
+    let decorated_files = if !args.tree_format && !args.recursive_format {
         sort_files(decorated_files, &sorter, args)?
     } else {
         decorated_files
@@ -60,7 +60,9 @@ pub fn list_directory(
 }
 
 pub fn get_format(args: &Args) -> &'static str {
-    if args.long_format {
+    if args.fuzzy_format {
+        "fuzzy"
+    } else if args.long_format {
         "long"
     } else if args.tree_format {
         "tree"
@@ -68,6 +70,8 @@ pub fn get_format(args: &Args) -> &'static str {
         "table"
     } else if args.grid_format {
         "grid"
+    } else if args.recursive_format {
+        "recursive"
     } else {
         "default"
     }
@@ -97,6 +101,22 @@ pub fn convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
     }
 }
 
+fn calculate_dir_size(path: &std::path::Path) -> std::io::Result<u64> {
+    let mut total_size = 0;
+    if path.is_dir() {
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                total_size += calculate_dir_size(&path)?;
+            } else {
+                total_size += entry.metadata()?.len();
+            }
+        }
+    }
+    Ok(total_size)
+}
+
 pub fn list_and_decorate_files(
     args: &Args,
     lister: &Arc<dyn FileLister + Send + Sync>,
@@ -105,10 +125,21 @@ pub fn list_and_decorate_files(
     format: &str,
 ) -> Result<Vec<DecoratedEntry>> {
     let mut entries: Vec<DecoratedEntry> = lister
-        .list_files(&args.directory, args.tree_format, args.depth)?
+        .list_files(
+            &args.directory,
+            args.tree_format || args.recursive_format,
+            args.depth,
+        )?
         .into_par_iter()
         .filter_map(|path| {
             let fs_metadata = path.metadata().ok()?;
+            let mut metadata = convert_metadata(&fs_metadata);
+
+            if args.include_dirs && metadata.is_dir {
+                if let Ok(dir_size) = calculate_dir_size(&path) {
+                    metadata.size = dir_size;
+                }
+            }
 
             if !filter
                 .filter_files(std::slice::from_ref(&path))
@@ -120,7 +151,7 @@ pub fn list_and_decorate_files(
 
             Some(DecoratedEntry {
                 path: path.to_string_lossy().into_owned(),
-                metadata: Some(convert_metadata(&fs_metadata)),
+                metadata: Some(metadata),
                 custom_fields: Default::default(),
             })
         })
@@ -134,13 +165,13 @@ pub fn list_and_decorate_files(
 }
 
 pub fn sort_files(
-    mut files: Vec<DecoratedEntry>,
+    files: Vec<DecoratedEntry>,
     sorter: &Arc<dyn FileSorter + Send + Sync>,
     args: &Args,
 ) -> Result<Vec<DecoratedEntry>> {
-    let mut paths: Vec<PathBuf> = files
+    let mut entries_with_paths: Vec<(PathBuf, &DecoratedEntry)> = files
         .iter()
-        .map(|entry| PathBuf::from(&entry.path))
+        .map(|entry| (PathBuf::from(&entry.path), entry))
         .collect();
 
     let options = SortOptions {
@@ -150,20 +181,22 @@ pub fn sort_files(
         natural: args.sort_natural,
     };
 
-    sorter.sort_files(&mut paths, options)?;
+    sorter.sort_files_with_metadata(&mut entries_with_paths, options)?;
 
-    files.sort_by_key(|entry| {
-        paths
-            .iter()
-            .position(|p| p == &PathBuf::from(&entry.path))
-            .unwrap_or(usize::MAX)
-    });
+    let sorted_files = entries_with_paths
+        .into_iter()
+        .map(|(_, entry)| entry)
+        .cloned()
+        .collect();
 
-    Ok(files)
+    Ok(sorted_files)
 }
 
 pub fn create_lister(args: &Args) -> Arc<dyn FileLister + Send + Sync> {
-    if args.tree_format {
+    if args.fuzzy_format {
+        let config = Config::load(&Config::get_config_path()).unwrap_or_default();
+        Arc::new(FuzzyLister::new(config))
+    } else if args.tree_format || args.recursive_format {
         let config = Config::load(&Config::get_config_path()).unwrap_or_default();
         Arc::new(RecursiveLister::new(config))
     } else {
@@ -232,7 +265,9 @@ fn create_base_filter(pattern: &str, case_insensitive: bool) -> Box<dyn FileFilt
 }
 
 pub fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
-    if args.long_format {
+    if args.fuzzy_format {
+        Box::new(FuzzyFormatter::new(args.show_icons))
+    } else if args.long_format {
         Box::new(LongFormatter::new(args.show_icons))
     } else if args.tree_format {
         Box::new(TreeFormatter::new(args.show_icons))
@@ -246,6 +281,8 @@ pub fn create_formatter(args: &Args) -> Box<dyn FileFormatter> {
         Box::new(TimelineFormatter::new(args.show_icons))
     } else if args.git_format {
         Box::new(GitFormatter::new(args.show_icons))
+    } else if args.recursive_format {
+        Box::new(RecursiveFormatter::new(args.show_icons))
     } else {
         Box::new(DefaultFormatter::new(args.show_icons))
     }

@@ -10,7 +10,6 @@ lla_plugin_interface = { path = "../../lla_plugin_interface" }
 dirs = "5.0.1"
 base64 = { version = "0.22.1", features = ["std"] }
 ring = "0.17.8"
-rand = "0.8.4"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8.8"
 prost = "0.12"

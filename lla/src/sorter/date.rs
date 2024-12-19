@@ -1,25 +1,19 @@
 use super::{compare_dirs_first, FileSorter, SortOptions};
 use crate::error::Result;
+use lla_plugin_interface::proto::DecoratedEntry;
 use rayon::prelude::*;
 use std::path::PathBuf;
-use std::time::SystemTime;
 
 pub struct DateSorter;
 
 impl FileSorter for DateSorter {
-    fn sort_files(&self, files: &mut [PathBuf], options: SortOptions) -> Result<()> {
-        let times: Vec<_> = files
-            .par_iter()
-            .map(|path| {
-                path.metadata()
-                    .and_then(|m| m.modified())
-                    .unwrap_or(SystemTime::UNIX_EPOCH)
-            })
-            .collect();
-
-        let mut indices: Vec<usize> = (0..files.len()).collect();
-        indices.par_sort_unstable_by(|&i, &j| {
-            let dir_order = compare_dirs_first(&files[i], &files[j], options.dirs_first);
+    fn sort_files_with_metadata(
+        &self,
+        entries: &mut [(PathBuf, &DecoratedEntry)],
+        options: SortOptions,
+    ) -> Result<()> {
+        entries.par_sort_unstable_by(|(path_a, entry_a), (path_b, entry_b)| {
+            let dir_order = compare_dirs_first(path_a, path_b, options.dirs_first);
             if dir_order != std::cmp::Ordering::Equal {
                 return if options.reverse {
                     dir_order.reverse()
@@ -28,18 +22,16 @@ impl FileSorter for DateSorter {
                 };
             }
 
-            let date_order = times[i].cmp(&times[j]);
+            let time_a = entry_a.metadata.as_ref().map_or(0, |m| m.modified);
+            let time_b = entry_b.metadata.as_ref().map_or(0, |m| m.modified);
+            let date_order = time_a.cmp(&time_b);
+
             if options.reverse {
                 date_order.reverse()
             } else {
                 date_order
             }
         });
-
-        let temp = files.to_vec();
-        for (i, &idx) in indices.iter().enumerate() {
-            files[i] = temp[idx].clone();
-        }
 
         Ok(())
     }

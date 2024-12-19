@@ -35,15 +35,46 @@ impl Default for TreeFormatterConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct SizeMapConfig {}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct FormatterConfig {
     #[serde(default)]
     pub tree: TreeFormatterConfig,
+    #[serde(default)]
+    pub sizemap: SizeMapConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FuzzyConfig {
+    #[serde(default = "default_ignore_patterns")]
+    pub ignore_patterns: Vec<String>,
+}
+
+impl Default for FuzzyConfig {
+    fn default() -> Self {
+        Self {
+            ignore_patterns: default_ignore_patterns(),
+        }
+    }
+}
+
+fn default_ignore_patterns() -> Vec<String> {
+    vec![
+        String::from("node_modules"),
+        String::from("target"),
+        String::from(".git"),
+        String::from(".idea"),
+        String::from(".vscode"),
+    ]
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ListerConfig {
     #[serde(default)]
     pub recursive: RecursiveConfig,
+    #[serde(default)]
+    pub fuzzy: FuzzyConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -81,6 +112,8 @@ pub struct Config {
     pub default_depth: Option<usize>,
     #[serde(default)]
     pub show_icons: bool,
+    #[serde(default)]
+    pub include_dirs: bool,
     #[serde(default)]
     pub sort: SortConfig,
     #[serde(default)]
@@ -147,6 +180,7 @@ default_sort = "{}"
 #   - "default": Quick and clean directory listing
 #   - "long": Detailed file information with metadata
 #   - "tree": Hierarchical directory visualization
+#   - "fuzzy": Interactive fuzzy search
 #   - "grid": Organized grid layout for better readability
 #   - "git": Git-aware view with repository status
 #   - "timeline": Group files by time periods
@@ -158,6 +192,12 @@ default_format = "{}"
 # When true, file and directory icons will be displayed in all views
 # Default: false
 show_icons = {}
+
+# Whether to include directory sizes in file listings
+# When true, directory sizes will be calculated recursively
+# This may impact performance for large directories
+# Default: false
+include_dirs = {}
 
 # The theme to use for coloring
 # Place custom themes in ~/.config/lla/themes/
@@ -216,10 +256,21 @@ max_lines = {}
 # Controls memory usage and performance for deep directory structures
 # Set to 0 to process all entries (may impact performance)
 # Default: 20000 entries
-max_entries = {}"#,
+max_entries = {}
+
+# Fuzzy lister configuration
+[listers.fuzzy]
+# Patterns to ignore when listing files in fuzzy mode
+# Can be:
+#  - Simple substring match: "node_modules"
+#  - Glob pattern: "glob:*.min.js"
+#  - Regular expression: "regex:.*\\.pyc$"
+# Default: ["node_modules", "target", ".git", ".idea", ".vscode"]
+ignore_patterns = {}"#,
             self.default_sort,
             self.default_format,
             self.show_icons,
+            self.include_dirs,
             self.theme,
             serde_json::to_string(&self.enabled_plugins).unwrap(),
             self.plugins_dir.to_string_lossy(),
@@ -233,6 +284,7 @@ max_entries = {}"#,
             self.filter.case_sensitive,
             self.formatters.tree.max_lines.unwrap_or(0),
             self.listers.recursive.max_entries.unwrap_or(0),
+            serde_json::to_string(&self.listers.fuzzy.ignore_patterns).unwrap(),
         );
 
         if !self.shortcuts.is_empty() {
@@ -344,7 +396,7 @@ max_entries = {}"#,
         }
 
         let valid_formats = [
-            "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table",
+            "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table", "fuzzy",
         ];
         if !valid_formats.contains(&self.default_format.as_str()) {
             return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
@@ -460,6 +512,7 @@ max_entries = {}"#,
             ["default_format"] => {
                 let valid_formats = [
                     "default", "long", "tree", "grid", "git", "timeline", "sizemap", "table",
+                    "fuzzy",
                 ];
                 if !valid_formats.contains(&value) {
                     return Err(LlaError::Config(ConfigErrorKind::InvalidValue(
@@ -471,6 +524,14 @@ max_entries = {}"#,
             }
             ["show_icons"] => {
                 self.show_icons = value.parse().map_err(|_| {
+                    LlaError::Config(ConfigErrorKind::InvalidValue(
+                        key.to_string(),
+                        "must be true or false".to_string(),
+                    ))
+                })?;
+            }
+            ["include_dirs"] => {
+                self.include_dirs = value.parse().map_err(|_| {
                     LlaError::Config(ConfigErrorKind::InvalidValue(
                         key.to_string(),
                         "must be true or false".to_string(),
@@ -543,6 +604,7 @@ max_entries = {}"#,
                 }
                 self.formatters.tree.max_lines = Some(max_lines);
             }
+
             ["listers", "recursive", "max_entries"] => {
                 let max_entries = value.parse().map_err(|_| {
                     LlaError::Config(ConfigErrorKind::InvalidValue(
@@ -601,16 +663,21 @@ impl Default for Config {
             plugins_dir: default_plugins_dir,
             default_depth: Some(3),
             show_icons: false,
+            include_dirs: false,
             sort: SortConfig::default(),
             filter: FilterConfig::default(),
             formatters: FormatterConfig {
                 tree: TreeFormatterConfig {
                     max_lines: Some(20_000),
                 },
+                sizemap: SizeMapConfig::default(),
             },
             listers: ListerConfig {
                 recursive: RecursiveConfig {
                     max_entries: Some(20_000),
+                },
+                fuzzy: FuzzyConfig {
+                    ignore_patterns: default_ignore_patterns(),
                 },
             },
             shortcuts: HashMap::new(),
@@ -624,7 +691,7 @@ pub fn initialize_config() -> Result<()> {
     let config_dir = config_path.parent().unwrap();
     let themes_dir = config_dir.join("themes");
 
-    fs::create_dir_all(&config_dir)?;
+    fs::create_dir_all(config_dir)?;
     fs::create_dir_all(&themes_dir)?;
     let default_theme_path = themes_dir.join("default.toml");
     if !default_theme_path.exists() {

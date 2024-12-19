@@ -11,7 +11,9 @@ pub trait FileLister {
 }
 
 mod basic;
+mod fuzzy;
 mod recursive;
 
 pub use basic::BasicLister;
+pub use fuzzy::FuzzyLister;
 pub use recursive::RecursiveLister;

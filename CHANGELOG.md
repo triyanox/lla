@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2024-12-18
+
+### Added
+
+- Interactive fuzzy file search (Experimental - Might be unstable)
+
+  - Enabled via the new `--fuzzy` flag
+  - Designed for quick file lookups in standard-sized directories
+  - Future updates will optimize performance for large-scale directory structures
+
+- Directory size integration
+
+  - New option to include directory sizes in all listing formats
+  - Compatible with default, sizemap, grid, and tree visualizations
+  - Recursive directory size calculation with `calculate_dir_size`
+  - Configurable through the `include_dirs` setting in configuration files
+  - Enhanced size bar visualization for both directories and files
+
+- Enhanced shell integration
+
+  - Added comprehensive shell completion support for bash, zsh, fish, and elvish
+  - Generate completions using `lla completion <shell> [path]`
+
+- Customizable fuzzy search configuration
+
+  - New `listers.fuzzy.ignore_patterns` setting
+  - Supports multiple pattern types:
+    - Simple substring matching
+    - Glob patterns
+    - Regular expressions
+
+- Interactive theme management
+
+  - New `lla theme` command for interactive theme switching
+
+- Advanced directory visualization
+
+  - New `--recursive` flag for hierarchical directory display
+  - Implemented `RecursiveFormatter` for structured output
+  - Flexible tree and recursive format options
+
+### Changed
+
+- Architecture improvements
+
+  - Redesigned `Args` struct to accommodate shell completion, fuzzy format, and directory size features
+  - Enhanced command handler for improved shell integration
+  - Optimized file listing and formatting logic
+
+- Dependency updates
+
+  - Added `clap_complete` for shell completion functionality
+  - Updated `hermit-abi` version specifications
+  - Integrated `num_cpus` for improved performance
+
+- Search functionality enhancements
+
+  - Implemented configurable `FuzzyConfig` structure
+  - Enhanced `FuzzyLister` and `SearchIndex` components
+  - Improved pattern matching and file filtering capabilities
+
+- Core system refinements
+  - Optimized `create_lister` function
+  - Enhanced configuration loading for fuzzy search and directory size inclusion
+  - Improved recursive listing implementation
+  - Updated `SizeMapFormatter` for better directory and file size visualization
+
 ## [0.3.5] - 2024-12-16
 
 ### Added
