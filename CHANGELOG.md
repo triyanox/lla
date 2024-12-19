@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Shell completion support for various shells like `bash`, `zsh`, `fish`, and `elvish`
-- Interactive fuzzy file search functionality with the `--fuzzy` flag
+- Interactive fuzzy file search functionality with the `--fuzzy` flag, this will be improved in future releases to handle very large directories
 - New `FuzzyFormatter [unstable]` and `FuzzyLister [unstable]` components for fuzzy search support, this will be improved in future releases to handle very large directories
+- Shell completion support for various shells like `bash`, `zsh`, `fish`, and `elvish`
+- Configuration option `listers.fuzzy.ignore_patterns` to customize which files and directories to ignore during fuzzy search. Supports simple substring matches, glob patterns, and regular expressions
 
 ### Changed
 
@@ -19,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced command handling to support shell completion functionality
 - Refactored file listing and formatting logic to support fuzzy search
 - Modified dependencies to include `clap_complete`
+- Updated `Cargo.lock` to specify versions for `hermit-abi` and added `num_cpus` as a new dependency
+- Enhanced `FuzzyConfig` struct for customizable ignore patterns in fuzzy search
+- Updated `FuzzyLister` and `SearchIndex` to utilize the new configuration, allowing users to specify patterns to ignore during file searches
+- Refactored `create_lister` function to load configuration for fuzzy searching, improving the overall user experience
 
 ## [0.3.5] - 2024-12-16
 

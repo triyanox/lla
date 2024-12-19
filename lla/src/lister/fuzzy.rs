@@ -415,6 +415,7 @@ impl SearchIndex {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct FuzzyLister {
     index: SearchIndex,
     config: crate::config::Config,
