@@ -1,9 +1,9 @@
 .DS_Store
 target/
 
-# First ignore everything in completions
+.cache/
+
 completions/*
-# Then explicitly allow the shell completion files
 !completions/*.bash
 !completions/*.fish
 !completions/_lla
