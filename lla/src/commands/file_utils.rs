@@ -102,19 +102,35 @@ pub fn convert_metadata(metadata: &std::fs::Metadata) -> EntryMetadata {
 }
 
 fn calculate_dir_size(path: &std::path::Path) -> std::io::Result<u64> {
-    let mut total_size = 0;
-    if path.is_dir() {
-        for entry in std::fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                total_size += calculate_dir_size(&path)?;
-            } else {
-                total_size += entry.metadata()?.len();
-            }
-        }
+    use rayon::prelude::*;
+
+    if !path.is_dir() {
+        return Ok(0);
     }
-    Ok(total_size)
+
+    let entries: Vec<_> = std::fs::read_dir(path)?.collect::<std::io::Result<_>>()?;
+
+    entries
+        .par_iter()
+        .try_fold(
+            || 0u64,
+            |acc, entry| {
+                let metadata = entry.metadata()?;
+                if metadata.is_symlink() {
+                    return Ok(acc);
+                }
+
+                let path = entry.path();
+                let size = if metadata.is_dir() {
+                    calculate_dir_size(&path)?
+                } else {
+                    metadata.len()
+                };
+
+                Ok(acc + size)
+            },
+        )
+        .try_reduce(|| 0, |a, b| Ok(a + b))
 }
 
 pub fn list_and_decorate_files(

@@ -468,7 +468,7 @@ impl FuzzyLister {
                 .hidden(false)
                 .git_ignore(false)
                 .ignore(false)
-                .follow_links(true)
+                .follow_links(false)
                 .same_file_system(false)
                 .threads(num_cpus::get())
                 .build_parallel();
