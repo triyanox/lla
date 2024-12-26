@@ -250,7 +250,6 @@ fn get_extension_color(path: &Path) -> Option<Color> {
     if is_no_color() {
         return None;
     }
-    use crate::theme::get_file_color;
     get_file_color(path)
 }
 
