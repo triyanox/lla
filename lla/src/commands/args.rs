@@ -485,22 +485,39 @@ impl Args {
             })
         };
 
+        let has_format_flag = matches.is_present("long")
+            || matches.is_present("tree")
+            || matches.is_present("table")
+            || matches.is_present("grid")
+            || matches.is_present("sizemap")
+            || matches.is_present("timeline")
+            || matches.is_present("git")
+            || matches.is_present("fuzzy")
+            || matches.is_present("recursive");
+
         Args {
             directory: matches.value_of("directory").unwrap_or(".").to_string(),
             depth: matches
                 .value_of("depth")
                 .and_then(|s| s.parse().ok())
                 .or(config.default_depth),
-            long_format: matches.is_present("long") || config.default_format == "long",
-            tree_format: matches.is_present("tree") || config.default_format == "tree",
-            table_format: matches.is_present("table") || config.default_format == "table",
-            grid_format: matches.is_present("grid") || config.default_format == "grid",
-            sizemap_format: matches.is_present("sizemap") || config.default_format == "sizemap",
-            timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
-            git_format: matches.is_present("git") || config.default_format == "git",
+            long_format: matches.is_present("long")
+                || (!has_format_flag && config.default_format == "long"),
+            tree_format: matches.is_present("tree")
+                || (!has_format_flag && config.default_format == "tree"),
+            table_format: matches.is_present("table")
+                || (!has_format_flag && config.default_format == "table"),
+            grid_format: matches.is_present("grid")
+                || (!has_format_flag && config.default_format == "grid"),
+            sizemap_format: matches.is_present("sizemap")
+                || (!has_format_flag && config.default_format == "sizemap"),
+            timeline_format: matches.is_present("timeline")
+                || (!has_format_flag && config.default_format == "timeline"),
+            git_format: matches.is_present("git")
+                || (!has_format_flag && config.default_format == "git"),
             fuzzy_format: matches.is_present("fuzzy"),
             recursive_format: matches.is_present("recursive")
-                || config.default_format == "recursive",
+                || (!has_format_flag && config.default_format == "recursive"),
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
             no_color: matches.is_present("no-color"),
