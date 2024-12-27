@@ -106,12 +106,15 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 
 [[package]]
 name = "categorizer"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
  "dirs",
+ "lazy_static",
  "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
  "prost",
  "serde",
  "toml",

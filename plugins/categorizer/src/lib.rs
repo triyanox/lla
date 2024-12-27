@@ -1,10 +1,174 @@
-use colored::Colorize;
-use dirs::config_dir;
-use lla_plugin_interface::{DecoratedEntry, Plugin};
+use lazy_static::lazy_static;
+use lla_plugin_interface::{DecoratedEntry, Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::{
+        components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List},
+        format_size, TextBlock,
+    },
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
+};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::{collections::HashMap, fs, path::PathBuf};
+
+lazy_static! {
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "add-category",
+            "add-category <name> <color> <ext1,ext2,...> [description]",
+            "Add a new category",
+            vec!["lla plugin --name categorizer --action add-category Documents blue txt,doc,pdf \"Text documents\""],
+            |args| {
+                if args.len() < 3 {
+                    return Err("Usage: add-category <name> <color> <ext1,ext2,...> [description]".to_string());
+                }
+                let mut rule = CategoryRule::default();
+                rule.name = args[0].clone();
+                rule.color = args[1].clone();
+                rule.extensions = args[2].split(',').map(String::from).collect();
+                if let Some(desc) = args.get(3) {
+                    rule.description = desc.clone();
+                }
+                PLUGIN_STATE.write().add_rule(rule);
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "add-subcategory",
+            "add-subcategory <category> <subcategory> <ext1,ext2,...>",
+            "Add a subcategory to an existing category",
+            vec!["lla plugin --name categorizer --action add-subcategory Documents Text txt,md"],
+            |args| {
+                if args.len() != 3 {
+                    return Err(
+                        "Usage: add-subcategory <category> <subcategory> <ext1,ext2,...>"
+                            .to_string(),
+                    );
+                }
+                PLUGIN_STATE
+                    .write()
+                    .add_subcategory(&args[0], &args[1], &args[2])
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "show-stats",
+            "show-stats",
+            "Show category statistics",
+            vec!["lla plugin --name categorizer --action show-stats"],
+            |_| {
+                let state = PLUGIN_STATE.read();
+                println!("{}", state.format_stats());
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "list-categories",
+            "list-categories",
+            "List all categories and their details",
+            vec!["lla plugin --name categorizer --action list-categories"],
+            |_| {
+                let state = PLUGIN_STATE.read();
+                let mut list = List::new();
+                for rule in &state.rules {
+                    let mut details = Vec::new();
+                    details.push(format!("Extensions: {}", rule.extensions.join(", ")));
+
+                    if !rule.subcategories.is_empty() {
+                        details.push("Subcategories:".to_string());
+                        for (sub, exts) in &rule.subcategories {
+                            details.push(format!("  {}: {}", sub, exts.join(", ")));
+                        }
+                    }
+
+                    list.add_item(
+                        KeyValue::new(&rule.name, &rule.description)
+                            .key_color(&rule.color)
+                            .key_width(15)
+                            .render(),
+                    );
+
+                    for detail in details {
+                        list.add_item("  ".to_string() + &detail);
+                    }
+                }
+
+                println!(
+                    "{}",
+                    BoxComponent::new(list.render())
+                        .style(BoxStyle::Minimal)
+                        .padding(1)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name categorizer --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("File Categorizer Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Categorizes files based on their extensions and metadata".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string())
+                    .add_command(
+                        "add-category".to_string(),
+                        "Add a new category".to_string(),
+                        vec!["lla plugin --name categorizer --action add-category Documents blue txt,doc,pdf \"Text documents\"".to_string()],
+                    )
+                    .add_command(
+                        "add-subcategory".to_string(),
+                        "Add a subcategory to an existing category".to_string(),
+                        vec!["lla plugin --name categorizer --action add-subcategory Documents Text txt,md".to_string()],
+                    )
+                    .add_command(
+                        "show-stats".to_string(),
+                        "Show category statistics".to_string(),
+                        vec!["lla plugin --name categorizer --action show-stats".to_string()],
+                    )
+                    .add_command(
+                        "list-categories".to_string(),
+                        "List all categories and their details".to_string(),
+                        vec!["lla plugin --name categorizer --action list-categories".to_string()],
+                    )
+                    .add_command(
+                        "help".to_string(),
+                        "Show this help information".to_string(),
+                        vec!["lla plugin --name categorizer --action help".to_string()],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&CategorizerConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+    static ref PLUGIN_STATE: RwLock<PluginState> = RwLock::new(PluginState::new());
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CategoryRule {
@@ -36,15 +200,15 @@ struct CategoryStats {
     subcategory_counts: HashMap<String, usize>,
 }
 
-pub struct FileCategoryPlugin {
+struct PluginState {
     rules: Vec<CategoryRule>,
     config_path: PathBuf,
     stats: HashMap<String, CategoryStats>,
 }
 
-impl FileCategoryPlugin {
-    pub fn new() -> Self {
-        let config_path = config_dir()
+impl PluginState {
+    fn new() -> Self {
+        let config_path = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("lla")
             .join("categorizer.toml");
@@ -53,7 +217,7 @@ impl FileCategoryPlugin {
             vec![
                 CategoryRule {
                     name: "Document".to_string(),
-                    color: "blue".to_string(),
+                    color: "bright_blue".to_string(),
                     extensions: vec!["txt", "md", "doc", "docx", "pdf", "rtf", "odt"]
                         .into_iter()
                         .map(String::from)
@@ -77,36 +241,8 @@ impl FileCategoryPlugin {
                     description: "Text documents and office files".to_string(),
                 },
                 CategoryRule {
-                    name: "Image".to_string(),
-                    color: "green".to_string(),
-                    extensions: vec!["jpg", "jpeg", "png", "gif", "bmp", "svg", "webp", "tiff"]
-                        .into_iter()
-                        .map(String::from)
-                        .collect(),
-                    size_ranges: Some(vec![(0, 52_428_800)]),
-                    subcategories: {
-                        let mut map = HashMap::new();
-                        map.insert(
-                            "Raster".to_string(),
-                            vec!["jpg", "jpeg", "png", "gif", "bmp"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map.insert(
-                            "Vector".to_string(),
-                            vec!["svg", "ai", "eps"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map
-                    },
-                    description: "Image files in various formats".to_string(),
-                },
-                CategoryRule {
                     name: "Code".to_string(),
-                    color: "cyan".to_string(),
+                    color: "bright_cyan".to_string(),
                     extensions: vec![
                         "rs", "py", "js", "ts", "java", "c", "cpp", "h", "hpp", "go", "rb", "php",
                         "cs", "swift", "kt",
@@ -145,25 +281,11 @@ impl FileCategoryPlugin {
             ]
         });
 
-        FileCategoryPlugin {
+        Self {
             rules,
             config_path,
             stats: HashMap::new(),
         }
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
     }
 
     fn load_rules(path: &PathBuf) -> Option<Vec<CategoryRule>> {
@@ -178,6 +300,29 @@ impl FileCategoryPlugin {
         }
         if let Ok(content) = toml::to_string_pretty(&self.rules) {
             fs::write(&self.config_path, content).ok();
+        }
+    }
+
+    fn add_rule(&mut self, rule: CategoryRule) {
+        self.rules.push(rule);
+        self.save_rules();
+    }
+
+    fn add_subcategory(
+        &mut self,
+        category: &str,
+        subcategory: &str,
+        extensions: &str,
+    ) -> Result<(), String> {
+        if let Some(rule) = self.rules.iter_mut().find(|r| r.name == category) {
+            rule.subcategories.insert(
+                subcategory.to_string(),
+                extensions.split(',').map(String::from).collect(),
+            );
+            self.save_rules();
+            Ok(())
+        } else {
+            Err(format!("Category '{}' not found", category))
         }
     }
 
@@ -217,251 +362,154 @@ impl FileCategoryPlugin {
         }
     }
 
-    fn string_to_color(color: &str) -> colored::Color {
-        match color.to_lowercase().as_str() {
-            "black" => colored::Color::Black,
-            "red" => colored::Color::Red,
-            "green" => colored::Color::Green,
-            "yellow" => colored::Color::Yellow,
-            "blue" => colored::Color::Blue,
-            "magenta" => colored::Color::Magenta,
-            "cyan" => colored::Color::Cyan,
-            _ => colored::Color::White,
-        }
-    }
-
     fn format_stats(&self) -> String {
-        let mut output = String::new();
-        output.push_str("Category Statistics:\n");
-
+        let mut list = List::new();
         for (category, stats) in &self.stats {
-            let color = self
-                .rules
-                .iter()
-                .find(|r| &r.name == category)
-                .map(|r| Self::string_to_color(&r.color))
-                .unwrap_or(colored::Color::White);
+            let rule = self.rules.iter().find(|r| &r.name == category);
+            let white = "white".to_string();
+            let color = rule.map(|r| &r.color).unwrap_or(&white);
 
-            output.push_str(&format!(
-                "\n{} ({} files, {})\n",
-                category.color(color),
-                stats.count,
-                Self::format_size(stats.total_size)
-            ));
+            let header = KeyValue::new(
+                category,
+                &format!("{} files, {}", stats.count, format_size(stats.total_size)),
+            )
+            .key_color(color)
+            .key_width(15)
+            .render();
+
+            list.add_item(header);
 
             for (sub, count) in &stats.subcategory_counts {
-                output.push_str(&format!("  {} ({} files)\n", sub, count));
+                list.add_item(format!("  {} ({} files)", sub, count));
             }
         }
-        output
+
+        BoxComponent::new(list.render())
+            .style(BoxStyle::Minimal)
+            .padding(1)
+            .render()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategorizerConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for CategorizerConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for CategorizerConfig {}
+
+pub struct FileCategoryPlugin {
+    base: BasePlugin<CategorizerConfig>,
+}
+
+impl FileCategoryPlugin {
+    pub fn new() -> Self {
+        Self {
+            base: BasePlugin::new(),
+        }
     }
 
-    fn format_size(size: u64) -> String {
-        const KB: u64 = 1024;
-        const MB: u64 = KB * 1024;
-        const GB: u64 = MB * 1024;
-
-        if size >= GB {
-            format!("{:.2} GB", size as f64 / GB as f64)
-        } else if size >= MB {
-            format!("{:.2} MB", size as f64 / MB as f64)
-        } else if size >= KB {
-            format!("{:.2} KB", size as f64 / KB as f64)
-        } else {
-            format!("{} B", size)
+    fn format_file_info(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
+        match (
+            entry.custom_fields.get("category"),
+            entry.custom_fields.get("category_color"),
+            entry.custom_fields.get("subcategory"),
+        ) {
+            (Some(category), Some(color), subcategory) => match format {
+                "default" => Some(
+                    TextBlock::new(format!("[{}]", category))
+                        .color(color)
+                        .build(),
+                ),
+                "long" => {
+                    let base = TextBlock::new(format!("[{}]", category))
+                        .color(color)
+                        .build();
+                    if let Some(sub) = subcategory {
+                        Some(format!(
+                            "{} ({})",
+                            base,
+                            TextBlock::new(sub).color("bright_black").build()
+                        ))
+                    } else {
+                        Some(base)
+                    }
+                }
+                _ => None,
+            },
+            _ => None,
         }
     }
 }
 
 impl Plugin for FileCategoryPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        use lla_plugin_interface::proto::{self, plugin_message};
-        use prost::Message as ProstMessage;
-
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(plugin_message::Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
-
-        let response_msg = match proto_msg.message {
-            Some(plugin_message::Message::GetName(_)) => {
-                plugin_message::Message::NameResponse(env!("CARGO_PKG_NAME").to_string())
-            }
-            Some(plugin_message::Message::GetVersion(_)) => {
-                plugin_message::Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(plugin_message::Message::GetDescription(_)) => {
-                plugin_message::Message::DescriptionResponse(
-                    env!("CARGO_PKG_DESCRIPTION").to_string(),
-                )
-            }
-            Some(plugin_message::Message::GetSupportedFormats(_)) => {
-                plugin_message::Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(plugin_message::Message::Decorate(entry)) => {
-                let mut decorated_entry = match DecoratedEntry::try_from(entry.clone()) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
                     }
-                };
-
-                if let Some((category, color, subcategory)) =
-                    self.get_category_info(&decorated_entry)
-                {
-                    decorated_entry
-                        .custom_fields
-                        .insert("category".to_string(), category.clone());
-                    decorated_entry
-                        .custom_fields
-                        .insert("category_color".to_string(), color);
-                    if let Some(sub) = &subcategory {
-                        decorated_entry
-                            .custom_fields
-                            .insert("subcategory".to_string(), sub.clone());
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
                     }
-                    self.update_stats(&decorated_entry, &category, subcategory.as_deref());
-                }
-
-                plugin_message::Message::DecoratedResponse(decorated_entry.into())
-            }
-            Some(plugin_message::Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
-                        }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = match req.format.as_str() {
-                    "default" => entry.custom_fields.get("category").map(|category| {
-                        let color = entry
-                            .custom_fields
-                            .get("category_color")
-                            .and_then(|c| c.parse::<colored::Color>().ok())
-                            .unwrap_or(colored::Color::White);
-                        format!("[{}]", category.color(color))
-                    }),
-                    "long" => entry.custom_fields.get("category").map(|category| {
-                        let color = entry
-                            .custom_fields
-                            .get("category_color")
-                            .and_then(|c| c.parse::<colored::Color>().ok())
-                            .unwrap_or(colored::Color::White);
-                        let base = format!("[{}]", category.color(color));
-                        if let Some(sub) = entry.custom_fields.get("subcategory") {
-                            format!("{} ({})", base, sub.bright_black())
-                        } else {
-                            base
-                        }
-                    }),
-                    _ => None,
-                };
-
-                plugin_message::Message::FieldResponse(proto::FormattedFieldResponse {
-                    field: formatted,
-                })
-            }
-            Some(plugin_message::Message::Action(req)) => {
-                let result: Result<(), String> = match req.action.as_str() {
-                    "add-category" => {
-                        if req.args.len() < 3 {
-                            Err(
-                                "Usage: add-category <n> <color> <ext1,ext2,...> [description]"
-                                    .to_string(),
-                            )
-                        } else {
-                            let mut rule = CategoryRule::default();
-                            rule.name = req.args[0].clone();
-                            rule.color = req.args[1].clone();
-                            rule.extensions = req.args[2].split(',').map(String::from).collect();
-                            if let Some(desc) = req.args.get(3) {
-                                rule.description = desc.clone();
-                            }
-                            self.rules.push(rule);
-                            self.save_rules();
-                            Ok(())
-                        }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
                     }
-                    "add-subcategory" => {
-                        if req.args.len() != 4 {
-                            Err(
-                                "Usage: add-subcategory <category> <subcategory> <ext1,ext2,...>"
-                                    .to_string(),
-                            )
-                        } else if let Some(rule) =
-                            self.rules.iter_mut().find(|r| r.name == req.args[0])
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        let mut state = PLUGIN_STATE.write();
+                        if let Some((category, color, subcategory)) =
+                            state.get_category_info(&entry)
                         {
-                            rule.subcategories.insert(
-                                req.args[1].clone(),
-                                req.args[2].split(',').map(String::from).collect(),
-                            );
-                            self.save_rules();
-                            Ok(())
-                        } else {
-                            Err(format!("Category '{}' not found", req.args[0]))
-                        }
-                    }
-                    "show-stats" => {
-                        println!("{}", self.format_stats());
-                        Ok(())
-                    }
-                    "list-categories" => {
-                        for rule in &self.rules {
-                            let color = Self::string_to_color(&rule.color);
-                            println!("\n{} ({})", rule.name.color(color), rule.description);
-                            println!("  Extensions: {}", rule.extensions.join(", "));
-                            if !rule.subcategories.is_empty() {
-                                println!("  Subcategories:");
-                                for (sub, exts) in &rule.subcategories {
-                                    println!("    {}: {}", sub, exts.join(", "));
-                                }
+                            entry
+                                .custom_fields
+                                .insert("category".to_string(), category.clone());
+                            entry
+                                .custom_fields
+                                .insert("category_color".to_string(), color);
+                            if let Some(sub) = &subcategory {
+                                entry
+                                    .custom_fields
+                                    .insert("subcategory".to_string(), sub.clone());
                             }
+                            state.update_stats(&entry, &category, subcategory.as_deref());
                         }
-                        Ok(())
+                        PluginResponse::Decorated(entry)
                     }
-                    "help" => {
-                        let help_text = "Available actions:\n\
-                                add-category <n> <color> <ext1,ext2,...> [description] - Add a new category\n\
-                                add-subcategory <category> <subcategory> <ext1,ext2,...> - Add a subcategory\n\
-                                show-stats - Show category statistics\n\
-                                list-categories - List all categories and their details\n\
-                                help - Show this help message\n\n";
-                        println!("{}", help_text);
-                        Ok(())
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_file_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
                     }
-                    _ => Err(format!("Unknown action: {}", req.action)),
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
+                    }
                 };
-
-                plugin_message::Message::ActionResponse(proto::ActionResponse {
-                    success: result.is_ok(),
-                    error: result.err(),
-                })
+                self.encode_response(response)
             }
-            _ => plugin_message::Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -470,5 +518,19 @@ impl Default for FileCategoryPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for FileCategoryPlugin {
+    type Config = CategorizerConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for FileCategoryPlugin {}
 
 lla_plugin_interface::declare_plugin!(FileCategoryPlugin);
