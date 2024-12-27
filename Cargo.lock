@@ -110,7 +110,7 @@ version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
- "dirs 5.0.1",
+ "dirs",
  "lla_plugin_interface",
  "prost",
  "serde",
@@ -185,7 +185,7 @@ version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
- "dirs 5.0.1",
+ "dirs",
  "lla_plugin_interface",
  "prost",
  "serde",
@@ -199,7 +199,7 @@ dependencies = [
  "base64",
  "bytes",
  "colored",
- "dirs 5.0.1",
+ "dirs",
  "lla_plugin_interface",
  "prost",
  "ring",
@@ -352,20 +352,6 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "0.3.0"
-dependencies = [
- "bytes",
- "colored",
- "lazy_static",
- "lla_plugin_interface",
- "parking_lot",
- "prost",
- "rayon",
- "walkdir",
-]
-
-[[package]]
-name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
@@ -383,6 +369,22 @@ dependencies = [
  "option-ext",
  "redox_users",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "dirs_meta"
+version = "0.3.1"
+dependencies = [
+ "bytes",
+ "colored",
+ "lazy_static",
+ "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
+ "prost",
+ "rayon",
+ "serde",
+ "walkdir",
 ]
 
 [[package]]
@@ -461,7 +463,7 @@ version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
- "dirs 5.0.1",
+ "dirs",
  "lla_plugin_interface",
  "prost",
 ]
@@ -663,7 +665,7 @@ version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
- "dirs 5.0.1",
+ "dirs",
  "lla_plugin_interface",
  "prost",
  "regex",
@@ -733,7 +735,7 @@ dependencies = [
  "crossterm",
  "dashmap",
  "dialoguer",
- "dirs 5.0.1",
+ "dirs",
  "glob",
  "ignore",
  "indicatif",
@@ -764,6 +766,23 @@ dependencies = [
  "prost",
  "prost-build",
  "serde",
+]
+
+[[package]]
+name = "lla_plugin_utils"
+version = "0.3.7"
+dependencies = [
+ "bytes",
+ "chrono",
+ "colored",
+ "console",
+ "dirs",
+ "indicatif",
+ "lla_plugin_interface",
+ "prost",
+ "serde",
+ "toml",
+ "users",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["lla", "lla_plugin_interface", "plugins/*"]
+members = ["lla", "lla_plugin_interface", "lla_plugin_utils", "plugins/*"]
 
 [workspace.package]
 description = "Blazing Fast and highly customizable ls Replacement with Superpowers"
