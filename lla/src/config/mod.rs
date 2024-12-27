@@ -101,6 +101,8 @@ impl Default for SortConfig {
 pub struct FilterConfig {
     #[serde(default)]
     pub case_sensitive: bool,
+    #[serde(default)]
+    pub no_dotfiles: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -242,6 +244,10 @@ natural = {}
 # Default: false
 case_sensitive = {}
 
+# Hide dot files and directories by default
+# Default: false
+no_dotfiles = {}
+
 # Formatter-specific configurations
 [formatters.tree]
 # Maximum number of entries to display in tree view
@@ -282,6 +288,7 @@ ignore_patterns = {}"#,
             self.sort.case_sensitive,
             self.sort.natural,
             self.filter.case_sensitive,
+            self.filter.no_dotfiles,
             self.formatters.tree.max_lines.unwrap_or(0),
             self.listers.recursive.max_entries.unwrap_or(0),
             serde_json::to_string(&self.listers.fuzzy.ignore_patterns).unwrap(),
@@ -583,6 +590,14 @@ ignore_patterns = {}"#,
             }
             ["filter", "case_sensitive"] => {
                 self.filter.case_sensitive = value.parse().map_err(|_| {
+                    LlaError::Config(ConfigErrorKind::InvalidValue(
+                        key.to_string(),
+                        "must be true or false".to_string(),
+                    ))
+                })?;
+            }
+            ["filter", "no_dotfiles"] => {
+                self.filter.no_dotfiles = value.parse().map_err(|_| {
                     LlaError::Config(ConfigErrorKind::InvalidValue(
                         key.to_string(),
                         "must be true or false".to_string(),

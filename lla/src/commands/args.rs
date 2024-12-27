@@ -445,7 +445,7 @@ impl Args {
                     no_dirs: false,
                     no_files: false,
                     no_symlinks: false,
-                    no_dotfiles: false,
+                    no_dotfiles: config.filter.no_dotfiles,
                     dotfiles_only: false,
                     command: Some(Command::Shortcut(ShortcutAction::Run(
                         potential_shortcut.clone(),
@@ -607,7 +607,7 @@ impl Args {
             no_dirs: matches.is_present("no-dirs"),
             no_files: matches.is_present("no-files"),
             no_symlinks: matches.is_present("no-symlinks"),
-            no_dotfiles: matches.is_present("no-dotfiles"),
+            no_dotfiles: matches.is_present("no-dotfiles") || config.filter.no_dotfiles,
             dotfiles_only: matches.is_present("dotfiles-only"),
             command,
         }
