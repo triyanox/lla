@@ -1,173 +1,272 @@
-use colored::*;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use lazy_static::lazy_static;
+use lla_plugin_interface::{DecoratedEntry, Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::{
+        components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List},
+        format_size,
+    },
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
-use std::time::SystemTime;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, time::SystemTime};
 
-pub struct FileMetadataPlugin;
+lazy_static! {
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name file_meta --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("File Metadata Plugin".to_string());
+                help.add_section("Description".to_string())
+                    .add_command(
+                        "".to_string(),
+                        "Displays detailed file metadata including timestamps, ownership, size, and permissions.".to_string(),
+                        vec![],
+                    );
+
+                help.add_section("Actions".to_string()).add_command(
+                    "help".to_string(),
+                    "Show this help information".to_string(),
+                    vec!["lla plugin --name file_meta --action help".to_string()],
+                );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show basic file metadata".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show detailed file metadata including timestamps".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&FileMetaConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMetaConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("accessed".to_string(), "bright_blue".to_string());
+    colors.insert("modified".to_string(), "bright_green".to_string());
+    colors.insert("created".to_string(), "bright_yellow".to_string());
+    colors.insert("ownership".to_string(), "bright_magenta".to_string());
+    colors.insert("size".to_string(), "bright_cyan".to_string());
+    colors.insert("permissions".to_string(), "bright_red".to_string());
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for FileMetaConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for FileMetaConfig {}
+
+pub struct FileMetadataPlugin {
+    base: BasePlugin<FileMetaConfig>,
+}
 
 impl FileMetadataPlugin {
     pub fn new() -> Self {
-        FileMetadataPlugin
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        Self {
+            base: BasePlugin::new(),
+        }
     }
 
     fn format_timestamp(timestamp: SystemTime) -> String {
         let datetime: chrono::DateTime<chrono::Local> = timestamp.into();
         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
     }
+
+    fn format_file_info(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
+        let colors = &self.base.config().colors;
+
+        match format {
+            "long" | "default" => {
+                match (
+                    entry.custom_fields.get("accessed"),
+                    entry.custom_fields.get("modified"),
+                    entry.custom_fields.get("created"),
+                    entry.custom_fields.get("uid"),
+                    entry.custom_fields.get("gid"),
+                    entry.custom_fields.get("size"),
+                    entry.custom_fields.get("permissions"),
+                ) {
+                    (
+                        Some(accessed),
+                        Some(modified),
+                        Some(created),
+                        Some(uid),
+                        Some(gid),
+                        Some(size),
+                        Some(permissions),
+                    ) => {
+                        let mut list = List::new().style(BoxStyle::Minimal).key_width(12);
+
+                        list.add_item(
+                            KeyValue::new("Accessed", accessed)
+                                .key_color(colors.get("accessed").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("accessed").unwrap_or(&"white".to_string()))
+                                .key_width(12)
+                                .render(),
+                        );
+
+                        list.add_item(
+                            KeyValue::new("Modified", modified)
+                                .key_color(colors.get("modified").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("modified").unwrap_or(&"white".to_string()))
+                                .key_width(12)
+                                .render(),
+                        );
+
+                        list.add_item(
+                            KeyValue::new("Created", created)
+                                .key_color(colors.get("created").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("created").unwrap_or(&"white".to_string()))
+                                .key_width(12)
+                                .render(),
+                        );
+
+                        list.add_item(
+                            KeyValue::new("UID/GID", format!("{}/{}", uid, gid))
+                                .key_color(colors.get("ownership").unwrap_or(&"white".to_string()))
+                                .value_color(
+                                    colors.get("ownership").unwrap_or(&"white".to_string()),
+                                )
+                                .key_width(12)
+                                .render(),
+                        );
+
+                        list.add_item(
+                            KeyValue::new("Size", format_size(size.parse().unwrap_or(0)))
+                                .key_color(colors.get("size").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("size").unwrap_or(&"white".to_string()))
+                                .key_width(12)
+                                .render(),
+                        );
+
+                        list.add_item(
+                            KeyValue::new(
+                                "Permissions",
+                                format!("{:o}", permissions.parse::<u32>().unwrap_or(0)),
+                            )
+                            .key_color(colors.get("permissions").unwrap_or(&"white".to_string()))
+                            .value_color(colors.get("permissions").unwrap_or(&"white".to_string()))
+                            .key_width(12)
+                            .render(),
+                        );
+
+                        Some(format!("\n{}", list.render()))
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Plugin for FileMetadataPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
+                    }
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        entry.custom_fields.insert(
+                            "accessed".to_string(),
+                            Self::format_timestamp(
+                                SystemTime::UNIX_EPOCH
+                                    + std::time::Duration::from_secs(entry.metadata.accessed),
+                            ),
+                        );
+                        entry.custom_fields.insert(
+                            "modified".to_string(),
+                            Self::format_timestamp(
+                                SystemTime::UNIX_EPOCH
+                                    + std::time::Duration::from_secs(entry.metadata.modified),
+                            ),
+                        );
+                        entry.custom_fields.insert(
+                            "created".to_string(),
+                            Self::format_timestamp(
+                                SystemTime::UNIX_EPOCH
+                                    + std::time::Duration::from_secs(entry.metadata.created),
+                            ),
+                        );
+                        entry
+                            .custom_fields
+                            .insert("uid".to_string(), entry.metadata.uid.to_string());
+                        entry
+                            .custom_fields
+                            .insert("gid".to_string(), entry.metadata.gid.to_string());
+                        entry
+                            .custom_fields
+                            .insert("size".to_string(), entry.metadata.size.to_string());
+                        entry.custom_fields.insert(
+                            "permissions".to_string(),
+                            entry.metadata.permissions.to_string(),
+                        );
 
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        PluginResponse::Decorated(entry)
+                    }
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_file_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
                     }
                 };
-
-                entry.custom_fields.insert(
-                    "accessed".to_string(),
-                    Self::format_timestamp(
-                        SystemTime::UNIX_EPOCH
-                            + std::time::Duration::from_secs(entry.metadata.accessed),
-                    ),
-                );
-                entry.custom_fields.insert(
-                    "modified".to_string(),
-                    Self::format_timestamp(
-                        SystemTime::UNIX_EPOCH
-                            + std::time::Duration::from_secs(entry.metadata.modified),
-                    ),
-                );
-                entry.custom_fields.insert(
-                    "created".to_string(),
-                    Self::format_timestamp(
-                        SystemTime::UNIX_EPOCH
-                            + std::time::Duration::from_secs(entry.metadata.created),
-                    ),
-                );
-                entry
-                    .custom_fields
-                    .insert("uid".to_string(), entry.metadata.uid.to_string());
-                entry
-                    .custom_fields
-                    .insert("gid".to_string(), entry.metadata.gid.to_string());
-                entry
-                    .custom_fields
-                    .insert("size".to_string(), entry.metadata.size.to_string());
-                entry.custom_fields.insert(
-                    "permissions".to_string(),
-                    format!("{:o}", entry.metadata.permissions),
-                );
-
-                Message::DecoratedResponse(entry.into())
+                self.encode_response(response)
             }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
-                        }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = match req.format.as_str() {
-                    "long" | "default" => {
-                        match (
-                            entry.custom_fields.get("accessed"),
-                            entry.custom_fields.get("modified"),
-                            entry.custom_fields.get("created"),
-                            entry.custom_fields.get("uid"),
-                            entry.custom_fields.get("gid"),
-                            entry.custom_fields.get("size"),
-                            entry.custom_fields.get("permissions"),
-                        ) {
-                            (
-                                Some(accessed),
-                                Some(modified),
-                                Some(created),
-                                Some(uid),
-                                Some(gid),
-                                Some(size),
-                                Some(permissions),
-                            ) => Some(format!(
-                                "\n{}\n{}\n{}\n{}\n{}\n{}",
-                                format!("Accessed: {}", accessed.blue()),
-                                format!("Modified: {}", modified.green()),
-                                format!("Created:  {}", created.yellow()),
-                                format!("UID/GID:  {}/{}", uid.magenta(), gid.magenta()),
-                                format!("Size:     {}", size.cyan()),
-                                format!("Perms:    {}", permissions.red())
-                            )),
-                            _ => None,
-                        }
-                    }
-                    _ => None,
-                };
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
-            }
-            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
-                success: true,
-                error: None,
-            }),
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -176,5 +275,19 @@ impl Default for FileMetadataPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for FileMetadataPlugin {
+    type Config = FileMetaConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for FileMetadataPlugin {}
 
 lla_plugin_interface::declare_plugin!(FileMetadataPlugin);
