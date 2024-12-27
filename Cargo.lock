@@ -401,8 +401,10 @@ dependencies = [
  "colored",
  "lazy_static",
  "lla_plugin_interface",
+ "lla_plugin_utils",
  "parking_lot",
  "prost",
+ "serde",
  "sha2",
 ]
 
