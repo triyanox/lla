@@ -1,30 +1,105 @@
 use colored::Colorize;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use lazy_static::lazy_static;
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, Spinner},
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
-use std::cmp;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::{cmp, collections::HashMap};
 
-pub struct FileSizeVisualizerPlugin;
+lazy_static! {
+    static ref SPINNER: RwLock<Spinner> = RwLock::new(Spinner::new());
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name sizeviz --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("Size Visualizer Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Visualizes file sizes with bars and percentage indicators.".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string()).add_command(
+                    "help".to_string(),
+                    "Show this help information".to_string(),
+                    vec!["lla plugin --name sizeviz --action help".to_string()],
+                );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show basic size visualization".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show detailed size visualization with percentage".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&SizeConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SizeConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("tiny".to_string(), "bright_green".to_string());
+    colors.insert("small".to_string(), "bright_cyan".to_string());
+    colors.insert("medium".to_string(), "bright_yellow".to_string());
+    colors.insert("large".to_string(), "bright_red".to_string());
+    colors.insert("huge".to_string(), "bright_magenta".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("size".to_string(), "bright_yellow".to_string());
+    colors.insert("percentage".to_string(), "bright_magenta".to_string());
+    colors
+}
+
+impl Default for SizeConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for SizeConfig {}
+
+pub struct FileSizeVisualizerPlugin {
+    base: BasePlugin<SizeConfig>,
+}
 
 impl FileSizeVisualizerPlugin {
     pub fn new() -> Self {
-        FileSizeVisualizerPlugin
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        Self {
+            base: BasePlugin::new(),
+        }
     }
 
     fn format_size(size: u64) -> String {
@@ -64,7 +139,8 @@ impl FileSizeVisualizerPlugin {
         format!("{}{}{}", full_blocks, partial_block, spaces)
     }
 
-    fn size_to_color(size: u64) -> colored::Color {
+    fn get_size_color(&self, size: u64) -> String {
+        let colors = &self.base.config().colors;
         const KB: u64 = 1024;
         const KB_1: u64 = KB + 1;
         const KB_10: u64 = KB * 10;
@@ -78,13 +154,34 @@ impl FileSizeVisualizerPlugin {
         const GB: u64 = MB * 1024;
 
         match size {
-            0..=KB => colored::Color::Green,
-            KB_1..=KB_10 => colored::Color::BrightGreen,
-            KB_10_1..=MB => colored::Color::Cyan,
-            MB_1..=MB_10 => colored::Color::Blue,
-            MB_10_1..=MB_100 => colored::Color::Yellow,
-            MB_100_1..=GB => colored::Color::Red,
-            _ => colored::Color::Magenta,
+            0..=KB => colors
+                .get("tiny")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            KB_1..=KB_10 => colors
+                .get("small")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            KB_10_1..=MB => colors
+                .get("small")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            MB_1..=MB_10 => colors
+                .get("medium")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            MB_10_1..=MB_100 => colors
+                .get("large")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            MB_100_1..=GB => colors
+                .get("large")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
+            _ => colors
+                .get("huge")
+                .unwrap_or(&"white".to_string())
+                .to_string(),
         }
     }
 
@@ -95,128 +192,119 @@ impl FileSizeVisualizerPlugin {
             (size as f64 / total_size as f64) * 100.0
         }
     }
+
+    fn format_size_info(
+        &self,
+        entry: &lla_plugin_interface::DecoratedEntry,
+        format: &str,
+    ) -> Option<String> {
+        entry
+            .custom_fields
+            .get("size")
+            .and_then(|size_str| size_str.parse::<u64>().ok())
+            .map(|size| {
+                let max_size = 1_073_741_824;
+                let result = match format {
+                    "long" => {
+                        let bar = Self::size_to_bar(size, max_size, 20);
+                        let bar_color = self.get_size_color(size);
+                        let percentage = Self::get_percentage(size, max_size);
+
+                        format!(
+                            "\n{}\n{}\n{}\n{}",
+                            format!(
+                                "┌─ {} ─{}",
+                                "Size".bright_blue(),
+                                "─".repeat(40).bright_black()
+                            ),
+                            format!(
+                                "│ {} {}",
+                                bar.color(match bar_color.as_str() {
+                                    "bright_green" => colored::Color::BrightGreen,
+                                    "bright_cyan" => colored::Color::BrightCyan,
+                                    "bright_yellow" => colored::Color::BrightYellow,
+                                    "bright_red" => colored::Color::BrightRed,
+                                    "bright_magenta" => colored::Color::BrightMagenta,
+                                    _ => colored::Color::White,
+                                }),
+                                Self::format_size(size).bright_yellow()
+                            ),
+                            format!(
+                                "│ {}% of reference (1GB)",
+                                format!("{:.1}", percentage).bright_magenta()
+                            ),
+                            format!("└{}", "─".repeat(50).bright_black())
+                        )
+                    }
+                    "default" => {
+                        let bar = Self::size_to_bar(size, max_size, 10);
+                        let bar_color = self.get_size_color(size);
+                        format!(
+                            "{} {}",
+                            bar.color(match bar_color.as_str() {
+                                "bright_green" => colored::Color::BrightGreen,
+                                "bright_cyan" => colored::Color::BrightCyan,
+                                "bright_yellow" => colored::Color::BrightYellow,
+                                "bright_red" => colored::Color::BrightRed,
+                                "bright_magenta" => colored::Color::BrightMagenta,
+                                _ => colored::Color::White,
+                            }),
+                            Self::format_size(size).bright_yellow()
+                        )
+                    }
+                    _ => return None,
+                };
+                Some(result)
+            })
+            .flatten()
+    }
 }
 
 impl Plugin for FileSizeVisualizerPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
+                    }
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        let spinner = SPINNER.write();
+                        spinner.set_status("Calculating size...".to_string());
 
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        if entry.path.is_file() {
+                            let size = entry.metadata.size;
+                            entry
+                                .custom_fields
+                                .insert("size".to_string(), size.to_string());
+                        }
+
+                        spinner.finish();
+                        PluginResponse::Decorated(entry)
+                    }
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_size_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
                     }
                 };
-
-                if entry.path.is_file() {
-                    let size = entry.metadata.size;
-                    entry
-                        .custom_fields
-                        .insert("size".to_string(), size.to_string());
-                }
-                Message::DecoratedResponse(entry.into())
+                self.encode_response(response)
             }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
-                        }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = match req.format.as_str() {
-                    "long" => entry
-                        .custom_fields
-                        .get("size")
-                        .and_then(|size_str| size_str.parse::<u64>().ok())
-                        .map(|size| {
-                            let max_size = 1_073_741_824;
-                            let bar = Self::size_to_bar(size, max_size, 20);
-                            let color = Self::size_to_color(size);
-                            let formatted_size = Self::format_size(size);
-                            let percentage = Self::get_percentage(size, max_size);
-
-                            format!(
-                                "\n{}\n{}\n{}\n{}",
-                                format!(
-                                    "┌─ {} ─{}",
-                                    "Size".bright_cyan(),
-                                    "─".repeat(40).bright_black()
-                                ),
-                                format!(
-                                    "│ {} {}",
-                                    bar.color(color),
-                                    formatted_size.bright_yellow()
-                                ),
-                                format!(
-                                    "│ {}% of reference (1GB)",
-                                    format!("{:.2}", percentage).bright_magenta()
-                                ),
-                                format!("└{}", "─".repeat(50).bright_black())
-                            )
-                        }),
-                    "default" => entry
-                        .custom_fields
-                        .get("size")
-                        .and_then(|size_str| size_str.parse::<u64>().ok())
-                        .map(|size| {
-                            let max_size = 1_073_741_824;
-                            let bar = Self::size_to_bar(size, max_size, 10);
-                            let color = Self::size_to_color(size);
-                            format!(
-                                "{} {}",
-                                bar.color(color),
-                                Self::format_size(size).bright_yellow()
-                            )
-                        }),
-                    _ => None,
-                };
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
-            }
-            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
-                success: true,
-                error: None,
-            }),
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -225,5 +313,19 @@ impl Default for FileSizeVisualizerPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for FileSizeVisualizerPlugin {
+    type Config = SizeConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for FileSizeVisualizerPlugin {}
 
 lla_plugin_interface::declare_plugin!(FileSizeVisualizerPlugin);
