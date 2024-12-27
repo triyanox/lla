@@ -151,7 +151,6 @@ pub fn list_and_decorate_files(
             let fs_metadata = path.metadata().ok()?;
             let mut metadata = convert_metadata(&fs_metadata);
 
-            // Handle dot files filtering
             let is_dotfile = path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -164,7 +163,6 @@ pub fn list_and_decorate_files(
                 return None;
             }
 
-            // Apply type filtering based on flags
             let should_include = if args.dirs_only {
                 metadata.is_dir
             } else if args.files_only {
