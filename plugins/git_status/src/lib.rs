@@ -234,7 +234,6 @@ impl GitStatusPlugin {
         ) {
             match format {
                 "long" => {
-                    // Branch info
                     let key_color = colors
                         .get("info")
                         .unwrap_or(&"white".to_string())
@@ -249,7 +248,6 @@ impl GitStatusPlugin {
                         .key_width(12);
                     list.add_item(kv.render());
 
-                    // Commit info
                     let commit_parts: Vec<&str> = commit.split_whitespace().collect();
                     if let Some((hash, msg)) = commit_parts.split_first() {
                         let key_color = colors
@@ -267,7 +265,6 @@ impl GitStatusPlugin {
                         list.add_item(kv.render());
                     }
 
-                    // Status counts
                     let mut status_items = Vec::new();
                     if let Some(staged) = entry.custom_fields.get("git_staged") {
                         if let Ok(count) = staged.parse::<usize>() {
