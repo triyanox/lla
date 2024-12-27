@@ -446,8 +446,12 @@ version = "0.3.0"
 dependencies = [
  "bytes",
  "colored",
+ "lazy_static",
  "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
  "prost",
+ "serde",
  "sha1",
  "sha2",
 ]

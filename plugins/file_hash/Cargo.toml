@@ -8,9 +8,13 @@ edition = "2021"
 sha1 = "0.10.1"
 sha2 = "0.10.2"
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
+lla_plugin_utils = { path = "../../lla_plugin_utils" }
 colored = "2.0.0"
 prost = "0.12"
 bytes = "1.5"
+lazy_static = "1.4"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
 
 [lib]
 crate-type = ["cdylib"]

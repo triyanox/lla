@@ -1,33 +1,107 @@
-use colored::Colorize;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use lazy_static::lazy_static;
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, Read},
+};
 
-pub struct FileHashPlugin;
+lazy_static! {
+    static ref SPINNER: RwLock<Spinner> = RwLock::new(Spinner::new());
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name file_hash --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("File Hash Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Calculates SHA1 and SHA256 hashes for files.".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string()).add_command(
+                    "help".to_string(),
+                    "Show this help information".to_string(),
+                    vec!["lla plugin --name file_hash --action help".to_string()],
+                );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show basic hash information (first 8 characters)".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show complete hash values".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&FileHashConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileHashConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("sha1".to_string(), "bright_green".to_string());
+    colors.insert("sha256".to_string(), "bright_yellow".to_string());
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for FileHashConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for FileHashConfig {}
+
+pub struct FileHashPlugin {
+    base: BasePlugin<FileHashConfig>,
+}
 
 impl FileHashPlugin {
     pub fn new() -> Self {
-        FileHashPlugin
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        Self {
+            base: BasePlugin::new(),
+        }
     }
 
     fn calculate_hashes(path: &std::path::Path) -> Option<(String, String)> {
@@ -41,111 +115,117 @@ impl FileHashPlugin {
 
         Some((sha1, sha256))
     }
+
+    fn format_hash_info(
+        &self,
+        entry: &lla_plugin_interface::DecoratedEntry,
+        format: &str,
+    ) -> Option<String> {
+        if !entry.metadata.is_file {
+            return None;
+        }
+
+        let (sha1, sha256) = match (
+            entry.custom_fields.get("sha1"),
+            entry.custom_fields.get("sha256"),
+        ) {
+            (Some(s1), Some(s2)) => (s1, s2),
+            _ => return None,
+        };
+
+        let colors = &self.base.config().colors;
+        let mut list = List::new().style(BoxStyle::Minimal).key_width(12);
+
+        match format {
+            "long" => {
+                list.add_item(
+                    KeyValue::new("SHA1", sha1)
+                        .key_color(colors.get("sha1").unwrap_or(&"white".to_string()))
+                        .value_color(colors.get("sha1").unwrap_or(&"white".to_string()))
+                        .key_width(12)
+                        .render(),
+                );
+
+                list.add_item(
+                    KeyValue::new("SHA256", sha256)
+                        .key_color(colors.get("sha256").unwrap_or(&"white".to_string()))
+                        .value_color(colors.get("sha256").unwrap_or(&"white".to_string()))
+                        .key_width(12)
+                        .render(),
+                );
+            }
+            "default" => {
+                let sha1_short = &sha1[..8];
+                let sha256_short = &sha256[..8];
+
+                list.add_item(
+                    KeyValue::new("SHA1", sha1_short)
+                        .key_color(colors.get("sha1").unwrap_or(&"white".to_string()))
+                        .value_color(colors.get("sha1").unwrap_or(&"white".to_string()))
+                        .key_width(12)
+                        .render(),
+                );
+
+                list.add_item(
+                    KeyValue::new("SHA256", sha256_short)
+                        .key_color(colors.get("sha256").unwrap_or(&"white".to_string()))
+                        .value_color(colors.get("sha256").unwrap_or(&"white".to_string()))
+                        .key_width(12)
+                        .render(),
+                );
+            }
+            _ => return None,
+        };
+
+        Some(format!("\n{}", list.render()))
+    }
 }
 
 impl Plugin for FileHashPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
-
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
                     }
-                };
-
-                if entry.path.is_file() {
-                    if let Some((sha1, sha256)) = Self::calculate_hashes(&entry.path) {
-                        entry.custom_fields.insert("sha1".to_string(), sha1);
-                        entry.custom_fields.insert("sha256".to_string(), sha256);
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
                     }
-                }
-                Message::DecoratedResponse(entry.into())
-            }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        if entry.metadata.is_file {
+                            let spinner = SPINNER.write();
+                            spinner.set_status("Calculating hashes...".to_string());
+
+                            if let Some((sha1, sha256)) = Self::calculate_hashes(&entry.path) {
+                                entry.custom_fields.insert("sha1".to_string(), sha1);
+                                entry.custom_fields.insert("sha256".to_string(), sha256);
+                            }
+
+                            spinner.finish();
                         }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = match req.format.as_str() {
-                    "long" | "default" => {
-                        if entry.path.is_dir() {
-                            None
-                        } else {
-                            let sha1 = entry
-                                .custom_fields
-                                .get("sha1")
-                                .map(|s| s[..8].to_string())
-                                .unwrap_or_default();
-                            let sha256 = entry
-                                .custom_fields
-                                .get("sha256")
-                                .map(|s| s[..8].to_string())
-                                .unwrap_or_default();
-                            Some(format!(
-                                "\n{} {} {}{}\n{} {} {}{}",
-                                "┌".bright_black(),
-                                "SHA1".bright_green().bold(),
-                                "→".bright_black(),
-                                sha1.green(),
-                                "└".bright_black(),
-                                "SHA256".bright_yellow().bold(),
-                                "→".bright_black(),
-                                sha256.yellow()
-                            ))
-                        }
+                        PluginResponse::Decorated(entry)
                     }
-                    _ => None,
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_hash_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
+                    }
                 };
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
+                self.encode_response(response)
             }
-            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
-                success: true,
-                error: None,
-            }),
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -154,5 +234,19 @@ impl Default for FileHashPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for FileHashPlugin {
+    type Config = FileHashConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for FileHashPlugin {}
 
 lla_plugin_interface::declare_plugin!(FileHashPlugin);
