@@ -184,12 +184,15 @@ dependencies = [
 
 [[package]]
 name = "code_complexity"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
  "dirs",
+ "lazy_static",
  "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
  "prost",
  "serde",
  "toml",
