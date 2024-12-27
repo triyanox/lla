@@ -34,6 +34,8 @@ pub struct Args {
     pub no_dirs: bool,
     pub no_files: bool,
     pub no_symlinks: bool,
+    pub no_dotfiles: bool,
+    pub dotfiles_only: bool,
     pub command: Option<Command>,
 }
 
@@ -254,6 +256,16 @@ impl Args {
                     .long("no-symlinks")
                     .help("Hide symbolic links"),
             )
+            .arg(
+                Arg::with_name("no-dotfiles")
+                    .long("no-dotfiles")
+                    .help("Hide dot files and directories (those starting with a dot)"),
+            )
+            .arg(
+                Arg::with_name("dotfiles-only")
+                    .long("dotfiles-only")
+                    .help("Show only dot files and directories (those starting with a dot)"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -433,6 +445,8 @@ impl Args {
                     no_dirs: false,
                     no_files: false,
                     no_symlinks: false,
+                    no_dotfiles: false,
+                    dotfiles_only: false,
                     command: Some(Command::Shortcut(ShortcutAction::Run(
                         potential_shortcut.clone(),
                         args[2..].to_vec(),
@@ -593,6 +607,8 @@ impl Args {
             no_dirs: matches.is_present("no-dirs"),
             no_files: matches.is_present("no-files"),
             no_symlinks: matches.is_present("no-symlinks"),
+            no_dotfiles: matches.is_present("no-dotfiles"),
+            dotfiles_only: matches.is_present("dotfiles-only"),
             command,
         }
     }
