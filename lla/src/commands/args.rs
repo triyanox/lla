@@ -28,6 +28,12 @@ pub struct Args {
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
     pub include_dirs: bool,
+    pub dirs_only: bool,
+    pub files_only: bool,
+    pub symlinks_only: bool,
+    pub no_dirs: bool,
+    pub no_files: bool,
+    pub no_symlinks: bool,
     pub command: Option<Command>,
 }
 
@@ -218,6 +224,36 @@ impl Args {
                     .long("include-dirs")
                     .help("Include directory sizes in the metadata"),
             )
+            .arg(
+                Arg::with_name("dirs-only")
+                    .long("dirs-only")
+                    .help("Show only directories"),
+            )
+            .arg(
+                Arg::with_name("files-only")
+                    .long("files-only")
+                    .help("Show only regular files"),
+            )
+            .arg(
+                Arg::with_name("symlinks-only")
+                    .long("symlinks-only")
+                    .help("Show only symbolic links"),
+            )
+            .arg(
+                Arg::with_name("no-dirs")
+                    .long("no-dirs")
+                    .help("Hide directories"),
+            )
+            .arg(
+                Arg::with_name("no-files")
+                    .long("no-files")
+                    .help("Hide regular files"),
+            )
+            .arg(
+                Arg::with_name("no-symlinks")
+                    .long("no-symlinks")
+                    .help("Hide symbolic links"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -391,6 +427,12 @@ impl Args {
                     disable_plugin: Vec::new(),
                     plugins_dir: config.plugins_dir.clone(),
                     include_dirs: false,
+                    dirs_only: false,
+                    files_only: false,
+                    symlinks_only: false,
+                    no_dirs: false,
+                    no_files: false,
+                    no_symlinks: false,
                     command: Some(Command::Shortcut(ShortcutAction::Run(
                         potential_shortcut.clone(),
                         args[2..].to_vec(),
@@ -545,6 +587,12 @@ impl Args {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
             include_dirs: matches.is_present("include-dirs") || config.include_dirs,
+            dirs_only: matches.is_present("dirs-only"),
+            files_only: matches.is_present("files-only"),
+            symlinks_only: matches.is_present("symlinks-only"),
+            no_dirs: matches.is_present("no-dirs"),
+            no_files: matches.is_present("no-files"),
+            no_symlinks: matches.is_present("no-symlinks"),
             command,
         }
     }
