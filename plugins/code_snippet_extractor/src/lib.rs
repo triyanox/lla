@@ -10,7 +10,7 @@ use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use lla_plugin_utils::{
     config::PluginConfig,
     ui::components::{BoxComponent, BoxStyle, HelpFormatter},
-    ActionRegistry, BasePlugin, ProtobufHandler,
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
 use ring::digest;
@@ -35,6 +35,10 @@ use uuid::Uuid;
 pub struct SnippetConfig {
     #[serde(default = "default_colors")]
     colors: HashMap<String, String>,
+    #[serde(default = "default_syntax_themes")]
+    syntax_themes: HashMap<String, String>,
+    #[serde(default = "default_max_preview_lines")]
+    max_preview_lines: usize,
 }
 
 fn default_colors() -> HashMap<String, String> {
@@ -48,10 +52,22 @@ fn default_colors() -> HashMap<String, String> {
     colors
 }
 
+fn default_syntax_themes() -> HashMap<String, String> {
+    let mut themes = HashMap::new();
+    themes.insert("default".to_string(), "Solarized (dark)".to_string());
+    themes
+}
+
+fn default_max_preview_lines() -> usize {
+    10
+}
+
 impl Default for SnippetConfig {
     fn default() -> Self {
         Self {
             colors: default_colors(),
+            syntax_themes: default_syntax_themes(),
+            max_preview_lines: default_max_preview_lines(),
         }
     }
 }
@@ -239,13 +255,22 @@ pub struct CodeSnippetExtractorPlugin {
 
 impl CodeSnippetExtractorPlugin {
     pub fn new() -> Self {
-        let base = BasePlugin::new();
-        let snippet_file = dirs::config_dir()
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+            snippets: Self::load_snippets(&Self::get_snippets_path()),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[CodeSnippetExtractorPlugin] Failed to save config: {}", e);
+        }
+        plugin
+    }
+
+    fn get_snippets_path() -> PathBuf {
+        dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("lla")
-            .join("code_snippets.toml");
-        let snippets = Self::load_snippets(&snippet_file);
-        Self { base, snippets }
+            .join("code_snippets.toml")
     }
 
     fn load_snippets(path: &PathBuf) -> HashMap<String, CodeSnippet> {
@@ -1253,4 +1278,24 @@ impl Plugin for CodeSnippetExtractorPlugin {
     }
 }
 
-lla_plugin_utils::create_plugin!(CodeSnippetExtractorPlugin);
+impl ConfigurablePlugin for CodeSnippetExtractorPlugin {
+    type Config = SnippetConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for CodeSnippetExtractorPlugin {}
+
+lla_plugin_interface::declare_plugin!(CodeSnippetExtractorPlugin);
+
+impl Default for CodeSnippetExtractorPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
