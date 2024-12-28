@@ -1,12 +1,15 @@
 pub mod actions;
 pub mod config;
 pub mod format;
+pub mod syntax;
 pub mod ui;
 
 pub use actions::{Action, ActionHelp, ActionRegistry};
 pub use config::PluginConfig;
+pub use syntax::CodeHighlighter;
 pub use ui::{
     components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
+    selector::InteractiveSelector,
     TextBlock, TextStyle,
 };
 
