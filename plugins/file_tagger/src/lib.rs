@@ -212,16 +212,21 @@ pub struct FileTaggerPlugin {
 
 impl FileTaggerPlugin {
     pub fn new() -> Self {
+        let plugin_name = env!("CARGO_PKG_NAME");
         let tag_file = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("lla")
             .join("file_tags.txt");
         let tags = Self::load_tags(&tag_file);
-        Self {
-            base: BasePlugin::new(),
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
             tag_file,
             tags,
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[FileTaggerPlugin] Failed to save config: {}", e);
         }
+        plugin
     }
 
     fn load_tags(path: &PathBuf) -> HashMap<String, Vec<String>> {
