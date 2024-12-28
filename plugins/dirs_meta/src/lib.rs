@@ -132,6 +132,10 @@ pub struct DirsConfig {
     cache_size: usize,
     #[serde(default = "default_colors")]
     colors: HashMap<String, String>,
+    #[serde(default = "default_scan_depth")]
+    max_scan_depth: usize,
+    #[serde(default = "default_parallel_threshold")]
+    parallel_threshold: usize,
 }
 
 fn default_cache_size() -> usize {
@@ -150,11 +154,21 @@ fn default_colors() -> HashMap<String, String> {
     colors
 }
 
+fn default_scan_depth() -> usize {
+    100
+}
+
+fn default_parallel_threshold() -> usize {
+    1000
+}
+
 impl Default for DirsConfig {
     fn default() -> Self {
         Self {
             cache_size: default_cache_size(),
             colors: default_colors(),
+            max_scan_depth: default_scan_depth(),
+            parallel_threshold: default_parallel_threshold(),
         }
     }
 }
@@ -166,6 +180,17 @@ pub struct DirsPlugin {
 }
 
 impl DirsPlugin {
+    pub fn new() -> Self {
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[DirsPlugin] Failed to save config: {}", e);
+        }
+        plugin
+    }
+
     fn analyze_directory(path: &Path) -> Option<(usize, usize, u64)> {
         let path_str = path.to_string_lossy().to_string();
 
@@ -409,9 +434,7 @@ impl Plugin for DirsPlugin {
 
 impl Default for DirsPlugin {
     fn default() -> Self {
-        Self {
-            base: BasePlugin::new(),
-        }
+        Self::new()
     }
 }
 
