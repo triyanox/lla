@@ -1,39 +1,66 @@
 # LLA Duplicate File Detector Plugin
 
-A plugin for `lla` that identifies duplicate files by comparing their content using SHA-256 hashing.
+A plugin for `lla` that identifies identical files using secure hash comparison.
 
-## What it Does
+## Features
 
-- Detects duplicate files by comparing file contents
-- Identifies original files and their duplicates
-- Tracks file modification times to determine originals
-- Uses SHA-256 hashing for reliable comparison
-- Caches results for better performance
+- SHA-256 content hashing with intelligent caching
+- Original file and duplicate chain tracking
+- Color-coded status display
+- Performance optimized with chunk-based processing
+
+## Configuration
+
+Located at `~/.config/lla/duplicate_file_detector/config.toml`:
+
+```toml
+[colors]
+duplicate = "bright_red"        # Duplicate file indicator
+has_duplicates = "bright_yellow"# Original file with duplicates
+path = "bright_cyan"           # File path display
+success = "bright_green"       # Success messages
+info = "bright_blue"          # Information messages
+name = "bright_yellow"        # Name highlighting
+```
+
+## Usage
+
+```bash
+# Clear the detection cache
+lla plugin --name duplicate_file_detector --action clear-cache
+
+# View help information
+lla plugin --name duplicate_file_detector --action help
+```
 
 ## Display Formats
 
-### Default View
-
-Shows basic duplicate information:
+### Default Format
 
 ```
-file.txt (DUPLICATE)
-other.txt (HAS DUPLICATES)
+file.txt
+Status: DUPLICATE of /path/to/original.txt
+
+other.txt
+Status: HAS DUPLICATES: /path/to/copy1.txt, /path/to/copy2.txt
 ```
 
-### Detailed View (`-l` flag)
-
-Shows complete duplicate information:
+### Long Format
 
 ```
-file.txt (DUPLICATE of: /path/to/original.txt)
-other.txt (HAS DUPLICATES copies: /path/to/copy1.txt, /path/to/copy2.txt)
+file.txt
+Status:       DUPLICATE
+Original File: /path/to/original.txt
+
+other.txt
+Status:          HAS DUPLICATES
+Duplicate Copies: /path/to/copy1.txt
+                 /path/to/copy2.txt
 ```
 
-### Color Coding
+## Technical Details
 
-- Original files with duplicates: Yellow
-- Duplicate files: Red
-- File paths: Cyan
-
-The plugin automatically integrates with `lla`'s display system.
+- Uses SHA-256 hashing with 8KB chunk-based reading
+- Implements efficient caching with automatic invalidation
+- Thread-safe operations
+- Color-coded status indicators for duplicates and originals

@@ -1,17 +1,23 @@
-use colored::Colorize;
 use lazy_static::lazy_static;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    DecoratedEntry, Plugin,
+use lla_plugin_interface::{DecoratedEntry, Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::{
+        components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
+        TextBlock,
+    },
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
-use prost::Message as _;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 #[derive(Clone)]
 struct FileInfo {
@@ -21,33 +27,133 @@ struct FileInfo {
 
 lazy_static! {
     static ref CACHE: RwLock<HashMap<String, Vec<FileInfo>>> = RwLock::new(HashMap::new());
+    static ref SPINNER: RwLock<Spinner> = RwLock::new(Spinner::new());
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "clear-cache",
+            "clear-cache",
+            "Clear the duplicate file detection cache",
+            vec!["lla plugin --name duplicate_file_detector --action clear-cache"],
+            |_| {
+                let spinner = SPINNER.write();
+                spinner.set_status("Clearing cache...".to_string());
+                CACHE.write().clear();
+                spinner.finish();
+                println!(
+                    "{}",
+                    BoxComponent::new(
+                        TextBlock::new("Cache cleared successfully")
+                            .color("bright_green")
+                            .build()
+                    )
+                    .style(BoxStyle::Minimal)
+                    .padding(1)
+                    .render()
+                );
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name duplicate_file_detector --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("Duplicate File Detector Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Detects duplicate files by comparing their content hashes.".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string())
+                    .add_command(
+                        "clear-cache".to_string(),
+                        "Clear the duplicate file detection cache".to_string(),
+                        vec![
+                            "lla plugin --name duplicate_file_detector --action clear-cache"
+                                .to_string(),
+                        ],
+                    )
+                    .add_command(
+                        "help".to_string(),
+                        "Show this help information".to_string(),
+                        vec!["lla plugin --name duplicate_file_detector --action help".to_string()],
+                    );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show basic duplicate information".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show detailed duplicate information including paths".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&DuplicateConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
 }
 
-pub struct DuplicateFileDetectorPlugin;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DuplicateConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
 
-impl Default for DuplicateFileDetectorPlugin {
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("duplicate".to_string(), "bright_red".to_string());
+    colors.insert("has_duplicates".to_string(), "bright_yellow".to_string());
+    colors.insert("path".to_string(), "bright_cyan".to_string());
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for DuplicateConfig {
     fn default() -> Self {
-        Self::new()
+        Self {
+            colors: default_colors(),
+        }
     }
+}
+
+impl PluginConfig for DuplicateConfig {}
+
+pub struct DuplicateFileDetectorPlugin {
+    base: BasePlugin<DuplicateConfig>,
 }
 
 impl DuplicateFileDetectorPlugin {
     pub fn new() -> Self {
-        DuplicateFileDetectorPlugin
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
         };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[DuplicateFileDetectorPlugin] Failed to save config: {}", e);
+        }
+        plugin
     }
 
     fn get_file_hash(path: &Path) -> Option<String> {
@@ -69,6 +175,9 @@ impl DuplicateFileDetectorPlugin {
         if !entry.metadata.is_file {
             return entry;
         }
+
+        let spinner = SPINNER.write();
+        spinner.set_status("Checking for duplicates...".to_string());
 
         if let Some(hash) = Self::get_file_hash(&entry.path) {
             let mut cache = CACHE.write();
@@ -118,113 +227,171 @@ impl DuplicateFileDetectorPlugin {
             }
         }
 
+        spinner.finish();
         entry
+    }
+
+    fn format_duplicate_info(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
+        let colors = &self.base.config().colors;
+        let mut list = List::new().style(BoxStyle::Minimal).key_width(15);
+
+        if entry.custom_fields.get("has_duplicates").is_some() {
+            match format {
+                "long" => {
+                    list.add_item(
+                        KeyValue::new("Status", "HAS DUPLICATES")
+                            .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                            .value_color(
+                                colors.get("has_duplicates").unwrap_or(&"white".to_string()),
+                            )
+                            .key_width(15)
+                            .render(),
+                    );
+
+                    if let Some(paths) = entry.custom_fields.get("duplicate_paths") {
+                        list.add_item(
+                            KeyValue::new("Duplicate Copies", paths)
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("path").unwrap_or(&"white".to_string()))
+                                .key_width(15)
+                                .render(),
+                        );
+                    }
+                }
+                "default" => {
+                    if let Some(paths) = entry.custom_fields.get("duplicate_paths") {
+                        list.add_item(
+                            KeyValue::new("Status", format!("HAS DUPLICATES: {}", paths))
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(
+                                    colors.get("has_duplicates").unwrap_or(&"white".to_string()),
+                                )
+                                .key_width(15)
+                                .render(),
+                        );
+                    } else {
+                        list.add_item(
+                            KeyValue::new("Status", "HAS DUPLICATES")
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(
+                                    colors.get("has_duplicates").unwrap_or(&"white".to_string()),
+                                )
+                                .key_width(15)
+                                .render(),
+                        );
+                    }
+                }
+                _ => return None,
+            }
+        } else if entry.custom_fields.get("is_duplicate").is_some() {
+            match format {
+                "long" => {
+                    list.add_item(
+                        KeyValue::new("Status", "DUPLICATE")
+                            .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                            .value_color(colors.get("duplicate").unwrap_or(&"white".to_string()))
+                            .key_width(15)
+                            .render(),
+                    );
+
+                    if let Some(original) = entry.custom_fields.get("original_path") {
+                        list.add_item(
+                            KeyValue::new("Original File", original)
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(colors.get("path").unwrap_or(&"white".to_string()))
+                                .key_width(15)
+                                .render(),
+                        );
+                    }
+                }
+                "default" => {
+                    if let Some(original) = entry.custom_fields.get("original_path") {
+                        list.add_item(
+                            KeyValue::new("Status", format!("DUPLICATE of {}", original))
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(
+                                    colors.get("duplicate").unwrap_or(&"white".to_string()),
+                                )
+                                .key_width(15)
+                                .render(),
+                        );
+                    } else {
+                        list.add_item(
+                            KeyValue::new("Status", "DUPLICATE")
+                                .key_color(colors.get("info").unwrap_or(&"white".to_string()))
+                                .value_color(
+                                    colors.get("duplicate").unwrap_or(&"white".to_string()),
+                                )
+                                .key_width(15)
+                                .render(),
+                        );
+                    }
+                }
+                _ => return None,
+            }
+        } else {
+            return None;
+        }
+
+        Some(format!("\n{}", list.render()))
     }
 }
 
 impl Plugin for DuplicateFileDetectorPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                return self.encode_error(&format!("Failed to decode request: {}", e));
-            }
-        };
-
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let entry = match DecoratedEntry::try_from(entry.clone()) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
+                    }
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(entry) => {
+                        PluginResponse::Decorated(self.process_entry(entry))
+                    }
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_duplicate_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
                     }
                 };
-                Message::DecoratedResponse(self.process_entry(entry).into())
+                self.encode_response(response)
             }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
-                        }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = if entry.custom_fields.get("has_duplicates").is_some() {
-                    match req.format.as_str() {
-                        "long" => Some(format!(
-                            "{} {}",
-                            "HAS DUPLICATES".bright_yellow(),
-                            format!(
-                                "copies: {}",
-                                entry.custom_fields.get("duplicate_paths").unwrap()
-                            )
-                            .bright_cyan()
-                        )),
-                        "default" => Some(format!("{}", "HAS DUPLICATES".bright_yellow())),
-                        _ => None,
-                    }
-                } else {
-                    let cache = CACHE.read();
-                    let mut original_path = None;
-                    let is_duplicate = cache.values().any(|entries| {
-                        if let Some(oldest) = entries.iter().min_by_key(|f| f.modified) {
-                            let is_dup = entries
-                                .iter()
-                                .any(|f| f.path == entry.path && oldest.path != entry.path);
-                            if is_dup {
-                                original_path = Some(oldest.path.to_string_lossy().to_string());
-                            }
-                            is_dup
-                        } else {
-                            false
-                        }
-                    });
-
-                    if is_duplicate {
-                        match req.format.as_str() {
-                            "long" => Some(format!(
-                                "{} {}",
-                                "DUPLICATE".bright_red(),
-                                format!("of: {}", original_path.unwrap()).bright_cyan()
-                            )),
-                            "default" => Some(format!("{}", "DUPLICATE".bright_red())),
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    }
-                };
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
-            }
-            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
-                success: true,
-                error: None,
-            }),
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
+
+impl Default for DuplicateFileDetectorPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConfigurablePlugin for DuplicateFileDetectorPlugin {
+    type Config = DuplicateConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for DuplicateFileDetectorPlugin {}
 
 lla_plugin_interface::declare_plugin!(DuplicateFileDetectorPlugin);

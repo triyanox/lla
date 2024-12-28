@@ -17,7 +17,7 @@ Or you can install individual plugins as described below.
 - [categorizer](#categorizer): Categorizes files based on their extensions and metadata
 - [code_complexity](#code_complexity): Analyzes code complexity using various metrics
 - [code_snippet_extractor](#code_snippet_extractor): A plugin for extracting and managing code snippets
-- [dirs](#dirs): Shows directories metadata
+- [dirs_meta](#dirs_meta): Shows directories metadata
 - [duplicate_file_detector](#duplicate_file_detector): A plugin for the LLA that detects duplicate files.
 - [file_hash](#file_hash): Displays the hash of each file
 - [file_meta](#file_meta): Displays the file metadata of each file
@@ -31,18 +31,20 @@ Or you can install individual plugins as described below.
 
 **Description:** Categorizes files based on their extensions and metadata
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/categorizer/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/categorizer/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/categorizer/
@@ -55,18 +57,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Analyzes code complexity using various metrics
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/code_complexity/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/code_complexity/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/code_complexity/
@@ -79,18 +83,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** A plugin for extracting and managing code snippets
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/code_snippet_extractor/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/code_snippet_extractor/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/code_snippet_extractor/
@@ -103,18 +109,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Shows directories metadata
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/dirs/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/dirs/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/dirs/
@@ -127,18 +135,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** A plugin for the LLA that detects duplicate files.
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/duplicate_file_detector/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/duplicate_file_detector/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/duplicate_file_detector/
@@ -151,18 +161,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Displays the hash of each file
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/file_hash/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/file_hash/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_hash/
@@ -175,18 +187,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Displays the file metadata of each file
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/file_meta/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/file_meta/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_meta/
@@ -199,18 +213,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** A plugin for tagging files and filtering by tags
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/file_tagger/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/file_tagger/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/file_tagger/
@@ -223,18 +239,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Shows the git status of each file
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/git_status/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/git_status/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/git_status/
@@ -247,18 +265,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** Searches file contents for user-specified keywords
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/keyword_search/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/keyword_search/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/keyword_search/
@@ -271,18 +291,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** A plugin for the LLA that provides the last git commit hash
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/last_git_commit/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/last_git_commit/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/last_git_commit/
@@ -295,18 +317,20 @@ Then, copy the generated `.so`, `.dll`, or `.dylib` file from the `target/releas
 
 **Description:** File size visualizer plugin for LLA
 
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 **Documentation:** [Documentation](plugins/sizeviz/README.md)
 
 **Installation Options:**
 
 1. Using LLA install command:
+
 ```bash
 lla install --dir path/to/lla/plugins/sizeviz/
 ```
 
 2. Manual installation:
+
 ```bash
 git clone https://github.com/triyanox/lla
 cd lla/plugins/sizeviz/

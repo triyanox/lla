@@ -1,42 +1,55 @@
 # LLA Categorizer Plugin
 
-A file categorization plugin for `lla` that automatically categorizes files based on their extensions and provides detailed statistics about file categories in your directories.
+File categorization plugin for `lla` that organizes files based on extensions, with hierarchical categorization support.
 
 ## Features
 
-- Automatic file categorization with colored output
-- Category statistics with file counts and sizes
-- Subcategory support for organization
-- Configurable categories and rules
+- Automatic file categorization by extension with colored labels
+- Hierarchical categories and subcategories
+- Size-based rules and statistics tracking
+- Configurable categories, colors, and rules
+
+## Default Categories
+
+### Documents
+
+- Color: bright_blue
+- Extensions: txt, md, doc, docx, pdf, rtf, odt
+- Subcategories:
+  - Text: txt, md
+  - Office: doc, docx, xls, xlsx, ppt, pptx
+
+### Code
+
+- Color: bright_cyan
+- Extensions: rs, py, js, ts, java, c, cpp, h, hpp, go, rb, php
+- Subcategories:
+  - Systems: rs, c, cpp, h, hpp
+  - Web: js, ts, html, css, php
+  - Scripts: py, rb, sh, bash
 
 ## Usage
 
-The following actions are available through the plugin interface:
-
 ```bash
-# Add a new category
-lla plugin --name categorizer --action add-category --args "Audio" "yellow" "mp3,wav,flac,ogg" "Audio files"
+# Add category
+lla plugin --name categorizer --action add-category "Images" "yellow" "jpg,png,gif"
 
-# Add a subcategory to an existing category
-lla plugin --name categorizer --action add-subcategory --args "Audio" "Lossless" "flac,wav"
+# Add subcategory
+lla plugin --name categorizer --action add-subcategory "Images" "Raster" "jpg,png,gif"
 
-# Show statistics about file categories
-lla plugin --name categorizer --action show-stats
-
-# List all configured categories
+# List categories
 lla plugin --name categorizer --action list-categories
-
-# Show help and available actions
-lla plugin --name categorizer --action help
 ```
 
 ## Configuration
 
-The plugin stores its configuration in `~/.config/lla/categorizer.toml`. The configuration includes:
+Config file: `~/.config/lla/plugins/categorizer/config.toml`
 
-- Category names and colors
-- File extensions for each category
-- Subcategories and their extensions
-- Optional size ranges for categorization
+- Category definitions and mappings
+- Size rules and subcategories
+- UI color schemes
 
-Default categories include Documents, Images, and Code, each with their own subcategories and extensions.
+## Display Formats
+
+- **default**: `[Documents]`
+- **long**: `[Documents] (Text)`

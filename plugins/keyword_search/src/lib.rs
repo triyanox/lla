@@ -1,15 +1,27 @@
+use arboard::Clipboard;
 use colored::Colorize;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use itertools::Itertools;
+use lazy_static::lazy_static;
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter},
+    BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
 use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    io::{BufRead, BufReader},
+};
+use syntect::{
+    easy::HighlightLines,
+    highlighting::{Style, ThemeSet},
+    parsing::SyntaxSet,
+    util::as_24_bit_terminal_escaped,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct KeywordMatch {
@@ -21,13 +33,26 @@ struct KeywordMatch {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct SearchConfig {
-    keywords: Vec<String>,
-    case_sensitive: bool,
-    use_regex: bool,
-    context_lines: usize,
-    max_matches: usize,
-    file_extensions: Vec<String>,
+pub struct SearchConfig {
+    pub keywords: Vec<String>,
+    pub case_sensitive: bool,
+    pub use_regex: bool,
+    pub context_lines: usize,
+    pub max_matches: usize,
+    pub file_extensions: Vec<String>,
+    #[serde(default = "default_colors")]
+    pub colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("keyword".to_string(), "bright_red".to_string());
+    colors.insert("line_number".to_string(), "bright_yellow".to_string());
+    colors.insert("context".to_string(), "bright_black".to_string());
+    colors.insert("file".to_string(), "bright_blue".to_string());
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_cyan".to_string());
+    colors
 }
 
 impl Default for SearchConfig {
@@ -61,158 +86,136 @@ impl Default for SearchConfig {
                 "ini".to_string(),
                 "conf".to_string(),
             ],
+            colors: default_colors(),
         }
     }
 }
 
+impl PluginConfig for SearchConfig {}
+
 pub struct KeywordSearchPlugin {
-    config: Arc<Mutex<SearchConfig>>,
-    config_path: PathBuf,
+    base: BasePlugin<SearchConfig>,
 }
 
 impl KeywordSearchPlugin {
     pub fn new() -> Self {
-        let config_path = dirs::home_dir()
-            .expect("Failed to get home directory")
-            .join(".config")
-            .join("lla")
-            .join("plugins")
-            .join("keyword_search.toml");
-
-        if let Some(parent) = config_path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                eprintln!(
-                    "{} Failed to create plugin directory: {}",
-                    "Warning:".bright_yellow(),
-                    e
-                );
-            }
-        }
-
-        let config = Arc::new(Mutex::new(Self::load_config(&config_path)));
-        KeywordSearchPlugin {
-            config,
-            config_path,
-        }
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
         };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[KeywordSearchPlugin] Failed to save config: {}", e);
+        }
+        plugin
     }
 
-    fn load_config(path: &PathBuf) -> SearchConfig {
-        match fs::read_to_string(path) {
-            Ok(contents) => match toml::from_str(&contents) {
-                Ok(config) => config,
-                Err(e) => {
-                    eprintln!(
-                        "{} Failed to parse config: {}",
-                        "Warning:".bright_yellow(),
-                        e
-                    );
-                    if let Err(e) = fs::rename(path, path.with_extension("toml.bak")) {
-                        eprintln!(
-                            "{} Failed to backup corrupted config: {}",
-                            "Warning:".bright_yellow(),
-                            e
-                        );
-                    }
-                    let default = SearchConfig::default();
-                    if let Ok(contents) = toml::to_string_pretty(&default) {
-                        if let Err(e) = fs::write(path, contents) {
-                            eprintln!(
-                                "{} Failed to write default config: {}",
-                                "Warning:".bright_yellow(),
-                                e
-                            );
-                        } else {
-                            println!("{} Created new default config", "Info:".bright_blue());
-                        }
-                    }
-                    default
-                }
-            },
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                let default = SearchConfig::default();
-                if let Some(parent) = path.parent() {
-                    if let Err(e) = fs::create_dir_all(parent) {
-                        eprintln!(
-                            "{} Failed to create config directory: {}",
-                            "Warning:".bright_yellow(),
-                            e
-                        );
-                        return default;
-                    }
-                }
-                if let Ok(contents) = toml::to_string_pretty(&default) {
-                    match fs::write(path, contents) {
-                        Ok(_) => println!("{} Created new default config", "Info:".bright_blue()),
-                        Err(e) => eprintln!(
-                            "{} Failed to write default config: {}",
-                            "Warning:".bright_yellow(),
-                            e
-                        ),
-                    }
-                }
-                default
-            }
-            Err(e) => {
-                eprintln!(
-                    "{} Failed to read config: {}",
-                    "Warning:".bright_yellow(),
-                    e
+    fn highlight_match(&self, line: &str, keyword: &str) -> String {
+        lazy_static! {
+            static ref PS: SyntaxSet = SyntaxSet::load_defaults_newlines();
+            static ref TS: ThemeSet = ThemeSet::load_defaults();
+        }
+
+        let syntax = PS.find_syntax_plain_text();
+        let mut h = HighlightLines::new(syntax, &TS.themes["base16-ocean.dark"]);
+        let ranges: Vec<(Style, &str)> = h.highlight_line(line, &PS).unwrap_or_default();
+        let highlighted = as_24_bit_terminal_escaped(&ranges[..], false);
+        let mut result = highlighted.clone();
+
+        if let Some(pattern) = RegexBuilder::new(&regex::escape(keyword))
+            .case_insensitive(true)
+            .build()
+            .ok()
+        {
+            for mat in pattern.find_iter(&highlighted) {
+                let matched_text = &highlighted[mat.start()..mat.end()];
+                result.replace_range(
+                    mat.start()..mat.end(),
+                    &matched_text.bright_red().to_string(),
                 );
-                SearchConfig::default()
             }
         }
+
+        result
     }
 
-    fn save_config(&self) -> Result<(), String> {
-        if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    fn render_match(&self, m: &KeywordMatch, file_path: &str) -> String {
+        let mut output = String::new();
+        let separator_width = 98;
+        let line_number_width = 4;
+        let prefix_width = line_number_width + 3;
+        let max_line_width = separator_width - prefix_width;
+
+        output.push_str(&format!("─{}─\n", "─".repeat(separator_width)));
+        let truncated_path = if file_path.len() > max_line_width {
+            format!("{}...", &file_path[..max_line_width - 3])
+        } else {
+            file_path.to_string()
+        };
+        output.push_str(&format!(" 📂 {}\n", truncated_path.bright_blue()));
+        output.push_str(&format!("─{}─\n", "─".repeat(separator_width)));
+
+        let format_line = |line: &str, is_match: bool| -> String {
+            let stripped = strip_ansi_escapes::strip(line.as_bytes());
+            let visible_len = String::from_utf8_lossy(&stripped).chars().count();
+
+            if visible_len > max_line_width {
+                let mut truncated = String::new();
+                let mut current_len = 0;
+                let mut chars = line.chars();
+
+                while let Some(c) = chars.next() {
+                    if !c.is_ascii_control() {
+                        current_len += 1;
+                    }
+                    truncated.push(c);
+                    if current_len >= max_line_width - 3 {
+                        break;
+                    }
+                }
+
+                if is_match {
+                    format!("{}...", truncated)
+                } else {
+                    format!("{}...", truncated).bright_black().to_string()
+                }
+            } else if is_match {
+                line.to_string()
+            } else {
+                line.bright_black().to_string()
+            }
+        };
+
+        for (i, line) in m.context_before.iter().enumerate() {
+            let line_num = m.line_number - (m.context_before.len() - i);
+            output.push_str(&format!(
+                " {:>4} │ {}\n",
+                format!("{}", line_num).bright_black(),
+                format_line(line, false)
+            ));
         }
 
-        let config = self
-            .config
-            .lock()
-            .map_err(|_| "Failed to acquire config lock".to_string())?;
+        let highlighted = self.highlight_match(&m.line, &m.keyword);
+        output.push_str(&format!(
+            " {:>4} │ {}\n",
+            format!("{}", m.line_number).bright_yellow(),
+            format_line(&highlighted, true)
+        ));
 
-        let temp_path = self.config_path.with_extension("toml.tmp");
-        let contents = toml::to_string_pretty(&*config)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-
-        fs::write(&temp_path, contents)
-            .map_err(|e| format!("Failed to write temporary config: {}", e))?;
-
-        match fs::rename(&temp_path, &self.config_path) {
-            Ok(_) => {
-                println!(
-                    "{} Config saved to: {}",
-                    "Info:".bright_blue(),
-                    self.config_path.display().to_string().bright_yellow()
-                );
-                Ok(())
-            }
-            Err(e) => {
-                let _ = fs::remove_file(&temp_path);
-                Err(format!("Failed to save config: {}", e))
-            }
+        for (i, line) in m.context_after.iter().enumerate() {
+            let line_num = m.line_number + i + 1;
+            output.push_str(&format!(
+                " {:>4} │ {}\n",
+                format!("{}", line_num).bright_black(),
+                format_line(line, false)
+            ));
         }
+
+        output.push_str(&format!("─{}─\n", "─".repeat(separator_width)));
+        output
     }
 
     fn search_file(&self, path: &std::path::Path) -> Option<Vec<KeywordMatch>> {
-        let config = self.config.lock().unwrap();
+        let config = self.base.config();
 
         if let Some(ext) = path.extension() {
             if !config
@@ -269,309 +272,454 @@ impl KeywordSearchPlugin {
         }
     }
 
-    fn format_matches(&self, matches: &[KeywordMatch], long: bool) -> String {
-        let mut output = String::new();
-        for m in matches {
-            if long {
-                for (i, line) in m.context_before.iter().enumerate() {
-                    let line_num = m.line_number - (m.context_before.len() - i);
-                    output.push_str(&format!(
-                        "  {}: {}\n",
-                        line_num.to_string().bright_black(),
-                        line
-                    ));
-                }
-
-                output.push_str(&format!(
-                    "→ {}: {}\n",
+    fn interactive_search(
+        &self,
+        matches: Vec<KeywordMatch>,
+        file_path: &str,
+    ) -> Result<(), String> {
+        let items: Vec<String> = matches
+            .iter()
+            .map(|m| {
+                format!(
+                    "{} Line {}: {} {}",
+                    "►".bright_cyan(),
                     m.line_number.to_string().bright_yellow(),
-                    m.line
-                        .replace(&m.keyword, &m.keyword.bright_red().to_string())
-                ));
+                    self.highlight_match(&m.line, &m.keyword),
+                    format!("[{}]", m.keyword).bright_magenta()
+                )
+            })
+            .collect();
 
-                for (i, line) in m.context_after.iter().enumerate() {
-                    let line_num = m.line_number + i + 1;
-                    output.push_str(&format!(
-                        "  {}: {}\n",
-                        line_num.to_string().bright_black(),
-                        line
-                    ));
-                }
-                output.push('\n');
-            } else {
-                output.push_str(&format!(
-                    "{}:{} - {}\n",
-                    m.line_number,
-                    m.keyword.bright_red(),
-                    m.line.trim()
-                ));
-            }
+        let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+            .with_prompt(format!("{} Select matches to process", "🔍".bright_cyan()))
+            .items(&items)
+            .defaults(&vec![true; items.len()])
+            .interact()
+            .map_err(|e| format!("Failed to show selector: {}", e))?;
+
+        if selection.is_empty() {
+            println!("{} No matches selected", "Info:".bright_blue());
+            return Ok(());
         }
-        output
+
+        let selected_matches: Vec<&KeywordMatch> = selection.iter().map(|&i| &matches[i]).collect();
+
+        let actions = vec![
+            "📝 View detailed matches",
+            "📋 Copy to clipboard",
+            "💾 Save to file",
+            "📊 Show statistics",
+            "🔍 Filter matches",
+            "📈 Advanced analysis",
+        ];
+
+        let action_selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt(format!("{} Choose action", "⚡".bright_cyan()))
+            .items(&actions)
+            .default(0)
+            .interact()
+            .map_err(|e| format!("Failed to show action menu: {}", e))?;
+
+        match action_selection {
+            0 => {
+                println!(
+                    "\n{} Showing {} selected matches:",
+                    "Info:".bright_blue(),
+                    selected_matches.len()
+                );
+                for m in selected_matches {
+                    println!("\n{}", self.render_match(m, file_path));
+                }
+            }
+            1 => {
+                let content = selected_matches
+                    .iter()
+                    .map(|m| {
+                        format!(
+                            "File: {}\nLine {}: {}\nKeyword: {}\nContext:\n{}\n",
+                            file_path,
+                            m.line_number,
+                            m.line,
+                            m.keyword,
+                            m.context_before
+                                .iter()
+                                .chain(std::iter::once(&m.line))
+                                .chain(m.context_after.iter())
+                                .enumerate()
+                                .map(|(i, line)| format!(
+                                    "  {}: {}",
+                                    (m.line_number - m.context_before.len() + i),
+                                    line
+                                ))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n---\n");
+
+                match Clipboard::new() {
+                    Ok(mut clipboard) => {
+                        if let Err(e) = clipboard.set_text(&content) {
+                            println!(
+                                "{} Failed to copy to clipboard: {}",
+                                "Error:".bright_red(),
+                                e
+                            );
+                        } else {
+                            println!(
+                                "{} {} matches copied to clipboard with full context!",
+                                "Success:".bright_green(),
+                                selected_matches.len()
+                            );
+                        }
+                    }
+                    Err(e) => println!(
+                        "{} Failed to access clipboard: {}",
+                        "Error:".bright_red(),
+                        e
+                    ),
+                }
+            }
+            2 => {
+                let default_filename = format!(
+                    "keyword_matches_{}.txt",
+                    chrono::Local::now().format("%Y%m%d_%H%M%S")
+                );
+                let input = dialoguer::Input::<String>::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Enter file path to save")
+                    .with_initial_text(&default_filename)
+                    .interact_text()
+                    .map_err(|e| format!("Failed to get input: {}", e))?;
+
+                let content = selected_matches
+                    .iter()
+                    .map(|m| {
+                        format!(
+                            "Match Details:\n  File: {}\n  Line: {}\n  Keyword: {}\n  Content: {}\n  Context:\n{}",
+                            file_path,
+                            m.line_number,
+                            m.keyword,
+                            m.line,
+                            m.context_before
+                                .iter()
+                                .chain(std::iter::once(&m.line))
+                                .chain(m.context_after.iter())
+                                .enumerate()
+                                .map(|(i, line)| format!(
+                                    "    {}: {}",
+                                    (m.line_number - m.context_before.len() + i),
+                                    line
+                                ))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+
+                fs::write(&input, content).map_err(|e| format!("Failed to write file: {}", e))?;
+                println!(
+                    "{} {} matches saved to {} with full context",
+                    "Success:".bright_green(),
+                    selected_matches.len(),
+                    input.bright_blue()
+                );
+            }
+            3 => {
+                let total_matches = selected_matches.len();
+                let unique_keywords: std::collections::HashSet<_> =
+                    selected_matches.iter().map(|m| &m.keyword).collect();
+                let avg_context_lines = selected_matches
+                    .iter()
+                    .map(|m| m.context_before.len() + m.context_after.len())
+                    .sum::<usize>() as f64
+                    / total_matches as f64;
+
+                println!("\n{} Match Statistics:", "📊".bright_cyan());
+                println!("─{}─", "─".repeat(50));
+                println!(
+                    " • Total matches: {}",
+                    total_matches.to_string().bright_yellow()
+                );
+                println!(
+                    " • Unique keywords: {}",
+                    unique_keywords.len().to_string().bright_yellow()
+                );
+                println!(
+                    " • Average context lines: {:.1}",
+                    avg_context_lines.to_string().bright_yellow()
+                );
+                println!(" • File: {}", file_path.bright_blue());
+
+                println!("\n{} Keyword Frequency:", "📈".bright_cyan());
+                let mut keyword_freq: HashMap<&String, usize> = HashMap::new();
+                for m in selected_matches.iter() {
+                    *keyword_freq.entry(&m.keyword).or_insert(0) += 1;
+                }
+                for (keyword, count) in keyword_freq.iter() {
+                    println!(
+                        " • {}: {}",
+                        keyword.bright_magenta(),
+                        count.to_string().bright_yellow()
+                    );
+                }
+                println!("─{}─\n", "─".repeat(50));
+            }
+            4 => {
+                let keywords: Vec<_> = selected_matches
+                    .iter()
+                    .map(|m| &m.keyword)
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+
+                let keyword_selection = MultiSelect::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Filter by keywords")
+                    .items(&keywords)
+                    .interact()
+                    .map_err(|e| format!("Failed to show keyword selector: {}", e))?;
+
+                if keyword_selection.is_empty() {
+                    println!("{} No keywords selected", "Info:".bright_blue());
+                    return Ok(());
+                }
+
+                let filtered_matches: Vec<_> = selected_matches
+                    .into_iter()
+                    .filter(|m| keyword_selection.iter().any(|&i| keywords[i] == &m.keyword))
+                    .collect();
+
+                println!(
+                    "\n{} Showing {} filtered matches:",
+                    "Info:".bright_blue(),
+                    filtered_matches.len()
+                );
+                for m in filtered_matches {
+                    println!("\n{}", self.render_match(m, file_path));
+                }
+            }
+            5 => {
+                println!("\n{} Advanced Analysis:", "📈".bright_cyan());
+                println!("─{}─", "─".repeat(50));
+
+                let mut line_dist: HashMap<usize, usize> = HashMap::new();
+                for m in selected_matches.iter() {
+                    let bucket = (m.line_number / 10) * 10;
+                    *line_dist.entry(bucket).or_insert(0) += 1;
+                }
+                println!("\n{} Line Distribution:", "📊".bright_blue());
+                for (bucket, count) in line_dist.iter().sorted_by_key(|k| k.0) {
+                    println!(
+                        " • Lines {}-{}: {}",
+                        bucket,
+                        bucket + 9,
+                        "█".repeat(*count).bright_yellow()
+                    );
+                }
+
+                println!("\n{} Keyword Patterns:", "🔍".bright_blue());
+                let mut patterns: HashMap<(&String, &String), usize> = HashMap::new();
+                for window in selected_matches.windows(2) {
+                    if let [a, b] = window {
+                        *patterns.entry((&a.keyword, &b.keyword)).or_insert(0) += 1;
+                    }
+                }
+                for ((k1, k2), count) in patterns.iter().filter(|(_, &c)| c > 1) {
+                    println!(
+                        " • {} → {}: {} occurrences",
+                        k1.bright_magenta(),
+                        k2.bright_magenta(),
+                        count.to_string().bright_yellow()
+                    );
+                }
+                println!("─{}─\n", "─".repeat(50));
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(())
     }
 }
 
 impl Plugin for KeywordSearchPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
-
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
                     }
-                };
-
-                if let Some(matches) = entry
-                    .path
-                    .is_file()
-                    .then(|| self.search_file(&entry.path))
-                    .flatten()
-                {
-                    entry.custom_fields.insert(
-                        "keyword_matches".to_string(),
-                        toml::to_string(&matches).unwrap_or_default(),
-                    );
-                }
-                Message::DecoratedResponse(entry.into())
-            }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        if let Some(matches) = entry
+                            .path
+                            .is_file()
+                            .then(|| self.search_file(&entry.path))
+                            .flatten()
+                        {
+                            entry.custom_fields.insert(
+                                "keyword_matches".to_string(),
+                                toml::to_string(&matches).unwrap_or_default(),
+                            );
                         }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
+                        PluginResponse::Decorated(entry)
+                    }
+                    PluginRequest::FormatField(entry, _format) => {
+                        let field = entry
+                            .custom_fields
+                            .get("keyword_matches")
+                            .and_then(|toml_str| toml::from_str::<Vec<KeywordMatch>>(toml_str).ok())
+                            .map(|matches| {
+                                matches
+                                    .iter()
+                                    .map(|m| self.render_match(m, &entry.path.to_string_lossy()))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            });
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, _args) => {
+                        let response = match action.as_str() {
+                            "search" => {
+                                let result = (|| {
+                                    let config = self.base.config();
+                                    if config.keywords.is_empty() {
+                                        let input = dialoguer::Input::<String>::with_theme(
+                                            &ColorfulTheme::default(),
+                                        )
+                                        .with_prompt("Enter keywords (space-separated)")
+                                        .interact_text()
+                                        .map_err(|e| format!("Failed to get keywords: {}", e))?;
+
+                                        let keywords: Vec<String> = input
+                                            .split_whitespace()
+                                            .map(|s| s.to_string())
+                                            .collect();
+
+                                        if keywords.is_empty() {
+                                            return Err("No keywords provided".to_string());
+                                        }
+
+                                        self.base.config_mut().keywords = keywords;
+                                    }
+
+                                    let mut files: Vec<String> = Vec::new();
+                                    for entry in std::fs::read_dir(".")
+                                        .map_err(|e| format!("Failed to read directory: {}", e))?
+                                    {
+                                        let entry = entry
+                                            .map_err(|e| format!("Failed to read entry: {}", e))?;
+                                        let path = entry.path();
+                                        if path.is_file() {
+                                            if let Some(ext) = path.extension() {
+                                                if self
+                                                    .base
+                                                    .config()
+                                                    .file_extensions
+                                                    .contains(&ext.to_string_lossy().to_string())
+                                                {
+                                                    files.push(path.to_string_lossy().to_string());
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if files.is_empty() {
+                                        return Err(
+                                            "No supported files found in current directory"
+                                                .to_string(),
+                                        );
+                                    }
+
+                                    let selection =
+                                        MultiSelect::with_theme(&ColorfulTheme::default())
+                                            .with_prompt("Select files to search")
+                                            .items(&files)
+                                            .interact()
+                                            .map_err(|e| {
+                                                format!("Failed to show file selector: {}", e)
+                                            })?;
+
+                                    if selection.is_empty() {
+                                        return Err("No files selected".to_string());
+                                    }
+
+                                    let mut all_matches = Vec::new();
+                                    for &idx in &selection {
+                                        let path = std::path::Path::new(&files[idx]);
+                                        if let Some(matches) = self.search_file(path) {
+                                            all_matches.extend(matches);
+                                        }
+                                    }
+
+                                    if all_matches.is_empty() {
+                                        println!(
+                                            "{} No matches found in selected files",
+                                            "Info:".bright_blue()
+                                        );
+                                        Ok(())
+                                    } else {
+                                        self.interactive_search(all_matches, "Selected Files")
+                                    }
+                                })();
+                                PluginResponse::ActionResult(result)
+                            }
+                            "help" => {
+                                let result = {
+                                    let mut help =
+                                        HelpFormatter::new("Keyword Search Plugin".to_string());
+                                    help.add_section("Description".to_string())
+                                        .add_command(
+                                            "".to_string(),
+                                            "Search for keywords in files with interactive selection and actions.".to_string(),
+                                            vec![],
+                                        );
+
+                                    help.add_section("Actions".to_string())
+                                        .add_command(
+                                            "search".to_string(),
+                                            "Search for keywords in files".to_string(),
+                                            vec!["search".to_string()],
+                                        )
+                                        .add_command(
+                                            "help".to_string(),
+                                            "Show this help information".to_string(),
+                                            vec!["help".to_string()],
+                                        );
+
+                                    println!(
+                                        "{}",
+                                        BoxComponent::new(help.render(&self.base.config().colors))
+                                            .style(BoxStyle::Minimal)
+                                            .padding(1)
+                                            .render()
+                                    );
+                                    Ok(())
+                                };
+                                PluginResponse::ActionResult(result)
+                            }
+                            _ => PluginResponse::ActionResult(Err(format!(
+                                "Unknown action: {}",
+                                action
+                            ))),
+                        };
+                        response
+                    }
                 };
-
-                let formatted = entry
-                    .custom_fields
-                    .get("keyword_matches")
-                    .and_then(|toml_str| toml::from_str::<Vec<KeywordMatch>>(toml_str).ok())
-                    .map(|matches| self.format_matches(&matches[..], req.format == "long"));
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
+                self.encode_response(response)
             }
-            Some(Message::Action(req)) => match req.action.as_str() {
-                "set-keywords" => {
-                    if req.args.is_empty() {
-                        return self.encode_error("Usage: set-keywords <keyword1> [keyword2 ...]");
-                    }
-                    let mut config = self.config.lock().unwrap();
-                    config.keywords = req.args.to_vec();
-                    drop(config);
-                    if let Err(e) = self.save_config() {
-                        return self.encode_error(&e);
-                    }
-                    println!(
-                        "Set keywords to: {}",
-                        req.args
-                            .iter()
-                            .map(|k| k.yellow().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "show-config" => {
-                    let config = self.config.lock().unwrap();
-                    println!("Current configuration:");
-                    println!(
-                        "  Keywords: {}",
-                        config
-                            .keywords
-                            .iter()
-                            .map(|k| k.yellow().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                    println!(
-                        "  Case sensitive: {}",
-                        config.case_sensitive.to_string().cyan()
-                    );
-                    println!("  Use regex: {}", config.use_regex.to_string().cyan());
-                    println!(
-                        "  Context lines: {}",
-                        config.context_lines.to_string().cyan()
-                    );
-                    println!(
-                        "  Max matches per file: {}",
-                        config.max_matches.to_string().cyan()
-                    );
-                    println!(
-                        "  File extensions: {}",
-                        config
-                            .file_extensions
-                            .iter()
-                            .map(|e| e.cyan().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "set-case-sensitive" => {
-                    let value = req.args.first().map(|s| s == "true").unwrap_or(false);
-                    let mut config = self.config.lock().unwrap();
-                    config.case_sensitive = value;
-                    drop(config);
-                    if let Err(e) = self.save_config() {
-                        return self.encode_error(&e);
-                    }
-                    println!("Case sensitive search: {}", value.to_string().cyan());
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "set-context-lines" => {
-                    if let Some(lines) = req.args.first().and_then(|s| s.parse().ok()) {
-                        let mut config = self.config.lock().unwrap();
-                        config.context_lines = lines;
-                        drop(config);
-                        if let Err(e) = self.save_config() {
-                            return self.encode_error(&e);
-                        }
-                        println!("Context lines set to: {}", lines.to_string().cyan());
-                        Message::ActionResponse(proto::ActionResponse {
-                            success: true,
-                            error: None,
-                        })
-                    } else {
-                        return self.encode_error("Invalid number of context lines");
-                    }
-                }
-                "set-max-matches" => {
-                    if let Some(max) = req.args.first().and_then(|s| s.parse().ok()) {
-                        let mut config = self.config.lock().unwrap();
-                        config.max_matches = max;
-                        drop(config);
-                        if let Err(e) = self.save_config() {
-                            return self.encode_error(&e);
-                        }
-                        println!("Max matches per file set to: {}", max.to_string().cyan());
-                        Message::ActionResponse(proto::ActionResponse {
-                            success: true,
-                            error: None,
-                        })
-                    } else {
-                        return self.encode_error("Invalid max matches value");
-                    }
-                }
-                "help" => {
-                    println!("{}", "Keyword Search Plugin".bright_green().bold());
-                    println!();
-                    println!("{}", "Actions:".bright_yellow());
-                    println!(
-                        "  {} <keyword1> [keyword2 ...]",
-                        "set-keywords".bright_cyan()
-                    );
-                    println!("    Set keywords to search for in files");
-                    println!();
-                    println!("  {}", "show-config".bright_cyan());
-                    println!("    Display current plugin configuration");
-                    println!();
-                    println!("  {} [true|false]", "set-case-sensitive".bright_cyan());
-                    println!("    Enable or disable case-sensitive search");
-                    println!();
-                    println!("  {} <number>", "set-context-lines".bright_cyan());
-                    println!("    Set number of context lines to show around matches");
-                    println!();
-                    println!("  {} <number>", "set-max-matches".bright_cyan());
-                    println!("    Set maximum number of matches to show per file");
-                    println!();
-                    println!("  {} <file_path>", "search".bright_cyan());
-                    println!("    Search for configured keywords in a specific file");
-                    println!();
-                    println!("  Configure search:");
-                    println!(
-                        "    {} --name keyword_search --action set-context-lines --args 3",
-                        "lla plugin".bright_blue()
-                    );
-                    println!(
-                        "    {} --name keyword_search --action set-case-sensitive --args true",
-                        "lla plugin".bright_blue()
-                    );
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "search" => {
-                    if req.args.is_empty() {
-                        return self.encode_error("Usage: search <file_path>");
-                    }
-                    let path = std::path::Path::new(&req.args[0]);
-                    if let Some(matches) = self.search_file(path) {
-                        println!(
-                            "\n{} in {}:",
-                            "Matches".bright_green().bold(),
-                            path.display().to_string().bright_blue()
-                        );
-                        println!("{}", self.format_matches(&matches[..], true));
-                        Message::ActionResponse(proto::ActionResponse {
-                            success: true,
-                            error: None,
-                        })
-                    } else {
-                        println!(
-                            "{} No matches found in {}",
-                            "Info:".bright_blue(),
-                            path.display().to_string().bright_yellow()
-                        );
-                        Message::ActionResponse(proto::ActionResponse {
-                            success: true,
-                            error: None,
-                        })
-                    }
-                }
-                _ => {
-                    return self.encode_error(&format!("Unknown action: {}", req.action));
-                }
-            },
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -580,5 +728,19 @@ impl Default for KeywordSearchPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for KeywordSearchPlugin {
+    type Config = SearchConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for KeywordSearchPlugin {}
 
 lla_plugin_interface::declare_plugin!(KeywordSearchPlugin);

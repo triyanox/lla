@@ -213,10 +213,22 @@ lla -R # use -d to control the depth
 - Filter by pattern (`-f`, `--filter`)
 - Case-sensitive filtering (`-c`, `--case-sensitive`)
 - Support for complex filter patterns:
+
   - Simple text matching
   - Regular expressions
   - Glob patterns
   - Logical operators (AND, OR, NOT, XOR)
+
+- Show only specific types:
+  - `--dirs-only`: Show only directories
+  - `--files-only`: Show only regular files
+  - `--symlinks-only`: Show only symbolic links
+  - `--dotfiles-only`: Show only dot files and directories (those starting with a dot)
+- Hide specific types:
+  - `--no-dirs`: Hide directories
+  - `--no-files`: Hide regular files
+  - `--no-symlinks`: Hide symbolic links
+  - `--no-dotfiles`: Hide dot files and directories (those starting with a dot)
 
 **Plugin System**
 
@@ -272,6 +284,22 @@ lla -t -d 3           # Tree view with max depth 3
 lla -f "test"              # Find files containing "test"
 lla -f "test" -c          # Case-sensitive search
 lla -f ".rs"              # Find files with .rs extension
+
+# Show only specific types
+lla --dirs-only        # Show only directories
+lla --files-only       # Show only regular files
+lla --symlinks-only    # Show only symbolic links
+lla --dotfiles-only    # Show only dot files and directories
+
+# Hide specific types
+lla --no-dirs          # Hide directories
+lla --no-files         # Hide regular files
+lla --no-symlinks      # Hide symbolic links
+lla --no-dotfiles      # Hide dot files and directories
+
+# Combine filters
+lla --dirs-only --dotfiles-only  # Show only dot directories
+lla --files-only --no-dotfiles   # Show only regular files, excluding dot files
 ```
 
 #### Advanced Filters
@@ -447,6 +475,10 @@ natural = true
 # Default: false
 case_sensitive = false
 
+# Hide dot files and directories by default
+# Default: false
+no_dotfiles = false
+
 # Formatter-specific configurations
 [formatters.tree]
 # Maximum number of entries to display in tree view
@@ -490,6 +522,7 @@ lla config --set show_icons true
 lla config --set sort.dirs_first true
 lla config --set sort.case_sensitive true
 lla config --set filter.case_sensitive true
+lla config --set filter.no_dotfiles true   # Hide dot files by default
 
 # Manage shortcuts
 lla shortcut add NAME PLUGIN ACTION [-d DESCRIPTION]  # Add shortcut

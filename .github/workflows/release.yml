@@ -169,6 +169,17 @@ jobs:
             echo "lla_plugin_interface v$VERSION already published, skipping..."
           fi
 
+          # Check and publish lla_plugin_utils
+          PUBLISHED_VERSION=$(cargo search lla_plugin_utils --limit 1 | awk -F '"' '{print $2}')
+          if [ "$PUBLISHED_VERSION" != "$VERSION" ]; then
+            echo "Publishing lla_plugin_utils v$VERSION"
+            cargo publish -p lla_plugin_utils
+            # Wait for crates.io indexing
+            sleep 30
+          else
+            echo "lla_plugin_utils v$VERSION already published, skipping..."
+          fi
+
           echo "Publishing lla v$VERSION"
           cargo publish -p lla
 

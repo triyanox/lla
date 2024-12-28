@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2024-12-21
+
+### Added
+
+- New utility library `lla_plugin_utils` for building plugins:
+
+  - UI components (BoxComponent, HelpFormatter, KeyValue, etc.)
+  - Plugin infrastructure utilities
+  - Code highlighting and syntax support
+  - Configuration management tools
+
+- New command-line arguments for file type filtering:
+
+  - `--dirs-only`: Show only directories
+  - `--files-only`: Show only regular files
+  - `--symlinks-only`: Show only symbolic links
+  - `--dotfiles-only`: Show only dot files and directories
+  - `--no-dirs`: Hide directories
+  - `--no-files`: Hide regular files
+  - `--no-symlinks`: Hide symbolic links
+  - `--no-dotfiles`: Hide dot files and directories
+
+- Enhanced plugin functionality:
+  - All official plugins updated with new UI components and improved functionality
+  - Users can update their plugins using `lla update` command
+  - Individual plugin updates supported via `lla update <plugin_name>`
+
+### Changed
+
+- Updated configuration with new `no_dotfiles` setting to hide dot files by default
+- Enhanced documentation with detailed examples of file type filtering
+- Updated `terminal_size` dependency to version 0.4.1
+
+### Fixed
+
+- Fix the issue with the default listing format from config overrides the args
+
 ## [0.3.7] - 2024-12-20
 
 ### Changed

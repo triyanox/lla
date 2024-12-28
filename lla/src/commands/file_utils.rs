@@ -151,6 +151,38 @@ pub fn list_and_decorate_files(
             let fs_metadata = path.metadata().ok()?;
             let mut metadata = convert_metadata(&fs_metadata);
 
+            let is_dotfile = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.starts_with('.'))
+                .unwrap_or(false);
+
+            if args.dotfiles_only && !is_dotfile {
+                return None;
+            } else if args.no_dotfiles && is_dotfile {
+                return None;
+            }
+
+            let should_include = if args.dirs_only {
+                metadata.is_dir
+            } else if args.files_only {
+                metadata.is_file
+            } else if args.symlinks_only {
+                metadata.is_symlink
+            } else {
+                let include_dirs = !args.no_dirs;
+                let include_files = !args.no_files;
+                let include_symlinks = !args.no_symlinks;
+
+                (metadata.is_dir && include_dirs)
+                    || (metadata.is_file && include_files)
+                    || (metadata.is_symlink && include_symlinks)
+            };
+
+            if !should_include {
+                return None;
+            }
+
             if args.include_dirs && metadata.is_dir {
                 if let Ok(dir_size) = calculate_dir_size(&path) {
                     metadata.size = dir_size;

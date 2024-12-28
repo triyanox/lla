@@ -1,47 +1,232 @@
-use colored::Colorize;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use lazy_static::lazy_static;
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::{
+        components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
+        TextBlock,
+    },
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    path::PathBuf,
+};
+
+lazy_static! {
+    static ref SPINNER: RwLock<Spinner> = RwLock::new(Spinner::new());
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "add-tag",
+            "add-tag <file_path> <tag>",
+            "Add a tag to a file",
+            vec![
+                "lla plugin --name file_tagger --action add-tag --args \"/path/to/file\" \"mytag\""
+            ],
+            |args| {
+                if args.len() != 2 {
+                    return Err("Usage: add-tag <file_path> <tag>".to_string());
+                }
+                let mut plugin = FileTaggerPlugin::new();
+                plugin.add_tag(&args[0], &args[1]);
+                println!(
+                    "{}",
+                    BoxComponent::new(
+                        TextBlock::new(format!("Added tag '{}' to {}", args[1], args[0]))
+                            .color("bright_green")
+                            .build()
+                    )
+                    .style(BoxStyle::Minimal)
+                    .padding(1)
+                    .render()
+                );
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "remove-tag",
+            "remove-tag <file_path> <tag>",
+            "Remove a tag from a file",
+            vec!["lla plugin --name file_tagger --action remove-tag --args \"/path/to/file\" \"mytag\""],
+            |args| {
+                if args.len() != 2 {
+                    return Err("Usage: remove-tag <file_path> <tag>".to_string());
+                }
+                let mut plugin = FileTaggerPlugin::new();
+                plugin.remove_tag(&args[0], &args[1]);
+                println!(
+                    "{}",
+                    BoxComponent::new(
+                        TextBlock::new(format!("Removed tag '{}' from {}", args[1], args[0]))
+                            .color("bright_green")
+                            .build()
+                    )
+                    .style(BoxStyle::Minimal)
+                    .padding(1)
+                    .render()
+                );
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "list-tags",
+            "list-tags <file_path>",
+            "List all tags for a file",
+            vec!["lla plugin --name file_tagger --action list-tags --args \"/path/to/file\""],
+            |args| {
+                if args.len() != 1 {
+                    return Err("Usage: list-tags <file_path>".to_string());
+                }
+                let plugin = FileTaggerPlugin::new();
+                let tags = plugin.get_tags(&args[0]);
+                let mut list = List::new().style(BoxStyle::Minimal).key_width(12);
+
+                if tags.is_empty() {
+                    list.add_item(
+                        KeyValue::new("Info", format!("No tags found for {}", args[0]))
+                            .key_color("bright_blue")
+                            .value_color("bright_yellow")
+                            .key_width(12)
+                            .render(),
+                    );
+                } else {
+                    list.add_item(
+                        KeyValue::new("Tags", tags.join(", "))
+                            .key_color("bright_green")
+                            .value_color("bright_cyan")
+                            .key_width(12)
+                            .render(),
+                    );
+                }
+
+                println!("\n{}", list.render());
+                Ok(())
+            }
+        );
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name file_tagger --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("File Tagger Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Add and manage tags for files.".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string())
+                    .add_command(
+                        "add-tag".to_string(),
+                        "Add a tag to a file".to_string(),
+                        vec!["lla plugin --name file_tagger --action add-tag --args \"/path/to/file\" \"mytag\"".to_string()],
+                    )
+                    .add_command(
+                        "remove-tag".to_string(),
+                        "Remove a tag from a file".to_string(),
+                        vec!["lla plugin --name file_tagger --action remove-tag --args \"/path/to/file\" \"mytag\"".to_string()],
+                    )
+                    .add_command(
+                        "list-tags".to_string(),
+                        "List all tags for a file".to_string(),
+                        vec!["lla plugin --name file_tagger --action list-tags --args \"/path/to/file\"".to_string()],
+                    )
+                    .add_command(
+                        "help".to_string(),
+                        "Show this help information".to_string(),
+                        vec!["lla plugin --name file_tagger --action help".to_string()],
+                    );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show tags in a compact format".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show tags in a detailed format".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&TaggerConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaggerConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("tag".to_string(), "bright_cyan".to_string());
+    colors.insert("tag_label".to_string(), "bright_green".to_string());
+    colors.insert("success".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for TaggerConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for TaggerConfig {}
 
 pub struct FileTaggerPlugin {
+    base: BasePlugin<TaggerConfig>,
     tag_file: PathBuf,
     tags: HashMap<String, Vec<String>>,
 }
 
-impl Default for FileTaggerPlugin {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FileTaggerPlugin {
     pub fn new() -> Self {
+        let plugin_name = env!("CARGO_PKG_NAME");
         let tag_file = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("lla")
             .join("file_tags.txt");
         let tags = Self::load_tags(&tag_file);
-        FileTaggerPlugin { tag_file, tags }
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+            tag_file,
+            tags,
         };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[FileTaggerPlugin] Failed to save config: {}", e);
+        }
+        plugin
     }
 
     fn load_tags(path: &PathBuf) -> HashMap<String, Vec<String>> {
@@ -94,174 +279,115 @@ impl FileTaggerPlugin {
     fn get_tags(&self, file_path: &str) -> Vec<String> {
         self.tags.get(file_path).cloned().unwrap_or_default()
     }
+
+    fn format_tags(
+        &self,
+        entry: &lla_plugin_interface::DecoratedEntry,
+        format: &str,
+    ) -> Option<String> {
+        let tags = entry.custom_fields.get("tags")?;
+        if tags.is_empty() {
+            return None;
+        }
+
+        let colors = &self.base.config().colors;
+        let mut list = List::new().style(BoxStyle::Minimal).key_width(12);
+
+        match format {
+            "long" => {
+                for tag in tags.split(", ") {
+                    list.add_item(
+                        KeyValue::new("Tag", tag)
+                            .key_color(colors.get("tag_label").unwrap_or(&"white".to_string()))
+                            .value_color(colors.get("tag").unwrap_or(&"white".to_string()))
+                            .key_width(12)
+                            .render(),
+                    );
+                }
+                Some(format!("\n{}", list.render()))
+            }
+            "default" => {
+                list.add_item(
+                    KeyValue::new(
+                        "Tags",
+                        tags.split(", ")
+                            .map(|t| format!("[{}]", t))
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    )
+                    .key_color(colors.get("tag_label").unwrap_or(&"white".to_string()))
+                    .value_color(colors.get("tag").unwrap_or(&"white".to_string()))
+                    .key_width(12)
+                    .render(),
+                );
+                Some(format!("\n{}", list.render()))
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Plugin for FileTaggerPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
-
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
                     }
-                };
-
-                let tags = self.get_tags(entry.path.to_str().unwrap_or(""));
-                if !tags.is_empty() {
-                    entry
-                        .custom_fields
-                        .insert("tags".to_string(), tags.join(", "));
-                }
-                Message::DecoratedResponse(entry.into())
-            }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        let tags = self.get_tags(entry.path.to_str().unwrap_or(""));
+                        if !tags.is_empty() {
+                            entry
+                                .custom_fields
+                                .insert("tags".to_string(), tags.join(", "));
                         }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
+                        PluginResponse::Decorated(entry)
+                    }
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_tags(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
+                    }
                 };
-
-                let formatted = entry.custom_fields.get("tags").map(|tags| {
-                    format!(
-                        "[{}]",
-                        tags.split(", ")
-                            .map(|t| t.cyan().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                });
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
+                self.encode_response(response)
             }
-            Some(Message::Action(req)) => match req.action.as_str() {
-                "add-tag" => {
-                    if req.args.len() != 2 {
-                        println!("{} add-tag <file_path> <tag>", "Usage:".bright_cyan());
-                        return self.encode_error("Invalid number of arguments for add-tag");
-                    }
-                    self.add_tag(&req.args[0], &req.args[1]);
-                    println!(
-                        "{} tag '{}' to {}",
-                        "Added".bright_green(),
-                        req.args[1].cyan(),
-                        req.args[0].bright_blue()
-                    );
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "remove-tag" => {
-                    if req.args.len() != 2 {
-                        println!("{} remove-tag <file_path> <tag>", "Usage:".bright_cyan());
-                        return self.encode_error("Invalid number of arguments for remove-tag");
-                    }
-                    self.remove_tag(&req.args[0], &req.args[1]);
-                    println!(
-                        "{} tag '{}' from {}",
-                        "Removed".bright_green(),
-                        req.args[1].cyan(),
-                        req.args[0].bright_blue()
-                    );
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "list-tags" => {
-                    if req.args.len() != 1 {
-                        println!("{} list-tags <file_path>", "Usage:".bright_cyan());
-                        return self.encode_error("Invalid number of arguments for list-tags");
-                    }
-                    let tags = self.get_tags(&req.args[0]);
-                    if tags.is_empty() {
-                        println!(
-                            "{} No tags found for {}",
-                            "Info:".bright_blue(),
-                            req.args[0].bright_yellow()
-                        );
-                    } else {
-                        println!(
-                            "{} for {}:",
-                            "Tags".bright_green(),
-                            req.args[0].bright_blue()
-                        );
-                        for tag in tags {
-                            println!("  {} {}", "→".bright_cyan(), tag.bright_yellow());
-                        }
-                    }
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                "help" => {
-                    println!("{}", "File Tagger Commands".bright_green().bold());
-                    println!();
-                    println!("{}", "Available actions:".bright_yellow());
-                    println!("  {} <file_path> <tag>", "add-tag".bright_cyan());
-                    println!("    Add a tag to a file");
-                    println!();
-                    println!("  {} <file_path> <tag>", "remove-tag".bright_cyan());
-                    println!("    Remove a tag from a file");
-                    println!();
-                    println!("  {} <file_path>", "list-tags".bright_cyan());
-                    println!("    List all tags for a file");
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: true,
-                        error: None,
-                    })
-                }
-                _ => {
-                    println!("{} Unknown action: {}", "Error:".bright_red(), req.action);
-                    Message::ActionResponse(proto::ActionResponse {
-                        success: false,
-                        error: Some(format!("Unknown action: {}", req.action)),
-                    })
-                }
-            },
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
+
+impl Default for FileTaggerPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConfigurablePlugin for FileTaggerPlugin {
+    type Config = TaggerConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for FileTaggerPlugin {}
 
 lla_plugin_interface::declare_plugin!(FileTaggerPlugin);

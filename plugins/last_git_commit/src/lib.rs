@@ -1,31 +1,106 @@
-use colored::Colorize;
-use lla_plugin_interface::{
-    proto::{self, plugin_message::Message},
-    Plugin,
+use lazy_static::lazy_static;
+use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
+use lla_plugin_utils::{
+    config::PluginConfig,
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
+    ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
-use prost::Message as _;
-use std::path::Path;
-use std::process::Command;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::Path, process::Command};
 
-pub struct LastGitCommitPlugin;
+lazy_static! {
+    static ref SPINNER: RwLock<Spinner> = RwLock::new(Spinner::new());
+    static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
+        let mut registry = ActionRegistry::new();
+
+        lla_plugin_utils::define_action!(
+            registry,
+            "help",
+            "help",
+            "Show help information",
+            vec!["lla plugin --name last_git_commit --action help"],
+            |_| {
+                let mut help = HelpFormatter::new("Last Git Commit Plugin".to_string());
+                help.add_section("Description".to_string()).add_command(
+                    "".to_string(),
+                    "Shows information about the last Git commit for files.".to_string(),
+                    vec![],
+                );
+
+                help.add_section("Actions".to_string()).add_command(
+                    "help".to_string(),
+                    "Show this help information".to_string(),
+                    vec!["lla plugin --name last_git_commit --action help".to_string()],
+                );
+
+                help.add_section("Formats".to_string())
+                    .add_command(
+                        "default".to_string(),
+                        "Show basic commit information".to_string(),
+                        vec![],
+                    )
+                    .add_command(
+                        "long".to_string(),
+                        "Show detailed commit information including author".to_string(),
+                        vec![],
+                    );
+
+                println!(
+                    "{}",
+                    BoxComponent::new(help.render(&CommitConfig::default().colors))
+                        .style(BoxStyle::Minimal)
+                        .padding(2)
+                        .render()
+                );
+                Ok(())
+            }
+        );
+
+        registry
+    });
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitConfig {
+    #[serde(default = "default_colors")]
+    colors: HashMap<String, String>,
+}
+
+fn default_colors() -> HashMap<String, String> {
+    let mut colors = HashMap::new();
+    colors.insert("hash".to_string(), "bright_yellow".to_string());
+    colors.insert("author".to_string(), "bright_cyan".to_string());
+    colors.insert("time".to_string(), "bright_green".to_string());
+    colors.insert("info".to_string(), "bright_blue".to_string());
+    colors.insert("name".to_string(), "bright_yellow".to_string());
+    colors
+}
+
+impl Default for CommitConfig {
+    fn default() -> Self {
+        Self {
+            colors: default_colors(),
+        }
+    }
+}
+
+impl PluginConfig for CommitConfig {}
+
+pub struct LastGitCommitPlugin {
+    base: BasePlugin<CommitConfig>,
+}
 
 impl LastGitCommitPlugin {
     pub fn new() -> Self {
-        LastGitCommitPlugin
-    }
-
-    fn encode_error(&self, error: &str) -> Vec<u8> {
-        use prost::Message;
-        let error_msg = lla_plugin_interface::proto::PluginMessage {
-            message: Some(
-                lla_plugin_interface::proto::plugin_message::Message::ErrorResponse(
-                    error.to_string(),
-                ),
-            ),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
         };
-        let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-        error_msg.encode(&mut buf).unwrap();
-        buf.to_vec()
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[LastGitCommitPlugin] Failed to save config: {}", e);
+        }
+        plugin
     }
 
     fn get_last_commit_info(path: &Path) -> Option<(String, String, String)> {
@@ -47,113 +122,131 @@ impl LastGitCommitPlugin {
             None
         }
     }
+
+    fn format_commit_info(
+        &self,
+        entry: &lla_plugin_interface::DecoratedEntry,
+        format: &str,
+    ) -> Option<String> {
+        let colors = &self.base.config().colors;
+        let mut list = List::new().style(BoxStyle::Minimal).key_width(12);
+
+        if let (Some(hash), Some(author), Some(time)) = (
+            entry.custom_fields.get("commit_hash"),
+            entry.custom_fields.get("commit_author"),
+            entry.custom_fields.get("commit_time"),
+        ) {
+            match format {
+                "long" => {
+                    let key_color = colors
+                        .get("info")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let hash_color = colors
+                        .get("hash")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let kv = KeyValue::new("Commit", hash)
+                        .key_color(&key_color)
+                        .value_color(&hash_color)
+                        .key_width(12);
+                    list.add_item(kv.render());
+
+                    let author_color = colors
+                        .get("author")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let kv = KeyValue::new("Author", author)
+                        .key_color(&key_color)
+                        .value_color(&author_color)
+                        .key_width(12);
+                    list.add_item(kv.render());
+
+                    let time_color = colors
+                        .get("time")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let kv = KeyValue::new("Time", time)
+                        .key_color(&key_color)
+                        .value_color(&time_color)
+                        .key_width(12);
+                    list.add_item(kv.render());
+                }
+                "default" => {
+                    let key_color = colors
+                        .get("info")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let hash_color = colors
+                        .get("hash")
+                        .unwrap_or(&"white".to_string())
+                        .to_string();
+                    let kv = KeyValue::new("Commit", format!("{} {}", hash, time))
+                        .key_color(&key_color)
+                        .value_color(&hash_color)
+                        .key_width(12);
+                    list.add_item(kv.render());
+                }
+                _ => return None,
+            }
+
+            Some(format!("\n{}", list.render()))
+        } else {
+            None
+        }
+    }
 }
 
 impl Plugin for LastGitCommitPlugin {
     fn handle_raw_request(&mut self, request: &[u8]) -> Vec<u8> {
-        let proto_msg = match proto::PluginMessage::decode(request) {
-            Ok(msg) => msg,
-            Err(e) => {
-                let error_msg = proto::PluginMessage {
-                    message: Some(Message::ErrorResponse(format!(
-                        "Failed to decode request: {}",
-                        e
-                    ))),
-                };
-                let mut buf = bytes::BytesMut::with_capacity(error_msg.encoded_len());
-                error_msg.encode(&mut buf).unwrap();
-                return buf.to_vec();
-            }
-        };
+        match self.decode_request(request) {
+            Ok(request) => {
+                let response = match request {
+                    PluginRequest::GetName => {
+                        PluginResponse::Name(env!("CARGO_PKG_NAME").to_string())
+                    }
+                    PluginRequest::GetVersion => {
+                        PluginResponse::Version(env!("CARGO_PKG_VERSION").to_string())
+                    }
+                    PluginRequest::GetDescription => {
+                        PluginResponse::Description(env!("CARGO_PKG_DESCRIPTION").to_string())
+                    }
+                    PluginRequest::GetSupportedFormats => PluginResponse::SupportedFormats(vec![
+                        "default".to_string(),
+                        "long".to_string(),
+                    ]),
+                    PluginRequest::Decorate(mut entry) => {
+                        let spinner = SPINNER.write();
+                        spinner.set_status("Checking last commit...".to_string());
 
-        let response_msg = match proto_msg.message {
-            Some(Message::GetName(_)) => Message::NameResponse(env!("CARGO_PKG_NAME").to_string()),
-            Some(Message::GetVersion(_)) => {
-                Message::VersionResponse(env!("CARGO_PKG_VERSION").to_string())
-            }
-            Some(Message::GetDescription(_)) => {
-                Message::DescriptionResponse(env!("CARGO_PKG_DESCRIPTION").to_string())
-            }
-            Some(Message::GetSupportedFormats(_)) => {
-                Message::FormatsResponse(proto::SupportedFormatsResponse {
-                    formats: vec!["default".to_string(), "long".to_string()],
-                })
-            }
-            Some(Message::Decorate(entry)) => {
-                let mut entry = match lla_plugin_interface::DecoratedEntry::try_from(entry.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        return self.encode_error(&format!("Failed to convert entry: {}", e));
+                        if let Some((commit_hash, author, time)) =
+                            Self::get_last_commit_info(&entry.path)
+                        {
+                            entry
+                                .custom_fields
+                                .insert("commit_hash".to_string(), commit_hash);
+                            entry
+                                .custom_fields
+                                .insert("commit_author".to_string(), author);
+                            entry.custom_fields.insert("commit_time".to_string(), time);
+                        }
+
+                        spinner.finish();
+                        PluginResponse::Decorated(entry)
+                    }
+                    PluginRequest::FormatField(entry, format) => {
+                        let field = self.format_commit_info(&entry, &format);
+                        PluginResponse::FormattedField(field)
+                    }
+                    PluginRequest::PerformAction(action, args) => {
+                        let result = ACTION_REGISTRY.read().handle(&action, &args);
+                        PluginResponse::ActionResult(result)
                     }
                 };
-
-                if let Some((commit_hash, author, time)) = Self::get_last_commit_info(&entry.path) {
-                    entry
-                        .custom_fields
-                        .insert("commit_hash".to_string(), commit_hash);
-                    entry
-                        .custom_fields
-                        .insert("commit_author".to_string(), author);
-                    entry.custom_fields.insert("commit_time".to_string(), time);
-                }
-                Message::DecoratedResponse(entry.into())
+                self.encode_response(response)
             }
-            Some(Message::FormatField(req)) => {
-                let entry = match req.entry {
-                    Some(e) => match lla_plugin_interface::DecoratedEntry::try_from(e) {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return self.encode_error(&format!("Failed to convert entry: {}", e));
-                        }
-                    },
-                    None => return self.encode_error("Missing entry in format field request"),
-                };
-
-                let formatted = match req.format.as_str() {
-                    "long" => {
-                        if let (Some(hash), Some(author), Some(time)) = (
-                            entry.custom_fields.get("commit_hash"),
-                            entry.custom_fields.get("commit_author"),
-                            entry.custom_fields.get("commit_time"),
-                        ) {
-                            Some(format!(
-                                "Last commit: {} by {} {}",
-                                hash.bright_yellow(),
-                                author.bright_cyan(),
-                                time.bright_green()
-                            ))
-                        } else {
-                            None
-                        }
-                    }
-                    "default" => {
-                        if let (Some(hash), Some(time)) = (
-                            entry.custom_fields.get("commit_hash"),
-                            entry.custom_fields.get("commit_time"),
-                        ) {
-                            Some(format!("Commit: {} {}", hash, time))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-                Message::FieldResponse(proto::FormattedFieldResponse { field: formatted })
-            }
-            Some(Message::Action(_)) => Message::ActionResponse(proto::ActionResponse {
-                success: true,
-                error: None,
-            }),
-            _ => Message::ErrorResponse("Invalid request type".to_string()),
-        };
-
-        let response = proto::PluginMessage {
-            message: Some(response_msg),
-        };
-        let mut buf = bytes::BytesMut::with_capacity(response.encoded_len());
-        response.encode(&mut buf).unwrap();
-        buf.to_vec()
+            Err(e) => self.encode_error(&e),
+        }
     }
 }
 
@@ -162,5 +255,19 @@ impl Default for LastGitCommitPlugin {
         Self::new()
     }
 }
+
+impl ConfigurablePlugin for LastGitCommitPlugin {
+    type Config = CommitConfig;
+
+    fn config(&self) -> &Self::Config {
+        self.base.config()
+    }
+
+    fn config_mut(&mut self) -> &mut Self::Config {
+        self.base.config_mut()
+    }
+}
+
+impl ProtobufHandler for LastGitCommitPlugin {}
 
 lla_plugin_interface::declare_plugin!(LastGitCommitPlugin);

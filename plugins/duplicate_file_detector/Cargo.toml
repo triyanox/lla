@@ -1,16 +1,19 @@
 [package]
 name = "duplicate_file_detector"
-description = "A plugin for the LLA that detects duplicate files."
-version = "0.3.0"
+description = "Detects duplicate files by comparing their content hashes"
+version = "0.3.1"
 edition = "2021"
 
 [dependencies]
-colored = "2.0.0"
+sha2 = "0.10.2"
 lla_plugin_interface = { path = "../../lla_plugin_interface" }
-sha2 = "0.10.8"
-parking_lot = "0.12.1"
-lazy_static = "1.4.0"
+lla_plugin_utils = { path = "../../lla_plugin_utils" }
+colored = "2.0.0"
 prost = "0.12"
 bytes = "1.5"
+lazy_static = "1.4"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+
 [lib]
 crate-type = ["cdylib"]

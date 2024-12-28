@@ -1,54 +1,45 @@
 # LLA Git Status Plugin
 
-A plugin for `lla` that shows Git repository status with color-coded symbols and detailed information.
+Git integration plugin for `lla` providing real-time repository status with rich formatting.
 
-## What it Does
+## Features
 
-- Shows Git status for files and directories:
-  - Staged, modified, and untracked files
-  - Branch and commit information
-  - Repository state (clean/changes)
-  - Merge conflicts
-- Uses color-coded symbols for quick status recognition
-- Provides both simple and detailed views
-- Automatically detects Git repositories
+- Status tracking (staged, modified, untracked, conflicts)
+- Repository info (branch, commits, working tree)
+- Color-coded display
+- Performance optimized
 
-## Status Symbols
+## Configuration
 
-| Symbol | Meaning   | Color   |
-| ------ | --------- | ------- |
-| ✓      | Staged    | Green   |
-| ±      | Modified  | Yellow  |
-| ✚      | New file  | Green   |
-| ✖      | Deleted   | Red     |
-| ➜      | Renamed   | Purple  |
-| ↠      | Copied    | Cyan    |
-| ⚡     | Conflict  | Magenta |
-| ?      | Untracked | Blue    |
-| ⎇      | Branch    | Blue    |
+Config location: `~/.config/lla/git_status/config.toml`
 
-## Display Formats
-
-### Default View
-
-Shows file status with symbols:
-
-```
-document.txt [✓ staged]
-script.py [± modified]
-new.rs [? untracked]
+```toml
+[colors]
+clean = "bright_green"
+modified = "bright_yellow"
+staged = "bright_green"
+untracked = "bright_blue"
+conflict = "bright_red"
+branch = "bright_cyan"
+commit = "bright_yellow"
+info = "bright_blue"
+name = "bright_yellow"
 ```
 
-### Detailed View (`-l` flag)
+## Display Examples
 
-Shows repository information:
+Basic:
+
+```
+document.txt
+Git: modified, 2 staged
+```
+
+Detailed:
 
 ```
 project/
-Branch:   ⎇ main
-Commit:   a1b2c3d Initial commit
-Status:   2 staged, 1 modified, 3 untracked
-Repo:     has changes
+Branch:  main
+Commit:  a1b2c3d Initial commit
+Status:  2 staged, 1 modified, 3 untracked
 ```
-
-The plugin automatically integrates with `lla`'s display system.

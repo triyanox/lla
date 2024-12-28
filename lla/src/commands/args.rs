@@ -28,6 +28,14 @@ pub struct Args {
     pub disable_plugin: Vec<String>,
     pub plugins_dir: PathBuf,
     pub include_dirs: bool,
+    pub dirs_only: bool,
+    pub files_only: bool,
+    pub symlinks_only: bool,
+    pub no_dirs: bool,
+    pub no_files: bool,
+    pub no_symlinks: bool,
+    pub no_dotfiles: bool,
+    pub dotfiles_only: bool,
     pub command: Option<Command>,
 }
 
@@ -218,6 +226,46 @@ impl Args {
                     .long("include-dirs")
                     .help("Include directory sizes in the metadata"),
             )
+            .arg(
+                Arg::with_name("dirs-only")
+                    .long("dirs-only")
+                    .help("Show only directories"),
+            )
+            .arg(
+                Arg::with_name("files-only")
+                    .long("files-only")
+                    .help("Show only regular files"),
+            )
+            .arg(
+                Arg::with_name("symlinks-only")
+                    .long("symlinks-only")
+                    .help("Show only symbolic links"),
+            )
+            .arg(
+                Arg::with_name("no-dirs")
+                    .long("no-dirs")
+                    .help("Hide directories"),
+            )
+            .arg(
+                Arg::with_name("no-files")
+                    .long("no-files")
+                    .help("Hide regular files"),
+            )
+            .arg(
+                Arg::with_name("no-symlinks")
+                    .long("no-symlinks")
+                    .help("Hide symbolic links"),
+            )
+            .arg(
+                Arg::with_name("no-dotfiles")
+                    .long("no-dotfiles")
+                    .help("Hide dot files and directories (those starting with a dot)"),
+            )
+            .arg(
+                Arg::with_name("dotfiles-only")
+                    .long("dotfiles-only")
+                    .help("Show only dot files and directories (those starting with a dot)"),
+            )
             .subcommand(
                 SubCommand::with_name("install")
                     .about("Install a plugin")
@@ -391,6 +439,14 @@ impl Args {
                     disable_plugin: Vec::new(),
                     plugins_dir: config.plugins_dir.clone(),
                     include_dirs: false,
+                    dirs_only: false,
+                    files_only: false,
+                    symlinks_only: false,
+                    no_dirs: false,
+                    no_files: false,
+                    no_symlinks: false,
+                    no_dotfiles: config.filter.no_dotfiles,
+                    dotfiles_only: false,
                     command: Some(Command::Shortcut(ShortcutAction::Run(
                         potential_shortcut.clone(),
                         args[2..].to_vec(),
@@ -485,22 +541,39 @@ impl Args {
             })
         };
 
+        let has_format_flag = matches.is_present("long")
+            || matches.is_present("tree")
+            || matches.is_present("table")
+            || matches.is_present("grid")
+            || matches.is_present("sizemap")
+            || matches.is_present("timeline")
+            || matches.is_present("git")
+            || matches.is_present("fuzzy")
+            || matches.is_present("recursive");
+
         Args {
             directory: matches.value_of("directory").unwrap_or(".").to_string(),
             depth: matches
                 .value_of("depth")
                 .and_then(|s| s.parse().ok())
                 .or(config.default_depth),
-            long_format: matches.is_present("long") || config.default_format == "long",
-            tree_format: matches.is_present("tree") || config.default_format == "tree",
-            table_format: matches.is_present("table") || config.default_format == "table",
-            grid_format: matches.is_present("grid") || config.default_format == "grid",
-            sizemap_format: matches.is_present("sizemap") || config.default_format == "sizemap",
-            timeline_format: matches.is_present("timeline") || config.default_format == "timeline",
-            git_format: matches.is_present("git") || config.default_format == "git",
+            long_format: matches.is_present("long")
+                || (!has_format_flag && config.default_format == "long"),
+            tree_format: matches.is_present("tree")
+                || (!has_format_flag && config.default_format == "tree"),
+            table_format: matches.is_present("table")
+                || (!has_format_flag && config.default_format == "table"),
+            grid_format: matches.is_present("grid")
+                || (!has_format_flag && config.default_format == "grid"),
+            sizemap_format: matches.is_present("sizemap")
+                || (!has_format_flag && config.default_format == "sizemap"),
+            timeline_format: matches.is_present("timeline")
+                || (!has_format_flag && config.default_format == "timeline"),
+            git_format: matches.is_present("git")
+                || (!has_format_flag && config.default_format == "git"),
             fuzzy_format: matches.is_present("fuzzy"),
             recursive_format: matches.is_present("recursive")
-                || config.default_format == "recursive",
+                || (!has_format_flag && config.default_format == "recursive"),
             show_icons: matches.is_present("icons")
                 || (!matches.is_present("no-icons") && config.show_icons),
             no_color: matches.is_present("no-color"),
@@ -528,6 +601,14 @@ impl Args {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| config.plugins_dir.clone()),
             include_dirs: matches.is_present("include-dirs") || config.include_dirs,
+            dirs_only: matches.is_present("dirs-only"),
+            files_only: matches.is_present("files-only"),
+            symlinks_only: matches.is_present("symlinks-only"),
+            no_dirs: matches.is_present("no-dirs"),
+            no_files: matches.is_present("no-files"),
+            no_symlinks: matches.is_present("no-symlinks"),
+            no_dotfiles: matches.is_present("no-dotfiles") || config.filter.no_dotfiles,
+            dotfiles_only: matches.is_present("dotfiles-only"),
             command,
         }
     }

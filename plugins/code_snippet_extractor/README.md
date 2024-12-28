@@ -1,81 +1,89 @@
 # LLA Code Snippet Extractor Plugin
 
-A plugin for `lla` that helps you extract, organize, and manage code snippets from your files with tagging and search capabilities.
+A plugin for `lla` that extracts, organizes, and manages code snippets with metadata and search capabilities.
 
-## What it Does
+## Features
 
-- Extracts code snippets with customizable context lines
-- Automatically detects language based on file extension
-- Organizes snippets with tags
-- Provides full-text search across all snippets
-- Preserves code context (before/after the snippet)
-- Supports import/export of snippets
-- Tracks snippet versions and modifications
+- **Smart Extraction**: Automatic language detection, contextual extraction
+- **Organization**: Categories, tags, metadata tracking
+- **Search**: Fuzzy search, multi-select operations
+- **Interface**: Syntax highlighting, interactive CLI menus
+- **Import/Export**: JSON-based snippet management
+
+## Configuration
+
+Config file: `~/.config/lla/code_snippets/config.toml`
+
+```toml
+[colors]
+success = "bright_green"
+info = "bright_blue"
+error = "bright_red"
+name = "bright_yellow"
+language = "bright_cyan"
+tag = "bright_magenta"
+
+[syntax_themes]
+default = "Solarized (dark)"
+```
 
 ## Usage
 
 ### Basic Operations
 
 ```bash
-# Extract a snippet (lines 10-20 with 3 context lines)
-lla plugin --name code_snippet_extractor --action extract --args "file.rs" "function_name" 10 20 3
+# Extract snippet with context
+lla plugin --name code_snippet_extractor --action extract "file.rs" "function_name" 10 20 3
 
-# List snippets in a file
-lla plugin --name code_snippet_extractor --action list --args "file.rs"
+# List snippets
+lla plugin --name code_snippet_extractor --action list
 
-# View a specific snippet
-lla plugin --name code_snippet_extractor --action get --args "file.rs" "function_name"
+# View snippet
+lla plugin --name code_snippet_extractor --action get "snippet_id"
 ```
 
 ### Organization
 
 ```bash
-# Search snippets
-lla plugin --name code_snippet_extractor --action search --args "query"
+# Add/remove tags
+lla plugin --name code_snippet_extractor --action add-tags "snippet_id" "tag1" "tag2"
+lla plugin --name code_snippet_extractor --action remove-tags "snippet_id" "tag1"
 
-# Add tags
-lla plugin --name code_snippet_extractor --action add-tags --args "file.rs" "function_name" "tag1" "tag2"
-
-# Remove tags
-lla plugin --name code_snippet_extractor --action remove-tags --args "file.rs" "function_name" "tag1"
+# Category management
+lla plugin --name code_snippet_extractor --action set-category "snippet_id" "category_name"
 ```
 
 ### Import/Export
 
 ```bash
-# Export snippets
-lla plugin --name code_snippet_extractor --action export --args "file.rs"
-
-# Import snippets
-lla plugin --name code_snippet_extractor --action import --args "file.rs" "toml_data"
+# Export/Import snippets
+lla plugin --name code_snippet_extractor --action export "snippets.json"
+lla plugin --name code_snippet_extractor --action import "snippets.json"
 ```
 
-### View Help
-
-```bash
-lla plugin --name code_snippet_extractor --action help
-```
-
-### Output Example
+## Display Format
 
 ```
-┌─ Context Before ─────────────
-// Helper function for parsing
-
-├─ Snippet Content ──────────────
-fn parse_input<T: FromStr>(input: &str) -> Option<T> {
-    input.trim().parse().ok()
-}
-
-├─ Context After ────────────────
-// Example usage:
-// let num: i32 = parse_input("42").unwrap();
-
-├─ Metadata ────────────────────
-│ Language: rust
-│ Version: 1
-│ Tags: #parser #input
-└──────────────────────────────
+─────────────────────────────────────
+ Example Function
+ ID: abc123  •  Language: rust  •  Version: v1
+─────────────────────────────────────
+ 📂 Source: src/example.rs
+ 🏷️  Tags: #rust #function #example
+ 📁 Category: Algorithms
+ 🕒 Created: 2024-01-20 10:30:00 UTC
+─────────────────────────────────────
+ ◀ Context (3 lines)
+    1 │ // Helper functions
+ ▶ Code (5 lines)
+    4 │ fn parse_input<T: FromStr>(input: &str) -> Option<T> {
+    5 │     input.trim().parse().ok()
+    6 │ }
+ ▼ Context (2 lines)
+   10 │ // Example usage
+─────────────────────────────────────
 ```
 
-Snippets are stored in `~/.config/lla/code_snippets.toml` and can be backed up or version controlled.
+## Language Support
+
+Supports common languages: Rust, Python, JavaScript, TypeScript, Go, C/C++, Java, Ruby, PHP, Shell, HTML, CSS, Markdown, JSON, YAML, XML, SQL
