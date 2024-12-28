@@ -1,42 +1,45 @@
 # LLA Size Visualizer Plugin
 
-A plugin for `lla` that visualizes file sizes using colored bars and human-readable formats.
+File size visualization plugin for `lla` providing real-time size analysis with rich formatting.
 
-## What it Does
+## Features
 
-- Shows file sizes in two ways:
-  - Visual bar representation
-  - Human-readable size format (B, KB, MB, GB, TB)
-- Uses color coding based on size ranges:
-  - Green: ≤ 1KB
-  - Bright Green: 1KB - 10KB
-  - Cyan: 10KB - 1MB
-  - Blue: 1MB - 10MB
-  - Yellow: 10MB - 100MB
-  - Red: 100MB - 1GB
-  - Magenta: > 1GB
-- Shows percentage relative to 1GB reference
-- Provides both compact and detailed views
+- Human-readable size formatting
+- Visual progress bars with Unicode blocks
+- Size-based color coding
+- Multiple display formats
+- Smart caching and quick analysis
+
+## Configuration
+
+Config file: `~/.config/lla/sizeviz/config.toml`
+
+```toml
+[colors]
+tiny = "bright_green"      # ≤ 1KB
+small = "bright_cyan"      # 1KB - 1MB
+medium = "bright_yellow"   # 1MB - 10MB
+large = "bright_red"       # 10MB - 100MB
+huge = "bright_magenta"    # > 100MB
+info = "bright_blue"
+size = "bright_yellow"
+percentage = "bright_magenta"
+```
 
 ## Display Formats
 
-### Default View
-
-Shows a compact size visualization:
+Default:
 
 ```
-file.txt █████     2.5 MB
+document.pdf
+█████░░░░░ 2.5 MB
 ```
 
-### Detailed View (`-l` flag)
-
-Shows complete size information:
+Long:
 
 ```
 ┌─ Size ────────────────────────────────────
-│ █░░░░░░░░░░░░░░░░░░ 25.5 MB
+│ ████████████░░░░░░░░░░ 25.5 MB
 │ 2.5% of reference (1GB)
 └──────────────────────────────────────────
 ```
-
-The plugin automatically integrates with `lla`'s display system.

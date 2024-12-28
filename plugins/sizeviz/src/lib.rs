@@ -140,7 +140,7 @@ impl FileSizeVisualizerPlugin {
             _ => "",
         };
 
-        let spaces = " ".repeat(max_width.saturating_sub(width));
+        let spaces = "░".repeat(max_width.saturating_sub(width));
         format!("{}{}{}", full_blocks, partial_block, spaces)
     }
 

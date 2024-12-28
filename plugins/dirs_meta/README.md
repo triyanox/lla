@@ -1,51 +1,51 @@
-# LLA Directory Summary Plugin
+# LLA Directory Metadata Plugin
 
-A plugin for `lla` that provides quick directory statistics including file counts, sizes, and modification times with intelligent caching for better performance.
+Real-time directory statistics with intelligent caching.
 
-## What it Does
+## Features
 
-- Calculates directory statistics:
-  - Total number of files
-  - Number of subdirectories
-  - Total size of all files
-  - Last modification time
-- Uses parallel processing for faster analysis
-- Caches results for improved performance
-- Automatically updates when directory contents change
-- Provides human-readable size formatting
+- **Analysis**: Parallel scanning, caching, configurable depth
+- **Statistics**: File counts, sizes, subdirectories, modification times
+- **Performance**: Multi-threaded, cache-optimized
+
+## Configuration
+
+`~/.config/lla/dirs_meta/config.toml`:
+
+```toml
+cache_size = 1000           # Max cached directories
+max_scan_depth = 100        # Max scan depth
+parallel_threshold = 1000    # Min entries for parallel
+
+[colors]
+files = "bright_cyan"
+dirs = "bright_green"
+size = "bright_yellow"
+time = "bright_magenta"
+```
+
+## Usage
+
+```bash
+# Show stats
+lla plugin --name dirs_meta --action stats "/path/to/directory"
+
+# Clear cache
+lla plugin --name dirs_meta --action clear-cache
+```
 
 ## Display Formats
 
-### Default View
+Default: `Documents (15 files, 2.5 GB)`
 
-Shows basic directory information:
-
-```
-Documents (15 files, 2.5 GB)
-```
-
-### Detailed View (`-l` flag)
-
-Shows complete directory information:
+Long:
 
 ```
-Documents (15 files, 3 dirs, 2.5 GB, modified 5 mins ago)
+Documents
+Files:       15
+Directories: 3
+Total Size:  2.5 GB
+Modified:    5 mins ago
 ```
 
-### Size Units
-
-- Automatically adjusts units based on size:
-  - Bytes (B) for < 1 KB
-  - Kilobytes (KB) for < 1 MB
-  - Megabytes (MB) for < 1 GB
-  - Gigabytes (GB) for ≥ 1 GB
-
-### Time Display
-
-- Shows modification time in human-readable format:
-  - Seconds for < 1 minute
-  - Minutes for < 1 hour
-  - Hours for < 1 day
-  - Days for ≥ 1 day
-
-The plugin automatically integrates with `lla`'s display system.
+Units: B/KB/MB/GB, seconds/minutes/hours/days ago

@@ -1,34 +1,48 @@
 # LLA File Hash Plugin
 
-A plugin for `lla` that calculates and displays SHA-1 and SHA-256 hashes for files.
+A high-performance file hashing plugin for `lla` that calculates secure cryptographic hashes (SHA-1 and SHA-256).
 
-## What it Does
+## Features
 
-- Calculates two types of hashes for each file:
-  - SHA-1 (shown in green)
-  - SHA-256 (shown in yellow)
-- Shows first 8 characters of each hash
-- Uses efficient buffered reading
-- Skips directories automatically
-- Displays hashes in a clean, formatted box layout
+- SHA-1 and SHA-256 hash calculation
+- Efficient buffered reading
+- Progress indication
+- Rich display formatting
 
-## Display Format
+## Configuration
 
-Shows hash information below each file:
+Located at `~/.config/lla/file_hash/config.toml`:
+
+```toml
+[colors]
+sha1 = "bright_green"     # SHA-1 hash color
+sha256 = "bright_yellow"  # SHA-256 hash color
+success = "bright_green"  # Success messages
+info = "bright_blue"     # Information messages
+name = "bright_yellow"   # Name highlighting
+```
+
+## Usage
+
+```bash
+# View help information
+lla plugin --name file_hash --action help
+```
+
+## Display Formats
+
+### Default Format
 
 ```
 document.pdf
-┌ SHA1   → a1b2c3d4
-└ SHA256 → e5f6g7h8
+SHA1:   a1b2c3d4
+SHA256: e5f6g7h8
 ```
 
-### Color Coding
+### Long Format
 
-- SHA-1: Green text
-- SHA-256: Yellow text
-- Box characters and arrows: Dark gray
-- Hash names: Bold colored text
-
-The plugin automatically integrates with `lla`'s display system and works in both default and long view formats.
-
-Note: The truncated 8-character display is for readability. For security-critical comparisons, use a dedicated hashing tool.
+```
+document.pdf
+SHA1:   a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+SHA256: u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0p1q2r3s4t5u6v7w8x9y0
+```

@@ -1,38 +1,46 @@
 # LLA File Metadata Plugin
 
-A plugin for `lla` that displays detailed file metadata including timestamps, ownership, size, and permissions.
+A file metadata plugin for `lla` that provides comprehensive file information with rich formatting.
 
-## What it Does
+## Features
 
-- Shows comprehensive file metadata:
-  - Access, modification, and creation timestamps
-  - User and group IDs (UID/GID)
-  - File size in bytes
-  - File permissions in octal format
-- Formats timestamps in human-readable format (YYYY-MM-DD HH:MM:SS)
-- Provides color-coded output for better readability
+- Timestamp tracking (access, modify, create)
+- Ownership and permission details
+- Size statistics
+- Color-coded information display
+
+## Configuration
+
+Located at `~/.config/lla/file_meta/config.toml`:
+
+```toml
+[colors]
+accessed = "bright_blue"      # Access time color
+modified = "bright_green"     # Modification time color
+created = "bright_yellow"     # Creation time color
+ownership = "bright_magenta"  # UID/GID information color
+size = "bright_cyan"         # File size color
+permissions = "bright_red"    # Permissions color
+success = "bright_green"     # Success messages
+info = "bright_blue"        # Information messages
+name = "bright_yellow"      # Name highlighting
+```
+
+## Usage
+
+```bash
+# View help information
+lla plugin --name file_meta --action help
+```
 
 ## Display Format
 
-Shows metadata information below each file:
-
 ```
 document.pdf
-Accessed: 2024-03-15 14:30:22
-Modified: 2024-03-15 14:30:20
-Created:  2024-03-15 14:30:18
-UID/GID:  1000/1000
-Size:     1048576
-Perms:    644
+Accessed:    2024-03-15 14:30:22
+Modified:    2024-03-15 14:30:20
+Created:     2024-03-15 14:30:18
+UID/GID:     1000/1000
+Size:        1.0 MB
+Permissions: 644
 ```
-
-### Color Coding
-
-- Access Time: Blue
-- Modification Time: Green
-- Creation Time: Yellow
-- UID/GID: Magenta
-- File Size: Cyan
-- Permissions: Red
-
-The plugin automatically integrates with `lla`'s display system and works in both default and long view formats.

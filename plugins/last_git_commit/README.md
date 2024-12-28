@@ -1,36 +1,42 @@
 # LLA Last Git Commit Plugin
 
-A plugin for `lla` that shows the last Git commit information for files with colored output.
+Git history plugin for `lla` providing real-time commit tracking with rich formatting.
 
-## What it Does
+## Features
 
-- Shows last commit information for files:
-  - Commit hash (short version)
-  - Author name (in detailed view)
-  - Time since commit
-- Uses color coding for better readability:
-  - Hash in yellow
-  - Author in cyan
-  - Time in green
-- Automatically detects Git repositories
-- Works with both files and directories
+- Short hash, author, and timestamp display
+- Path-specific history
+- Color-coded information
+- Multiple display formats
+- Smart caching and quick lookups
+
+## Configuration
+
+Config file: `~/.config/lla/last_git_commit/config.toml`
+
+```toml
+[colors]
+hash = "bright_yellow"
+author = "bright_cyan"
+time = "bright_green"
+info = "bright_blue"
+name = "bright_yellow"
+```
 
 ## Display Formats
 
-### Default View
-
-Shows basic commit information:
+Default:
 
 ```
-document.txt [Commit: a1b2c3d 2 days ago]
+document.txt
+Commit: a1b2c3d 2 days ago
 ```
 
-### Detailed View (`-l` flag)
-
-Shows complete commit information:
+Long:
 
 ```
-document.txt [Last commit: a1b2c3d by John Doe 2 days ago]
+document.txt
+Commit:  a1b2c3d
+Author:  John Doe
+Time:    2 days ago
 ```
-
-The plugin automatically integrates with `lla`'s display system.

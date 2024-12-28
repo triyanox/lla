@@ -1,42 +1,57 @@
 # LLA File Tagger Plugin
 
-A plugin for `lla` that helps you organize files using custom tags with persistent storage.
+A file tagging plugin for `lla` that provides persistent tag management.
 
-## What it Does
+## Features
 
-- Manages custom tags for files:
-  - Add tags to files
-  - Remove tags from files
-  - List tags for files
-- Displays tags next to file names
-- Stores tags persistently
-- Shows tags in cyan color for visibility
+- Add, remove, and list file tags
+- Persistent storage with efficient lookup
+- Color-coded tag display
+- Interactive commands
+
+## Configuration
+
+Config file: `~/.config/lla/file_tagger/config.toml`
+
+```toml
+[colors]
+tag = "bright_cyan"        # Tag text
+tag_label = "bright_green" # Tag label
+success = "bright_green"   # Success messages
+info = "bright_blue"      # Info messages
+name = "bright_yellow"    # Name highlighting
+```
 
 ## Usage
 
-### Basic Commands
-
 ```bash
-# Add a tag
-lla plugin --name file_tagger --action add-tag --args "file.txt" "important"
+# Add tag
+lla plugin --name file_tagger --action add-tag --args "/path/to/file" "important"
 
-# Remove a tag
-lla plugin --name file_tagger --action remove-tag --args "file.txt" "important"
+# Remove tag
+lla plugin --name file_tagger --action remove-tag --args "/path/to/file" "important"
 
 # List tags
-lla plugin --name file_tagger --action list-tags --args "file.txt"
+lla plugin --name file_tagger --action list-tags --args "/path/to/file"
 
-# View help
+# Help
 lla plugin --name file_tagger --action help
 ```
 
-### Display Format
+### Display Examples
 
-Tags appear in cyan brackets next to file names:
+Default format:
 
 ```
-document.pdf [important, work]
-image.jpg [personal]
+document.pdf
+Tags: [important] [work] [urgent]
 ```
 
-The plugin stores tags in `~/.config/lla/file_tags.txt` and automatically integrates with `lla`'s display system.
+Long format:
+
+```
+document.pdf
+Tag: important
+Tag: work
+Tag: urgent
+```

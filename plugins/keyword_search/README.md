@@ -1,67 +1,73 @@
 # LLA Keyword Search Plugin
 
-A plugin for `lla` that searches for keywords in files with configurable context and highlighting.
+High-performance keyword search plugin for `lla` with interactive search and rich display features.
 
-## What it Does
+## Features
 
-- Searches for configured keywords in files
-- Shows matches with surrounding context lines
-- Supports multiple search options:
-  - Case-sensitive search
-  - Multiple keywords
-  - Configurable context lines
-  - Maximum matches per file
-- Highlights matches in color
-- Supports many file extensions (txt, md, rs, py, js, etc.)
+- **Smart Search**: Multi-keyword, case-sensitive, regex support
+- **Interactive**: File selection, filtering, action menu
+- **Rich Display**: Syntax highlighting, context visualization
+- **Analysis**: Match statistics and pattern detection
 
 ## Usage
 
-### Basic Commands
-
 ```bash
-# Set keywords to search for
-lla plugin --name keyword_search --action set-keywords --args "TODO" "FIXME"
+# Search in current directory
+lla plugin --name keyword_search --action search
 
-# Search in a specific file
-lla plugin --name keyword_search --action search --args "src/main.rs"
-
-# Show current configuration
-lla plugin --name keyword_search --action show-config
-
-# View help
-lla plugin --name keyword_search --action help
+# Available actions after finding matches:
+1. View detailed matches
+2. Copy to clipboard
+3. Save to file
+4. Show statistics
+5. Filter matches
+6. Advanced analysis
 ```
 
-### Configuration Commands
+## Configuration
 
-```bash
-# Set case sensitivity
-lla plugin --name keyword_search --action set-case-sensitive --args true
+Config location: `~/.config/lla/keyword_search/config.toml`
 
-# Set number of context lines
-lla plugin --name keyword_search --action set-context-lines --args 3
+```toml
+keywords = []               # Keywords to search for
+case_sensitive = false      # Case sensitivity
+use_regex = false          # Regular expression support
+context_lines = 2          # Number of context lines
+max_matches = 5            # Maximum matches per file
 
-# Set maximum matches per file
-lla plugin --name keyword_search --action set-max-matches --args 5
+[colors]
+keyword = "bright_red"
+line_number = "bright_yellow"
+context = "bright_black"
+file = "bright_blue"
+success = "bright_green"
+info = "bright_cyan"
 ```
 
-### Display Format
+## Display Examples
 
-Default view shows line numbers and matches:
-
-```
-15:TODO - Add error handling here
-42:FIXME - Need to optimize this loop
-```
-
-Detailed view (`-l` flag) shows context:
+Match View:
 
 ```
-  12: function processData() {
-  13:   let data = [];
-→ 14: // TODO: Add error handling here
-  15:   return data;
-  16: }
+─────────────────────────────────
+ 📂 src/main.rs
+─────────────────────────────────
+ 123 │ function process() {
+ 124 │ let data = analyze();
+►125 │ // TODO: Implement error handling
+ 126 │ return data;
+ 127 │ }
+─────────────────────────────────
 ```
 
-The plugin stores configuration in `~/.config/lla/plugins/keyword_search.toml` and automatically integrates with `lla`'s display system.
+Statistics View:
+
+```
+📊 Match Statistics:
+─────────────────────────────────
+ • Total matches: 5
+ • Unique keywords: 2
+ • Average context: 2.5 lines
+ • File: src/main.rs
+─────────────────────────────────
+```
