@@ -93,9 +93,14 @@ pub struct LastGitCommitPlugin {
 
 impl LastGitCommitPlugin {
     pub fn new() -> Self {
-        Self {
-            base: BasePlugin::new(),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[LastGitCommitPlugin] Failed to save config: {}", e);
         }
+        plugin
     }
 
     fn get_last_commit_info(path: &Path) -> Option<(String, String, String)> {
