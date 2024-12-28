@@ -525,7 +525,7 @@ dependencies = [
 
 [[package]]
 name = "duplicate_file_detector"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "file_hash"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "file_tagger"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "git_status"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "keyword_search"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "last_git_commit"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -1666,7 +1666,7 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "sizeviz"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "colored",
@@ -1762,12 +1762,12 @@ dependencies = [
 
 [[package]]
 name = "terminal_size"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+checksum = "5352447f921fda68cf61b4101566c0bdb5104eff6804d0678e5227580ab6a4e9"
 dependencies = [
  "rustix",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
