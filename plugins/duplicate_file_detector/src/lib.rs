@@ -146,9 +146,14 @@ pub struct DuplicateFileDetectorPlugin {
 
 impl DuplicateFileDetectorPlugin {
     pub fn new() -> Self {
-        Self {
-            base: BasePlugin::new(),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[DuplicateFileDetectorPlugin] Failed to save config: {}", e);
         }
+        plugin
     }
 
     fn get_file_hash(path: &Path) -> Option<String> {
