@@ -913,13 +913,23 @@ dependencies = [
 name = "keyword_search"
 version = "0.3.1"
 dependencies = [
+ "arboard",
  "bytes",
+ "chrono",
  "colored",
+ "console",
+ "dialoguer",
  "dirs",
+ "itertools",
+ "lazy_static",
  "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
  "prost",
  "regex",
  "serde",
+ "strip-ansi-escapes 0.2.0",
+ "syntect",
  "toml",
 ]
 
@@ -1009,7 +1019,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "strip-ansi-escapes",
+ "strip-ansi-escapes 0.1.1",
  "tempfile",
  "terminal_size",
  "toml",
@@ -1696,7 +1706,16 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "011cbb39cf7c1f62871aea3cc46e5817b0937b49e9447370c93cacbe93a766d8"
 dependencies = [
- "vte",
+ "vte 0.10.1",
+]
+
+[[package]]
+name = "strip-ansi-escapes"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ff8ef943b384c414f54aefa961dd2bd853add74ec75e7ac74cf91dba62bcfa"
+dependencies = [
+ "vte 0.11.1",
 ]
 
 [[package]]
@@ -1974,6 +1993,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
 dependencies = [
  "arrayvec",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5022b5fbf9407086c180e9557be968742d839e68346af7792b8592489732197"
+dependencies = [
  "utf8parse",
  "vte_generate_state_changes",
 ]
