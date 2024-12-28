@@ -168,7 +168,9 @@ impl Default for LanguageRules {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityConfig {
+    #[serde(default = "default_languages")]
     languages: HashMap<String, LanguageRules>,
+    #[serde(default = "default_thresholds")]
     thresholds: ComplexityThresholds,
     #[serde(default = "default_colors")]
     colors: HashMap<String, String>,
@@ -186,13 +188,26 @@ fn default_colors() -> HashMap<String, String> {
     colors
 }
 
+fn default_thresholds() -> ComplexityThresholds {
+    ComplexityThresholds {
+        low: 10.0,
+        medium: 20.0,
+        high: 30.0,
+        very_high: 40.0,
+    }
+}
+
+fn default_languages() -> HashMap<String, LanguageRules> {
+    let mut languages = HashMap::new();
+    languages.insert("Rust".to_string(), LanguageRules::default());
+    languages
+}
+
 impl Default for ComplexityConfig {
     fn default() -> Self {
-        let mut languages = HashMap::new();
-        languages.insert("Rust".to_string(), LanguageRules::default());
         Self {
-            languages,
-            thresholds: ComplexityThresholds::default(),
+            languages: default_languages(),
+            thresholds: default_thresholds(),
             colors: default_colors(),
         }
     }
@@ -555,9 +570,17 @@ pub struct CodeComplexityEstimatorPlugin {
 
 impl CodeComplexityEstimatorPlugin {
     pub fn new() -> Self {
-        Self {
-            base: BasePlugin::new(),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!(
+                "[CodeComplexityEstimatorPlugin] Failed to save config: {}",
+                e
+            );
         }
+        plugin
     }
 
     fn format_file_info(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {

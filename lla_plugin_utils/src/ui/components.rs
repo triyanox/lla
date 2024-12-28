@@ -351,6 +351,7 @@ impl BoxComponent {
     pub fn render(&self) -> String {
         let chars = self.style.get_chars();
         let mut output = String::new();
+        output.push('\n');
         let lines: Vec<&str> = self.content.lines().collect();
 
         let content_width = lines
