@@ -4,13 +4,13 @@ use lla_plugin_utils::{
     config::PluginConfig,
     ui::{
         components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List},
-        format_size, TextBlock,
+        TextBlock,
     },
     ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::collections::HashMap;
 
 lazy_static! {
     static ref ACTION_REGISTRY: RwLock<ActionRegistry> = RwLock::new({
@@ -33,7 +33,9 @@ lazy_static! {
                 if let Some(desc) = args.get(3) {
                     rule.description = desc.clone();
                 }
-                PLUGIN_STATE.write().add_rule(rule);
+                let mut plugin = FileCategoryPlugin::new();
+                plugin.config_mut().rules.push(rule);
+                plugin.base.save_config().map_err(|e| e.to_string())?;
                 Ok(())
             }
         );
@@ -51,22 +53,20 @@ lazy_static! {
                             .to_string(),
                     );
                 }
-                PLUGIN_STATE
-                    .write()
-                    .add_subcategory(&args[0], &args[1], &args[2])
-            }
-        );
 
-        lla_plugin_utils::define_action!(
-            registry,
-            "show-stats",
-            "show-stats",
-            "Show category statistics",
-            vec!["lla plugin --name categorizer --action show-stats"],
-            |_| {
-                let state = PLUGIN_STATE.read();
-                println!("{}", state.format_stats());
-                Ok(())
+                let mut plugin = FileCategoryPlugin::new();
+                let config = plugin.config_mut();
+
+                if let Some(rule) = config.rules.iter_mut().find(|r| r.name == args[0]) {
+                    rule.subcategories.insert(
+                        args[1].to_string(),
+                        args[2].split(',').map(String::from).collect(),
+                    );
+                    plugin.base.save_config().map_err(|e| e.to_string())?;
+                    Ok(())
+                } else {
+                    Err(format!("Category '{}' not found", args[0]))
+                }
             }
         );
 
@@ -77,9 +77,9 @@ lazy_static! {
             "List all categories and their details",
             vec!["lla plugin --name categorizer --action list-categories"],
             |_| {
-                let state = PLUGIN_STATE.read();
+                let plugin = FileCategoryPlugin::new();
                 let mut list = List::new();
-                for rule in &state.rules {
+                for rule in &plugin.config().rules {
                     let mut details = Vec::new();
                     details.push(format!("Extensions: {}", rule.extensions.join(", ")));
 
@@ -120,6 +120,7 @@ lazy_static! {
             "Show help information",
             vec!["lla plugin --name categorizer --action help"],
             |_| {
+                let plugin = FileCategoryPlugin::new();
                 let mut help = HelpFormatter::new("File Categorizer Plugin".to_string());
                 help.add_section("Description".to_string()).add_command(
                     "".to_string(),
@@ -139,11 +140,6 @@ lazy_static! {
                         vec!["lla plugin --name categorizer --action add-subcategory Documents Text txt,md".to_string()],
                     )
                     .add_command(
-                        "show-stats".to_string(),
-                        "Show category statistics".to_string(),
-                        vec!["lla plugin --name categorizer --action show-stats".to_string()],
-                    )
-                    .add_command(
                         "list-categories".to_string(),
                         "List all categories and their details".to_string(),
                         vec!["lla plugin --name categorizer --action list-categories".to_string()],
@@ -156,7 +152,7 @@ lazy_static! {
 
                 println!(
                     "{}",
-                    BoxComponent::new(help.render(&CategorizerConfig::default().colors))
+                    BoxComponent::new(help.render(&plugin.config().colors))
                         .style(BoxStyle::Minimal)
                         .padding(2)
                         .render()
@@ -201,139 +197,24 @@ struct CategoryStats {
 }
 
 struct PluginState {
-    rules: Vec<CategoryRule>,
-    config_path: PathBuf,
     stats: HashMap<String, CategoryStats>,
 }
 
 impl PluginState {
     fn new() -> Self {
-        let config_path = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("lla")
-            .join("categorizer.toml");
-
-        let rules = Self::load_rules(&config_path).unwrap_or_else(|| {
-            vec![
-                CategoryRule {
-                    name: "Document".to_string(),
-                    color: "bright_blue".to_string(),
-                    extensions: vec!["txt", "md", "doc", "docx", "pdf", "rtf", "odt"]
-                        .into_iter()
-                        .map(String::from)
-                        .collect(),
-                    size_ranges: Some(vec![(0, 10_485_760)]),
-                    subcategories: {
-                        let mut map = HashMap::new();
-                        map.insert(
-                            "Text".to_string(),
-                            vec!["txt", "md"].into_iter().map(String::from).collect(),
-                        );
-                        map.insert(
-                            "Office".to_string(),
-                            vec!["doc", "docx", "xls", "xlsx", "ppt", "pptx"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map
-                    },
-                    description: "Text documents and office files".to_string(),
-                },
-                CategoryRule {
-                    name: "Code".to_string(),
-                    color: "bright_cyan".to_string(),
-                    extensions: vec![
-                        "rs", "py", "js", "ts", "java", "c", "cpp", "h", "hpp", "go", "rb", "php",
-                        "cs", "swift", "kt",
-                    ]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                    size_ranges: Some(vec![(0, 1_048_576)]),
-                    subcategories: {
-                        let mut map = HashMap::new();
-                        map.insert(
-                            "Systems".to_string(),
-                            vec!["rs", "c", "cpp", "h", "hpp"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map.insert(
-                            "Web".to_string(),
-                            vec!["js", "ts", "html", "css", "php"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map.insert(
-                            "Scripts".to_string(),
-                            vec!["py", "rb", "sh", "bash"]
-                                .into_iter()
-                                .map(String::from)
-                                .collect(),
-                        );
-                        map
-                    },
-                    description: "Source code files".to_string(),
-                },
-            ]
-        });
-
         Self {
-            rules,
-            config_path,
             stats: HashMap::new(),
         }
     }
 
-    fn load_rules(path: &PathBuf) -> Option<Vec<CategoryRule>> {
-        fs::read_to_string(path)
-            .ok()
-            .and_then(|content| toml::from_str(&content).ok())
-    }
-
-    fn save_rules(&self) {
-        if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent).ok();
-        }
-        if let Ok(content) = toml::to_string_pretty(&self.rules) {
-            fs::write(&self.config_path, content).ok();
-        }
-    }
-
-    fn add_rule(&mut self, rule: CategoryRule) {
-        self.rules.push(rule);
-        self.save_rules();
-    }
-
-    fn add_subcategory(
-        &mut self,
-        category: &str,
-        subcategory: &str,
-        extensions: &str,
-    ) -> Result<(), String> {
-        if let Some(rule) = self.rules.iter_mut().find(|r| r.name == category) {
-            rule.subcategories.insert(
-                subcategory.to_string(),
-                extensions.split(',').map(String::from).collect(),
-            );
-            self.save_rules();
-            Ok(())
-        } else {
-            Err(format!("Category '{}' not found", category))
-        }
-    }
-
     fn get_category_info(
-        &self,
+        rules: &[CategoryRule],
         entry: &DecoratedEntry,
     ) -> Option<(String, String, Option<String>)> {
         let extension = entry.path.extension()?.to_str()?.to_lowercase();
         let size = entry.metadata.size;
 
-        for rule in &self.rules {
+        for rule in rules {
             if rule.extensions.iter().any(|ext| ext == &extension) {
                 if let Some(ranges) = &rule.size_ranges {
                     if !ranges.iter().any(|(min, max)| size >= *min && size <= *max) {
@@ -361,40 +242,14 @@ impl PluginState {
             *stats.subcategory_counts.entry(sub.to_string()).or_default() += 1;
         }
     }
-
-    fn format_stats(&self) -> String {
-        let mut list = List::new();
-        for (category, stats) in &self.stats {
-            let rule = self.rules.iter().find(|r| &r.name == category);
-            let white = "white".to_string();
-            let color = rule.map(|r| &r.color).unwrap_or(&white);
-
-            let header = KeyValue::new(
-                category,
-                &format!("{} files, {}", stats.count, format_size(stats.total_size)),
-            )
-            .key_color(color)
-            .key_width(15)
-            .render();
-
-            list.add_item(header);
-
-            for (sub, count) in &stats.subcategory_counts {
-                list.add_item(format!("  {} ({} files)", sub, count));
-            }
-        }
-
-        BoxComponent::new(list.render())
-            .style(BoxStyle::Minimal)
-            .padding(1)
-            .render()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategorizerConfig {
     #[serde(default = "default_colors")]
     colors: HashMap<String, String>,
+    #[serde(default = "default_rules")]
+    rules: Vec<CategoryRule>,
 }
 
 fn default_colors() -> HashMap<String, String> {
@@ -405,10 +260,79 @@ fn default_colors() -> HashMap<String, String> {
     colors
 }
 
+fn default_rules() -> Vec<CategoryRule> {
+    vec![
+        CategoryRule {
+            name: "Document".to_string(),
+            color: "bright_blue".to_string(),
+            extensions: vec!["txt", "md", "doc", "docx", "pdf", "rtf", "odt"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            size_ranges: Some(vec![(0, 10_485_760)]),
+            subcategories: {
+                let mut map = HashMap::new();
+                map.insert(
+                    "Text".to_string(),
+                    vec!["txt", "md"].into_iter().map(String::from).collect(),
+                );
+                map.insert(
+                    "Office".to_string(),
+                    vec!["doc", "docx", "xls", "xlsx", "ppt", "pptx"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
+                );
+                map
+            },
+            description: "Text documents and office files".to_string(),
+        },
+        CategoryRule {
+            name: "Code".to_string(),
+            color: "bright_cyan".to_string(),
+            extensions: vec![
+                "rs", "py", "js", "ts", "java", "c", "cpp", "h", "hpp", "go", "rb", "php", "cs",
+                "swift", "kt",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            size_ranges: Some(vec![(0, 1_048_576)]),
+            subcategories: {
+                let mut map = HashMap::new();
+                map.insert(
+                    "Systems".to_string(),
+                    vec!["rs", "c", "cpp", "h", "hpp"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
+                );
+                map.insert(
+                    "Web".to_string(),
+                    vec!["js", "ts", "html", "css", "php"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
+                );
+                map.insert(
+                    "Scripts".to_string(),
+                    vec!["py", "rb", "sh", "bash"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
+                );
+                map
+            },
+            description: "Source code files".to_string(),
+        },
+    ]
+}
+
 impl Default for CategorizerConfig {
     fn default() -> Self {
         Self {
             colors: default_colors(),
+            rules: default_rules(),
         }
     }
 }
@@ -421,9 +345,14 @@ pub struct FileCategoryPlugin {
 
 impl FileCategoryPlugin {
     pub fn new() -> Self {
-        Self {
-            base: BasePlugin::new(),
+        let plugin_name = env!("CARGO_PKG_NAME");
+        let plugin = Self {
+            base: BasePlugin::with_name(plugin_name),
+        };
+        if let Err(e) = plugin.base.save_config() {
+            eprintln!("[FileCategoryPlugin] Failed to save config: {}", e);
         }
+        plugin
     }
 
     fn format_file_info(&self, entry: &DecoratedEntry, format: &str) -> Option<String> {
@@ -480,7 +409,7 @@ impl Plugin for FileCategoryPlugin {
                     PluginRequest::Decorate(mut entry) => {
                         let mut state = PLUGIN_STATE.write();
                         if let Some((category, color, subcategory)) =
-                            state.get_category_info(&entry)
+                            PluginState::get_category_info(&self.config().rules, &entry)
                         {
                             entry
                                 .custom_fields
