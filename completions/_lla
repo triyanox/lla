@@ -56,6 +56,14 @@ _lla() {
 '-R[Use recursive listing format]' \
 '--recursive[Use recursive listing format]' \
 '--include-dirs[Include directory sizes in the metadata]' \
+'--dirs-only[Show only directories]' \
+'--files-only[Show only regular files]' \
+'--symlinks-only[Show only symbolic links]' \
+'--no-dirs[Hide directories]' \
+'--no-files[Hide regular files]' \
+'--no-symlinks[Hide symbolic links]' \
+'--no-dotfiles[Hide dot files and directories (those starting with a dot)]' \
+'--dotfiles-only[Show only dot files and directories (those starting with a dot)]' \
 '::directory -- The directory to list:' \
 ":: :_lla_commands" \
 "*::: :->lla" \
