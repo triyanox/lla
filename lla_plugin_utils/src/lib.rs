@@ -5,7 +5,7 @@ pub mod syntax;
 pub mod ui;
 
 pub use actions::{Action, ActionHelp, ActionRegistry};
-pub use config::PluginConfig;
+pub use config::{ConfigManager, PluginConfig};
 pub use syntax::CodeHighlighter;
 pub use ui::{
     components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
@@ -14,50 +14,35 @@ pub use ui::{
 };
 
 use lla_plugin_interface::{proto, PluginRequest, PluginResponse};
-use std::path::PathBuf;
 
 pub struct BasePlugin<C: PluginConfig> {
-    config: C,
-    config_file: PathBuf,
+    config_manager: ConfigManager<C>,
 }
 
 impl<C: PluginConfig + Default> BasePlugin<C> {
     pub fn new() -> Self {
-        let config_file = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("lla")
-            .join("plugins")
-            .join(env!("CARGO_PKG_NAME"))
-            .join("config.toml");
-
-        let config = if let Ok(content) = std::fs::read_to_string(&config_file) {
-            toml::from_str(&content).unwrap_or_default()
-        } else {
-            C::default()
-        };
-
+        let plugin_name = env!("CARGO_PKG_NAME");
         Self {
-            config,
-            config_file,
+            config_manager: ConfigManager::new(plugin_name),
+        }
+    }
+
+    pub fn with_name(plugin_name: &str) -> Self {
+        Self {
+            config_manager: ConfigManager::new(plugin_name),
         }
     }
 
     pub fn config(&self) -> &C {
-        &self.config
+        self.config_manager.get()
     }
 
     pub fn config_mut(&mut self) -> &mut C {
-        &mut self.config
+        self.config_manager.get_mut()
     }
 
     pub fn save_config(&self) -> Result<(), String> {
-        if let Some(parent) = self.config_file.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let content = toml::to_string_pretty(&self.config)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        std::fs::write(&self.config_file, content).map_err(|e| e.to_string())?;
-        Ok(())
+        self.config_manager.save()
     }
 }
 

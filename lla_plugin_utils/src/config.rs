@@ -14,13 +14,40 @@ pub struct ConfigManager<T: PluginConfig> {
 
 impl<T: PluginConfig> ConfigManager<T> {
     pub fn new(plugin_name: &str) -> Self {
-        let config_path = dirs::config_dir()
+        let config_path = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
+            .join(".config")
             .join("lla")
+            .join("plugins")
             .join(plugin_name)
-            .with_extension("toml");
+            .join("config.toml");
 
-        let config = Self::load_config(&config_path).unwrap_or_default();
+        if let Some(parent) = config_path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                eprintln!("[ConfigManager] Failed to create config directory: {}", e);
+            }
+        }
+
+        let config = if config_path.exists() {
+            Self::load_config(&config_path).unwrap_or_else(|e| {
+                eprintln!(
+                    "[ConfigManager] Failed to load config: {}, using default",
+                    e
+                );
+                T::default()
+            })
+        } else {
+            let config = T::default();
+            match toml::to_string_pretty(&config) {
+                Ok(content) => {
+                    if let Err(e) = std::fs::write(&config_path, content) {
+                        eprintln!("[ConfigManager] Failed to write initial config: {}", e);
+                    }
+                }
+                Err(e) => eprintln!("[ConfigManager] Failed to serialize default config: {}", e),
+            }
+            config
+        };
 
         Self {
             config,
@@ -38,18 +65,14 @@ impl<T: PluginConfig> ConfigManager<T> {
 
     pub fn save(&self) -> Result<(), String> {
         self.config.validate()?;
-
         if let Some(parent) = self.config_path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create config directory: {}", e))?;
         }
-
         let content = toml::to_string_pretty(&self.config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
-
         std::fs::write(&self.config_path, content)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
-
         Ok(())
     }
 
