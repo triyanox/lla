@@ -2,7 +2,8 @@ use crate::config::Config;
 use crate::error::Result;
 use colored::Color;
 use colored::*;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::Select;
+use lla_plugin_utils::ui::components::LlaDialoguerTheme;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -458,20 +459,7 @@ pub fn select_theme(config: &mut Config) -> Result<()> {
         })
         .collect();
 
-    let theme = ColorfulTheme {
-        active_item_style: dialoguer::console::Style::new().cyan().bold(),
-        active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string())
-            .for_stderr()
-            .cyan(),
-        prompt_prefix: dialoguer::console::style("│ ".to_string())
-            .for_stderr()
-            .cyan(),
-        prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
-        success_prefix: dialoguer::console::style("│ ".to_string())
-            .for_stderr()
-            .cyan(),
-        ..ColorfulTheme::default()
-    };
+    let theme = LlaDialoguerTheme::default();
 
     println!("\n{}", "Theme Manager".cyan().bold());
     println!(

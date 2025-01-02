@@ -3,8 +3,9 @@ use crate::error::{LlaError, Result};
 use crate::utils::color::ColorState;
 use colored::{ColoredString, Colorize};
 use console::{style, Term};
-use dialoguer::{theme::ColorfulTheme, MultiSelect};
+use dialoguer::MultiSelect;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use lla_plugin_utils::ui::components::LlaDialoguerTheme;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -202,26 +203,7 @@ impl PluginInstaller {
         println!("\n{}", "Plugin Installation".cyan().bold());
         println!("{}\n", "Space to toggle, Enter to confirm".bright_black());
 
-        let theme = ColorfulTheme {
-            active_item_style: dialoguer::console::Style::new().cyan().bold(),
-            active_item_prefix: dialoguer::console::style("│ ⦿ ".to_string())
-                .for_stderr()
-                .cyan(),
-            checked_item_prefix: dialoguer::console::style("  ◉ ".to_string())
-                .for_stderr()
-                .green(),
-            unchecked_item_prefix: dialoguer::console::style("  ○ ".to_string())
-                .for_stderr()
-                .red(),
-            prompt_prefix: dialoguer::console::style("│ ".to_string())
-                .for_stderr()
-                .cyan(),
-            prompt_style: dialoguer::console::Style::new().for_stderr().cyan(),
-            success_prefix: dialoguer::console::style("│ ".to_string())
-                .for_stderr()
-                .cyan(),
-            ..ColorfulTheme::default()
-        };
+        let theme = LlaDialoguerTheme::default();
 
         let selections = MultiSelect::with_theme(&theme)
             .with_prompt("Select plugins to install")
