@@ -1,4 +1,5 @@
 use super::{TextBlock, TextStyle};
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::cmp;
 use std::time::Duration;
@@ -412,5 +413,169 @@ impl BoxComponent {
         output.push('\n');
 
         output
+    }
+}
+
+pub struct LlaDialoguerTheme {
+    colors: std::collections::HashMap<String, String>,
+}
+
+impl LlaDialoguerTheme {
+    pub fn new(colors: std::collections::HashMap<String, String>) -> Self {
+        Self { colors }
+    }
+
+    pub fn default() -> Self {
+        let mut colors = std::collections::HashMap::new();
+        colors.insert("success".to_string(), "bright_green".to_string());
+        colors.insert("info".to_string(), "bright_blue".to_string());
+        colors.insert("error".to_string(), "bright_red".to_string());
+        colors.insert("path".to_string(), "bright_yellow".to_string());
+        colors.insert("prompt".to_string(), "bright_cyan".to_string());
+        colors.insert("highlight".to_string(), "bright_white".to_string());
+        Self::new(colors)
+    }
+}
+
+impl dialoguer::theme::Theme for LlaDialoguerTheme {
+    fn format_prompt(&self, f: &mut dyn std::fmt::Write, prompt: &str) -> std::fmt::Result {
+        let prompt_color = self
+            .colors
+            .get("prompt")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_cyan");
+        write!(f, "{} ", prompt.color(prompt_color))
+    }
+
+    fn format_error(&self, f: &mut dyn std::fmt::Write, err: &str) -> std::fmt::Result {
+        let error_color = self
+            .colors
+            .get("error")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_red");
+        write!(f, "{} {}", "✘".color(error_color), err.color(error_color))
+    }
+
+    fn format_confirm_prompt(
+        &self,
+        f: &mut dyn std::fmt::Write,
+        prompt: &str,
+        default: Option<bool>,
+    ) -> std::fmt::Result {
+        let prompt_color = self
+            .colors
+            .get("prompt")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_cyan");
+        if let Some(default) = default {
+            write!(
+                f,
+                "{} {} ",
+                prompt.color(prompt_color),
+                if default { "[Y/n]" } else { "[y/N]" }
+            )
+        } else {
+            write!(f, "{} [y/n] ", prompt.color(prompt_color))
+        }
+    }
+
+    fn format_select_prompt(&self, f: &mut dyn std::fmt::Write, prompt: &str) -> std::fmt::Result {
+        let prompt_color = self
+            .colors
+            .get("prompt")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_cyan");
+        write!(f, "{} ", prompt.color(prompt_color))
+    }
+
+    fn format_select_prompt_item(
+        &self,
+        f: &mut dyn std::fmt::Write,
+        text: &str,
+        active: bool,
+    ) -> std::fmt::Result {
+        let highlight_color = self
+            .colors
+            .get("highlight")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_white");
+        let info_color = self
+            .colors
+            .get("info")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_blue");
+
+        if active {
+            write!(
+                f,
+                "{} {}",
+                "→".color(info_color),
+                text.color(highlight_color)
+            )
+        } else {
+            write!(f, "  {}", text)
+        }
+    }
+
+    fn format_multi_select_prompt(
+        &self,
+        f: &mut dyn std::fmt::Write,
+        prompt: &str,
+    ) -> std::fmt::Result {
+        let prompt_color = self
+            .colors
+            .get("prompt")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_cyan");
+        write!(f, "{} ", prompt.color(prompt_color))
+    }
+
+    fn format_multi_select_prompt_item(
+        &self,
+        f: &mut dyn std::fmt::Write,
+        text: &str,
+        checked: bool,
+        active: bool,
+    ) -> std::fmt::Result {
+        let highlight_color = self
+            .colors
+            .get("highlight")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_white");
+        let success_color = self
+            .colors
+            .get("success")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_green");
+        let info_color = self
+            .colors
+            .get("info")
+            .map(|s| s.as_str())
+            .unwrap_or("bright_blue");
+
+        if active {
+            write!(
+                f,
+                "{} [{}] {}",
+                "→".color(info_color),
+                if checked {
+                    "✓".color(success_color)
+                } else {
+                    " ".into()
+                },
+                text.color(highlight_color)
+            )
+        } else {
+            write!(
+                f,
+                "  [{}] {}",
+                if checked {
+                    "✓".color(success_color)
+                } else {
+                    " ".into()
+                },
+                text
+            )
+        }
     }
 }

@@ -9,7 +9,6 @@ pub use config::{ConfigManager, PluginConfig};
 pub use syntax::CodeHighlighter;
 pub use ui::{
     components::{BoxComponent, BoxStyle, HelpFormatter, KeyValue, List, Spinner},
-    selector::InteractiveSelector,
     TextBlock, TextStyle,
 };
 
