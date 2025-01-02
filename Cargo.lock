@@ -1055,6 +1055,7 @@ dependencies = [
  "indicatif",
  "libloading",
  "lla_plugin_interface",
+ "lla_plugin_utils",
  "num_cpus",
  "once_cell",
  "parking_lot",

@@ -418,42 +418,112 @@ impl BoxComponent {
 
 pub struct LlaDialoguerTheme {
     colors: std::collections::HashMap<String, String>,
+    symbols: std::collections::HashMap<String, String>,
+    padding: usize,
 }
 
 impl LlaDialoguerTheme {
     pub fn new(colors: std::collections::HashMap<String, String>) -> Self {
-        Self { colors }
+        Self {
+            colors,
+            symbols: Self::default_symbols(),
+            padding: 1,
+        }
+    }
+
+    fn default_symbols() -> std::collections::HashMap<String, String> {
+        let mut symbols = std::collections::HashMap::new();
+        symbols.insert("error".to_string(), "✘".to_string());
+        symbols.insert("success".to_string(), "✔".to_string());
+        symbols.insert("pointer".to_string(), "➜".to_string());
+        symbols.insert("unchecked".to_string(), "◯".to_string());
+        symbols.insert("checked".to_string(), "◉".to_string());
+        symbols.insert("separator".to_string(), "•".to_string());
+        symbols.insert("prompt".to_string(), "⟩".to_string());
+        symbols.insert("bullet".to_string(), " ".to_string());
+        symbols.insert("warning".to_string(), "⚠".to_string());
+        symbols.insert("info".to_string(), "ℹ".to_string());
+        symbols.insert("gradient_sep".to_string(), "· · ·".to_string());
+        symbols
     }
 
     pub fn default() -> Self {
         let mut colors = std::collections::HashMap::new();
         colors.insert("success".to_string(), "bright_green".to_string());
-        colors.insert("info".to_string(), "bright_blue".to_string());
-        colors.insert("error".to_string(), "bright_red".to_string());
-        colors.insert("path".to_string(), "bright_yellow".to_string());
-        colors.insert("prompt".to_string(), "bright_cyan".to_string());
+        colors.insert("info".to_string(), "cyan".to_string());
+        colors.insert("error".to_string(), "red".to_string());
+        colors.insert("path".to_string(), "yellow".to_string());
+        colors.insert("prompt".to_string(), "bright_magenta".to_string());
         colors.insert("highlight".to_string(), "bright_white".to_string());
+        colors.insert("inactive".to_string(), "bright_black".to_string());
+        colors.insert("separator".to_string(), "bright_black".to_string());
+        colors.insert("warning".to_string(), "yellow".to_string());
+        colors.insert("accent".to_string(), "bright_blue".to_string());
+        colors.insert("gradient1".to_string(), "bright_magenta".to_string());
+        colors.insert("gradient2".to_string(), "magenta".to_string());
+        colors.insert("gradient3".to_string(), "bright_black".to_string());
         Self::new(colors)
+    }
+
+    pub fn with_symbols(mut self, symbols: std::collections::HashMap<String, String>) -> Self {
+        self.symbols.extend(symbols);
+        self
+    }
+
+    pub fn with_padding(mut self, padding: usize) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    fn get_color(&self, key: &str) -> &str {
+        self.colors.get(key).map(|s| s.as_str()).unwrap_or("white")
+    }
+
+    fn get_symbol(&self, key: &str) -> &str {
+        self.symbols.get(key).map(|s| s.as_str()).unwrap_or("")
+    }
+
+    fn format_gradient_separator(&self) -> String {
+        format!(
+            "{} {} {}",
+            "·".color(self.get_color("gradient1")),
+            "·".color(self.get_color("gradient2")),
+            "·".color(self.get_color("gradient3"))
+        )
+    }
+
+    fn format_select_prefix(&self, active: bool) -> String {
+        if active {
+            format!(
+                "{} {}",
+                self.get_symbol("pointer").color(self.get_color("accent")),
+                self.get_symbol("bullet").color(self.get_color("prompt"))
+            )
+        } else {
+            "   ".to_string()
+        }
     }
 }
 
 impl dialoguer::theme::Theme for LlaDialoguerTheme {
     fn format_prompt(&self, f: &mut dyn std::fmt::Write, prompt: &str) -> std::fmt::Result {
-        let prompt_color = self
-            .colors
-            .get("prompt")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_cyan");
-        write!(f, "{} ", prompt.color(prompt_color))
+        write!(
+            f,
+            "{} {} {} ",
+            self.get_symbol("prompt").color(self.get_color("accent")),
+            prompt.color(self.get_color("prompt")).bold(),
+            self.format_gradient_separator()
+        )
     }
 
     fn format_error(&self, f: &mut dyn std::fmt::Write, err: &str) -> std::fmt::Result {
-        let error_color = self
-            .colors
-            .get("error")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_red");
-        write!(f, "{} {}", "✘".color(error_color), err.color(error_color))
+        write!(
+            f,
+            "{} {} {}",
+            self.get_symbol("error").color(self.get_color("error")),
+            self.format_gradient_separator(),
+            err.color(self.get_color("error")).bold()
+        )
     }
 
     fn format_confirm_prompt(
@@ -462,30 +532,26 @@ impl dialoguer::theme::Theme for LlaDialoguerTheme {
         prompt: &str,
         default: Option<bool>,
     ) -> std::fmt::Result {
-        let prompt_color = self
-            .colors
-            .get("prompt")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_cyan");
-        if let Some(default) = default {
-            write!(
-                f,
-                "{} {} ",
-                prompt.color(prompt_color),
-                if default { "[Y/n]" } else { "[y/N]" }
-            )
-        } else {
-            write!(f, "{} [y/n] ", prompt.color(prompt_color))
-        }
-    }
-
-    fn format_select_prompt(&self, f: &mut dyn std::fmt::Write, prompt: &str) -> std::fmt::Result {
-        let prompt_color = self
-            .colors
-            .get("prompt")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_cyan");
-        write!(f, "{} ", prompt.color(prompt_color))
+        let options = match default {
+            Some(true) => format!(
+                "[{}{}]",
+                "Y".color(self.get_color("accent")).bold(),
+                "/n".color(self.get_color("inactive"))
+            ),
+            Some(false) => format!(
+                "[{}{}]",
+                "y".color(self.get_color("inactive")),
+                "/N".color(self.get_color("accent")).bold()
+            ),
+            None => format!("[{}]", "y/n".color(self.get_color("accent")).bold()),
+        };
+        write!(
+            f,
+            "{} {} {} ",
+            self.get_symbol("prompt").color(self.get_color("accent")),
+            prompt.color(self.get_color("prompt")).bold(),
+            options
+        )
     }
 
     fn format_select_prompt_item(
@@ -494,40 +560,24 @@ impl dialoguer::theme::Theme for LlaDialoguerTheme {
         text: &str,
         active: bool,
     ) -> std::fmt::Result {
-        let highlight_color = self
-            .colors
-            .get("highlight")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_white");
-        let info_color = self
-            .colors
-            .get("info")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_blue");
-
+        let padding = " ".repeat(self.padding);
         if active {
             write!(
                 f,
-                "{} {}",
-                "→".color(info_color),
-                text.color(highlight_color)
+                "{}{}{}",
+                padding,
+                self.format_select_prefix(active),
+                text.color(self.get_color("highlight")).bold()
             )
         } else {
-            write!(f, "  {}", text)
+            write!(
+                f,
+                "{}{}{}",
+                padding,
+                self.format_select_prefix(active),
+                text.color(self.get_color("inactive"))
+            )
         }
-    }
-
-    fn format_multi_select_prompt(
-        &self,
-        f: &mut dyn std::fmt::Write,
-        prompt: &str,
-    ) -> std::fmt::Result {
-        let prompt_color = self
-            .colors
-            .get("prompt")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_cyan");
-        write!(f, "{} ", prompt.color(prompt_color))
     }
 
     fn format_multi_select_prompt_item(
@@ -537,45 +587,35 @@ impl dialoguer::theme::Theme for LlaDialoguerTheme {
         checked: bool,
         active: bool,
     ) -> std::fmt::Result {
-        let highlight_color = self
-            .colors
-            .get("highlight")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_white");
-        let success_color = self
-            .colors
-            .get("success")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_green");
-        let info_color = self
-            .colors
-            .get("info")
-            .map(|s| s.as_str())
-            .unwrap_or("bright_blue");
-
-        if active {
-            write!(
-                f,
-                "{} [{}] {}",
-                "→".color(info_color),
-                if checked {
-                    "✓".color(success_color)
-                } else {
-                    " ".into()
-                },
-                text.color(highlight_color)
+        let padding = " ".repeat(self.padding);
+        let check_symbol = if checked {
+            format!(
+                "{}{}",
+                self.get_symbol("checked").color(self.get_color("success")),
+                "·".color(self.get_color("gradient2"))
             )
         } else {
-            write!(
-                f,
-                "  [{}] {}",
-                if checked {
-                    "✓".color(success_color)
-                } else {
-                    " ".into()
-                },
-                text
+            format!(
+                "{}{}",
+                self.get_symbol("unchecked")
+                    .color(self.get_color("inactive")),
+                " ".color(self.get_color("gradient3"))
             )
-        }
+        };
+
+        let text_style = if active {
+            text.color(self.get_color("highlight")).bold()
+        } else {
+            text.color(self.get_color("inactive"))
+        };
+
+        write!(
+            f,
+            "{}{}{} {}",
+            padding,
+            self.format_select_prefix(active),
+            check_symbol,
+            text_style
+        )
     }
 }
