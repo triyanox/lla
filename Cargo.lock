@@ -649,6 +649,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "file_remover"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "dialoguer",
+ "lazy_static",
+ "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "file_tagger"
 version = "0.3.1"
 dependencies = [
