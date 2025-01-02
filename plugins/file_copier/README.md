@@ -117,34 +117,3 @@ lla plugin --name file_copier --action copy-partial /path/to/target
  Use Space to select, Enter to confirm
 ─────────────────────────────────────
 ```
-
-## Features in Detail
-
-1. **Clipboard Persistence**
-
-   - Clipboard state persists between sessions
-   - Stored in user config directory
-   - JSON format for easy debugging
-
-2. **Interactive Selection**
-
-   - Multi-select interface for file operations
-   - Clear visual feedback
-   - Easy navigation with keyboard
-
-3. **Path Flexibility**
-
-   - Support for current directory operations
-   - Support for explicit path specifications
-   - Mix and match approaches in the same workflow
-
-4. **Safe Operations**
-
-   - Validation before copying files
-   - Error handling for common scenarios
-   - Clear feedback on operation status
-
-5. **Flexible Workflows**
-   - Support for multiple target directories
-   - Partial copies from clipboard
-   - Easy clipboard management

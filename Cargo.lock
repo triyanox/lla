@@ -588,6 +588,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "file_copier"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "dialoguer",
+ "dirs",
+ "lazy_static",
+ "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "file_hash"
 version = "0.3.1"
 dependencies = [
@@ -616,6 +631,21 @@ dependencies = [
  "parking_lot",
  "prost",
  "serde",
+]
+
+[[package]]
+name = "file_mover"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "dialoguer",
+ "dirs",
+ "lazy_static",
+ "lla_plugin_interface",
+ "lla_plugin_utils",
+ "parking_lot",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
