@@ -1,12 +1,12 @@
 use arboard::Clipboard;
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, MultiSelect, Select};
+use dialoguer::{MultiSelect, Select};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use lla_plugin_utils::{
     config::PluginConfig,
-    ui::components::{BoxComponent, BoxStyle, HelpFormatter},
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, LlaDialoguerTheme},
     BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use regex::RegexBuilder;
@@ -290,7 +290,8 @@ impl KeywordSearchPlugin {
             })
             .collect();
 
-        let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+        let theme = LlaDialoguerTheme::default();
+        let selection = MultiSelect::with_theme(&theme)
             .with_prompt(format!("{} Select matches to process", "🔍".bright_cyan()))
             .items(&items)
             .defaults(&vec![true; items.len()])
@@ -313,7 +314,8 @@ impl KeywordSearchPlugin {
             "📈 Advanced analysis",
         ];
 
-        let action_selection = Select::with_theme(&ColorfulTheme::default())
+        let theme = LlaDialoguerTheme::default();
+        let action_selection = Select::with_theme(&theme)
             .with_prompt(format!("{} Choose action", "⚡".bright_cyan()))
             .items(&actions)
             .default(0)
@@ -386,7 +388,8 @@ impl KeywordSearchPlugin {
                     "keyword_matches_{}.txt",
                     chrono::Local::now().format("%Y%m%d_%H%M%S")
                 );
-                let input = dialoguer::Input::<String>::with_theme(&ColorfulTheme::default())
+                let theme = LlaDialoguerTheme::default();
+                let input = dialoguer::Input::<String>::with_theme(&theme)
                     .with_prompt("Enter file path to save")
                     .with_initial_text(&default_filename)
                     .interact_text()
@@ -474,7 +477,8 @@ impl KeywordSearchPlugin {
                     .into_iter()
                     .collect();
 
-                let keyword_selection = MultiSelect::with_theme(&ColorfulTheme::default())
+                let theme = LlaDialoguerTheme::default();
+                let keyword_selection = MultiSelect::with_theme(&theme)
                     .with_prompt("Filter by keywords")
                     .items(&keywords)
                     .interact()
@@ -594,12 +598,13 @@ impl Plugin for KeywordSearchPlugin {
                                 let result = (|| {
                                     let config = self.base.config();
                                     if config.keywords.is_empty() {
-                                        let input = dialoguer::Input::<String>::with_theme(
-                                            &ColorfulTheme::default(),
-                                        )
-                                        .with_prompt("Enter keywords (space-separated)")
-                                        .interact_text()
-                                        .map_err(|e| format!("Failed to get keywords: {}", e))?;
+                                        let theme = LlaDialoguerTheme::default();
+                                        let input = dialoguer::Input::<String>::with_theme(&theme)
+                                            .with_prompt("Enter keywords (space-separated)")
+                                            .interact_text()
+                                            .map_err(|e| {
+                                                format!("Failed to get keywords: {}", e)
+                                            })?;
 
                                         let keywords: Vec<String> = input
                                             .split_whitespace()
@@ -641,14 +646,16 @@ impl Plugin for KeywordSearchPlugin {
                                         );
                                     }
 
-                                    let selection =
-                                        MultiSelect::with_theme(&ColorfulTheme::default())
-                                            .with_prompt("Select files to search")
-                                            .items(&files)
-                                            .interact()
-                                            .map_err(|e| {
-                                                format!("Failed to show file selector: {}", e)
-                                            })?;
+                                    let files =
+                                        files.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+                                    let theme = LlaDialoguerTheme::default();
+                                    let selection = MultiSelect::with_theme(&theme)
+                                        .with_prompt("Select files to search")
+                                        .items(&files)
+                                        .interact()
+                                        .map_err(|e| {
+                                            format!("Failed to show file selector: {}", e)
+                                        })?;
 
                                     if selection.is_empty() {
                                         return Err("No files selected".to_string());

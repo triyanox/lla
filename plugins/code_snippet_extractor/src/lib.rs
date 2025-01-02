@@ -2,14 +2,14 @@ use arboard::Clipboard;
 use base64::Engine as _;
 use chrono::{TimeZone, Utc};
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{MultiSelect, Select};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use lazy_static::lazy_static;
 use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use lla_plugin_utils::{
     config::PluginConfig,
-    ui::components::{BoxComponent, BoxStyle, HelpFormatter},
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, LlaDialoguerTheme},
     ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
@@ -731,18 +731,21 @@ impl CodeSnippetExtractorPlugin {
             })
             .collect();
 
-        let selections = dialoguer::MultiSelect::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select snippets (Space to select, Enter to confirm)")
+        let theme = LlaDialoguerTheme::default();
+        let selection = MultiSelect::with_theme(&theme)
+            .with_prompt(
+                "Select snippets (Space to select, Enter to confirm, Arrow keys to navigate)",
+            )
             .items(&selection_items)
             .defaults(&vec![false; selection_items.len()])
             .interact()
             .map_err(|e| format!("Failed to show selector: {}", e))?;
 
-        if selections.is_empty() {
+        if selection.is_empty() {
             return Ok(());
         }
 
-        let selected_snippets: Vec<&CodeSnippet> = selections.iter().map(|&i| results[i]).collect();
+        let selected_snippets: Vec<&CodeSnippet> = selection.iter().map(|&i| results[i]).collect();
 
         let actions = vec![
             "View snippets",
@@ -752,7 +755,7 @@ impl CodeSnippetExtractorPlugin {
             "Set category",
         ];
 
-        let action_selection = Select::with_theme(&ColorfulTheme::default())
+        let action_selection = Select::with_theme(&LlaDialoguerTheme::default())
             .with_prompt("Choose action")
             .items(&actions)
             .default(0)
@@ -778,7 +781,7 @@ impl CodeSnippetExtractorPlugin {
                 );
             }
             2 => {
-                let input = dialoguer::Input::<String>::with_theme(&ColorfulTheme::default())
+                let input = dialoguer::Input::<String>::with_theme(&LlaDialoguerTheme::default())
                     .with_prompt("Enter tags (space-separated)")
                     .interact_text()
                     .map_err(|e| format!("Failed to get input: {}", e))?;
@@ -793,7 +796,7 @@ impl CodeSnippetExtractorPlugin {
                 );
             }
             3 => {
-                let input = dialoguer::Input::<String>::with_theme(&ColorfulTheme::default())
+                let input = dialoguer::Input::<String>::with_theme(&LlaDialoguerTheme::default())
                     .with_prompt("Enter tags to remove (space-separated)")
                     .interact_text()
                     .map_err(|e| format!("Failed to get input: {}", e))?;
@@ -812,7 +815,7 @@ impl CodeSnippetExtractorPlugin {
                 let mut category_items = vec!["(None)".to_string(), "(New category)".to_string()];
                 category_items.extend(categories);
 
-                let category_selection = Select::with_theme(&ColorfulTheme::default())
+                let category_selection = Select::with_theme(&LlaDialoguerTheme::default())
                     .with_prompt("Choose category")
                     .items(&category_items)
                     .default(0)
@@ -823,7 +826,7 @@ impl CodeSnippetExtractorPlugin {
                     0 => None,
                     1 => {
                         let input =
-                            dialoguer::Input::<String>::with_theme(&ColorfulTheme::default())
+                            dialoguer::Input::<String>::with_theme(&LlaDialoguerTheme::default())
                                 .with_prompt("Enter new category name")
                                 .interact_text()
                                 .map_err(|e| format!("Failed to get input: {}", e))?;

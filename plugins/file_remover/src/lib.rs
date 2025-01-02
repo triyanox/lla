@@ -1,10 +1,10 @@
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, Confirm, MultiSelect};
+use dialoguer::{Confirm, MultiSelect};
 use lazy_static::lazy_static;
 use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use lla_plugin_utils::{
     config::PluginConfig,
-    ui::components::{BoxComponent, BoxStyle, HelpFormatter},
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, LlaDialoguerTheme},
     ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
@@ -141,7 +141,8 @@ impl FileRemoverPlugin {
             })
             .collect();
 
-        let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+        let theme = LlaDialoguerTheme::default();
+        let selections = MultiSelect::with_theme(&theme)
             .with_prompt("Select items to remove (Space to select, Enter to confirm)")
             .items(&items)
             .interact()
@@ -152,7 +153,6 @@ impl FileRemoverPlugin {
             return Ok(());
         }
 
-        // Show confirmation with list of items to be removed
         println!(
             "\n{} The following items will be removed:",
             "Warning:".bright_yellow()
@@ -161,7 +161,7 @@ impl FileRemoverPlugin {
             println!("  {} {}", "→".bright_red(), items[idx].bright_yellow());
         }
 
-        let confirmed = Confirm::with_theme(&ColorfulTheme::default())
+        let confirmed = Confirm::with_theme(&theme)
             .with_prompt("Are you sure you want to remove these items?")
             .default(false)
             .interact()

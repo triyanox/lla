@@ -1,10 +1,10 @@
 use colored::Colorize;
-use dialoguer::{theme::ColorfulTheme, MultiSelect};
+use dialoguer::MultiSelect;
 use lazy_static::lazy_static;
 use lla_plugin_interface::{Plugin, PluginRequest, PluginResponse};
 use lla_plugin_utils::{
     config::PluginConfig,
-    ui::components::{BoxComponent, BoxStyle, HelpFormatter},
+    ui::components::{BoxComponent, BoxStyle, HelpFormatter, LlaDialoguerTheme},
     ActionRegistry, BasePlugin, ConfigurablePlugin, ProtobufHandler,
 };
 use parking_lot::RwLock;
@@ -214,7 +214,8 @@ impl FileMoverPlugin {
             })
             .collect();
 
-        let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+        let theme = LlaDialoguerTheme::default();
+        let selections = MultiSelect::with_theme(&theme)
             .with_prompt("Select items to add to clipboard (Space to select, Enter to confirm)")
             .items(&items)
             .interact()
@@ -279,8 +280,9 @@ impl FileMoverPlugin {
 
         let item_strings: Vec<String> = items.iter().map(|p| p.display().to_string()).collect();
 
-        let selections = MultiSelect::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select items to move (Space to select, Enter to confirm)")
+        let theme = LlaDialoguerTheme::default();
+        let selections = MultiSelect::with_theme(&theme)
+            .with_prompt("Select items to move")
             .items(&item_strings)
             .interact()
             .map_err(|e| format!("Failed to show selector: {}", e))?;
@@ -330,7 +332,8 @@ impl FileMoverPlugin {
 
         let item_strings: Vec<String> = items.iter().map(|p| p.display().to_string()).collect();
 
-        let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+        let theme = LlaDialoguerTheme::default();
+        let selections = MultiSelect::with_theme(&theme)
             .with_prompt(
                 "Select items to remove from clipboard (Space to select, Enter to confirm)",
             )
